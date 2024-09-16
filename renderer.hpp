@@ -4,6 +4,7 @@
 #include "device.hpp"
 #include "pipeline.hpp"
 #include "swapchain.hpp"
+#include "model.hpp"
 
 #include <memory>
 #include <vector>
@@ -20,6 +21,7 @@ namespace mari {
             Renderer &operator=(const Renderer &) = delete;
 
             void run();
+            void loadModels();
         private:
             void createPipelineLayout();
             void createPipeline();
@@ -32,5 +34,6 @@ namespace mari {
             std::unique_ptr<Pipeline> pipeline;
             VkPipelineLayout pipelineLayout;
             std::vector<VkCommandBuffer> commandBuffers;
+            std::unique_ptr<Model> model;
     };
 }

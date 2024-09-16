@@ -57,6 +57,7 @@ add_executable(
     device.cpp
     pipeline.cpp
     swapchain.cpp
+    model.cpp
 )
 
 #add_executable(mari)
