@@ -26,11 +26,14 @@ namespace mari {
             void createPipelineLayout();
             void createPipeline();
             void createCommandBuffers();
+            void freeCommandBuffers();
             void drawFrame();
+            void recreateSwapchain();
+            void recordCommandBuffer(int imageIndex);
 
             Window window{WIDTH, HEIGHT, "Mari"};
             Device device{window};
-            Swapchain swapchain{device, window.getExtent()};
+            std::unique_ptr<Swapchain> swapchain;
             std::unique_ptr<Pipeline> pipeline;
             VkPipelineLayout pipelineLayout;
             std::vector<VkCommandBuffer> commandBuffers;

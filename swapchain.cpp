@@ -11,8 +11,18 @@
 namespace mari
 {
 
-    Swapchain::Swapchain(Device &deviceRef, VkExtent2D extent) : device{deviceRef}, windowExtent{extent}
-    {
+    Swapchain::Swapchain(Device &deviceRef, VkExtent2D extent) : device{deviceRef}, windowExtent{extent} {
+        initialize();
+    }
+
+        Swapchain::Swapchain(Device &deviceRef, VkExtent2D extent, std::shared_ptr<Swapchain> previous) 
+            : device{deviceRef}, windowExtent{extent}, oldSwapchain{previous} {
+        initialize();
+
+        // clean up old swap chain since it's no longer used
+    }
+
+    void Swapchain::initialize() {
         createSwapchain();
         createImageViews();
         createRenderPass();
@@ -21,8 +31,7 @@ namespace mari
         createSyncObjects();
     }
 
-    Swapchain::~Swapchain()
-    {
+    Swapchain::~Swapchain() {
         for (auto imageView : SwapchainImageViews)
         {
             vkDestroyImageView(device.device(), imageView, nullptr);
@@ -58,8 +67,7 @@ namespace mari
         }
     }
 
-    VkResult Swapchain::acquireNextImage(uint32_t *imageIndex)
-    {
+    VkResult Swapchain::acquireNextImage(uint32_t *imageIndex) {
         vkWaitForFences(
             device.device(),
             1,
@@ -78,9 +86,7 @@ namespace mari
         return result;
     }
 
-    VkResult Swapchain::submitCommandBuffers(
-        const VkCommandBuffer *buffers, uint32_t *imageIndex)
-    {
+    VkResult Swapchain::submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex) {
         if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE)
         {
             vkWaitForFences(device.device(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
@@ -129,8 +135,7 @@ namespace mari
         return result;
     }
 
-    void Swapchain::createSwapchain()
-    {
+    void Swapchain::createSwapchain() {
         SwapchainSupportDetails SwapchainSupport = device.getSwapchainSupport();
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(SwapchainSupport.formats);
@@ -177,11 +182,11 @@ namespace mari
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
 
-        createInfo.oldSwapchain = VK_NULL_HANDLE;
+        createInfo.oldSwapchain = oldSwapchain == nullptr ? VK_NULL_HANDLE : oldSwapchain->swapchain;
 
         if (vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapchain) != VK_SUCCESS)
         {
-            throw std::runtime_error("Failed to create swap chain!");
+            throw std::runtime_error("Failed to create swap chain");
         }
 
         // we only specified a minimum number of images in the swap chain, so the implementation is
@@ -196,8 +201,7 @@ namespace mari
         SwapchainExtent = extent;
     }
 
-    void Swapchain::createImageViews()
-    {
+    void Swapchain::createImageViews() {
         SwapchainImageViews.resize(SwapchainImages.size());
         for (size_t i = 0; i < SwapchainImages.size(); i++)
         {
@@ -220,8 +224,7 @@ namespace mari
         }
     }
 
-    void Swapchain::createRenderPass()
-    {
+    void Swapchain::createRenderPass() {
         VkAttachmentDescription depthAttachment{};
         depthAttachment.format = findDepthFormat();
         depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -283,8 +286,7 @@ namespace mari
         }
     }
 
-    void Swapchain::createFramebuffers()
-    {
+    void Swapchain::createFramebuffers() {
         SwapchainFramebuffers.resize(imageCount());
         for (size_t i = 0; i < imageCount(); i++)
         {
@@ -311,8 +313,7 @@ namespace mari
         }
     }
 
-    void Swapchain::createDepthResources()
-    {
+    void Swapchain::createDepthResources() {
         VkFormat depthFormat = findDepthFormat();
         VkExtent2D SwapchainExtent = getSwapchainExtent();
 
@@ -362,8 +363,7 @@ namespace mari
         }
     }
 
-    void Swapchain::createSyncObjects()
-    {
+    void Swapchain::createSyncObjects() {
         imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
@@ -389,12 +389,10 @@ namespace mari
         }
     }
 
-    VkSurfaceFormatKHR Swapchain::chooseSwapSurfaceFormat(
-        const std::vector<VkSurfaceFormatKHR> &availableFormats)
-    {
+    VkSurfaceFormatKHR Swapchain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats) {
         for (const auto &availableFormat : availableFormats)
         {
-            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
                 availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             {
                 return availableFormat;
@@ -404,9 +402,7 @@ namespace mari
         return availableFormats[0];
     }
 
-    VkPresentModeKHR Swapchain::chooseSwapPresentMode(
-        const std::vector<VkPresentModeKHR> &availablePresentModes)
-    {
+    VkPresentModeKHR Swapchain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes) {
         for (const auto &availablePresentMode : availablePresentModes)
         {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
@@ -427,8 +423,7 @@ namespace mari
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
-    VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
-    {
+    VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
         if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
         {
             return capabilities.currentExtent;
@@ -447,8 +442,7 @@ namespace mari
         }
     }
 
-    VkFormat Swapchain::findDepthFormat()
-    {
+    VkFormat Swapchain::findDepthFormat() {
         return device.findSupportedFormat(
             {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
             VK_IMAGE_TILING_OPTIMAL,
