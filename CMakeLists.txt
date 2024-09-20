@@ -53,11 +53,14 @@ enable_testing()
 add_executable(
     mari
     window.cpp
-    renderer.cpp
+    mari.cpp
     device.cpp
     pipeline.cpp
     swapchain.cpp
     model.cpp
+    game_object.cpp
+    renderer.cpp
+    simple_render_system.cpp
 )
 
 #add_executable(mari)

@@ -1,14 +1,14 @@
-#include "renderer.hpp"
+#include "mari.hpp"
 
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 
 int main() {
-    mari::Renderer renderer{};
+    mari::Mari mari{};
 
     try {
-        renderer.run();
+        mari.run();
     }
     catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;

@@ -32,11 +32,11 @@ namespace mari
     }
 
     Swapchain::~Swapchain() {
-        for (auto imageView : SwapchainImageViews)
+        for (auto imageView : swapchainImageViews)
         {
             vkDestroyImageView(device.device(), imageView, nullptr);
         }
-        SwapchainImageViews.clear();
+        swapchainImageViews.clear();
 
         if (swapchain != nullptr)
         {
@@ -51,7 +51,7 @@ namespace mari
             vkFreeMemory(device.device(), depthImageMemorys[i], nullptr);
         }
 
-        for (auto framebuffer : SwapchainFramebuffers)
+        for (auto framebuffer : swapchainFramebuffers)
         {
             vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
         }
@@ -194,29 +194,29 @@ namespace mari
         // images with vkGetSwapchainImagesKHR, then resize the container and finally call it again to
         // retrieve the handles.
         vkGetSwapchainImagesKHR(device.device(), swapchain, &imageCount, nullptr);
-        SwapchainImages.resize(imageCount);
-        vkGetSwapchainImagesKHR(device.device(), swapchain, &imageCount, SwapchainImages.data());
+        swapchainImages.resize(imageCount);
+        vkGetSwapchainImagesKHR(device.device(), swapchain, &imageCount, swapchainImages.data());
 
-        SwapchainImageFormat = surfaceFormat.format;
-        SwapchainExtent = extent;
+        swapchainImageFormat = surfaceFormat.format;
+        swapchainExtent = extent;
     }
 
     void Swapchain::createImageViews() {
-        SwapchainImageViews.resize(SwapchainImages.size());
-        for (size_t i = 0; i < SwapchainImages.size(); i++)
+        swapchainImageViews.resize(swapchainImages.size());
+        for (size_t i = 0; i < swapchainImages.size(); i++)
         {
             VkImageViewCreateInfo viewInfo{};
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            viewInfo.image = SwapchainImages[i];
+            viewInfo.image = swapchainImages[i];
             viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = SwapchainImageFormat;
+            viewInfo.format = swapchainImageFormat;
             viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             viewInfo.subresourceRange.baseMipLevel = 0;
             viewInfo.subresourceRange.levelCount = 1;
             viewInfo.subresourceRange.baseArrayLayer = 0;
             viewInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(device.device(), &viewInfo, nullptr, &SwapchainImageViews[i]) !=
+            if (vkCreateImageView(device.device(), &viewInfo, nullptr, &swapchainImageViews[i]) !=
                 VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to create texture image view!");
@@ -287,26 +287,26 @@ namespace mari
     }
 
     void Swapchain::createFramebuffers() {
-        SwapchainFramebuffers.resize(imageCount());
+        swapchainFramebuffers.resize(imageCount());
         for (size_t i = 0; i < imageCount(); i++)
         {
-            std::array<VkImageView, 2> attachments = {SwapchainImageViews[i], depthImageViews[i]};
+            std::array<VkImageView, 2> attachments = {swapchainImageViews[i], depthImageViews[i]};
 
-            VkExtent2D SwapchainExtent = getSwapchainExtent();
+            VkExtent2D swapchainExtent = getSwapchainExtent();
             VkFramebufferCreateInfo framebufferInfo = {};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.renderPass = renderPass;
             framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
             framebufferInfo.pAttachments = attachments.data();
-            framebufferInfo.width = SwapchainExtent.width;
-            framebufferInfo.height = SwapchainExtent.height;
+            framebufferInfo.width = swapchainExtent.width;
+            framebufferInfo.height = swapchainExtent.height;
             framebufferInfo.layers = 1;
 
             if (vkCreateFramebuffer(
                     device.device(),
                     &framebufferInfo,
                     nullptr,
-                    &SwapchainFramebuffers[i]) != VK_SUCCESS)
+                    &swapchainFramebuffers[i]) != VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to create framebuffer!");
             }
@@ -314,8 +314,8 @@ namespace mari
     }
 
     void Swapchain::createDepthResources() {
-        VkFormat depthFormat = findDepthFormat();
-        VkExtent2D SwapchainExtent = getSwapchainExtent();
+        swapchainDepthFormat = findDepthFormat();
+        VkExtent2D swapchainExtent = getSwapchainExtent();
 
         depthImages.resize(imageCount());
         depthImageMemorys.resize(imageCount());
@@ -326,12 +326,12 @@ namespace mari
             VkImageCreateInfo imageInfo{};
             imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
-            imageInfo.extent.width = SwapchainExtent.width;
-            imageInfo.extent.height = SwapchainExtent.height;
+            imageInfo.extent.width = swapchainExtent.width;
+            imageInfo.extent.height = swapchainExtent.height;
             imageInfo.extent.depth = 1;
             imageInfo.mipLevels = 1;
             imageInfo.arrayLayers = 1;
-            imageInfo.format = depthFormat;
+            imageInfo.format = swapchainDepthFormat;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -349,7 +349,7 @@ namespace mari
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
             viewInfo.image = depthImages[i];
             viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = depthFormat;
+            viewInfo.format = swapchainDepthFormat;
             viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
             viewInfo.subresourceRange.baseMipLevel = 0;
             viewInfo.subresourceRange.levelCount = 1;

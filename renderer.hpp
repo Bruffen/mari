@@ -2,41 +2,51 @@
 
 #include "window.hpp"
 #include "device.hpp"
-#include "pipeline.hpp"
 #include "swapchain.hpp"
-#include "model.hpp"
 
 #include <memory>
 #include <vector>
+#include <cassert>
 
 namespace mari {
     class Renderer {
         public:
-            static constexpr int WIDTH = 800;
-            static constexpr int HEIGHT = 600;
-
-            Renderer();
+            Renderer(Window& window, Device& device);
             ~Renderer();
             Renderer(const Renderer &) = delete;
             Renderer &operator=(const Renderer &) = delete;
 
-            void run();
-            void loadModels();
+            VkRenderPass getSwapchainRenderPass() const { return swapchain->getRenderPass(); }
+
+            bool isFrameInProgress() const { return isFrameStarted; }
+
+            VkCommandBuffer getCurrentCommandBuffer() const {
+                assert(isFrameStarted && "Cannot get command buffer when frame is not in progress"); 
+                return commandBuffers[currentFrameIndex]; 
+            }
+
+            int getFrameIndex() const {
+                assert(isFrameStarted && "Cannot get frame index when frame is not in progress");
+                return currentFrameIndex;
+            }
+
+            VkCommandBuffer beginFrame();
+            void endFrame();
+            void beginSwapchainRenderPass(VkCommandBuffer commandBuffer);
+            void endSwapchainRenderPass(VkCommandBuffer commandBuffer);
+
         private:
-            void createPipelineLayout();
-            void createPipeline();
             void createCommandBuffers();
             void freeCommandBuffers();
-            void drawFrame();
             void recreateSwapchain();
-            void recordCommandBuffer(int imageIndex);
 
-            Window window{WIDTH, HEIGHT, "Mari"};
-            Device device{window};
+            Window& window;
+            Device& device;
             std::unique_ptr<Swapchain> swapchain;
-            std::unique_ptr<Pipeline> pipeline;
-            VkPipelineLayout pipelineLayout;
             std::vector<VkCommandBuffer> commandBuffers;
-            std::unique_ptr<Model> model;
+
+            uint32_t currentImageIndex;
+            int currentFrameIndex{0};
+            bool isFrameStarted{false};
     };
 }
