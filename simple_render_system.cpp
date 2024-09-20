@@ -55,7 +55,7 @@ namespace mari {
         pipeline = std::make_unique<Pipeline>(device, "../../shaders/simple.vert.spv", "../../shaders/simple.frag.spv", pipelineConfig);
     }
 
-    void SimpleRenderSystem::renderGameObjects(VkCommandBuffer commandBuffer, std::vector<GameObject> &gameObjects) {
+    void SimpleRenderSystem::renderGameObjects(VkCommandBuffer commandBuffer, std::vector<GameObject> &gameObjects, const Camera &camera) {
         pipeline->bind(commandBuffer);
 
         for (auto& obj : gameObjects) {
@@ -63,7 +63,7 @@ namespace mari {
             obj.transform.rotation.x = glm::mod(obj.transform.rotation.x + 0.005f, glm::two_pi<float>());
 
             SimplePushConstantData push{};
-            push.transform = obj.transform.mat4();
+            push.transform = camera.getProjection() * obj.transform.mat4();
             push.color = obj.color;
 
             vkCmdPushConstants(

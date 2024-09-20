@@ -61,6 +61,7 @@ add_executable(
     game_object.cpp
     renderer.cpp
     simple_render_system.cpp
+    camera.cpp
 )
 
 #add_executable(mari)

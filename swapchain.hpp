@@ -14,7 +14,7 @@ namespace mari
     class Swapchain
     {
         public:
-            static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+            static constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
             Swapchain(Device &deviceRef, VkExtent2D windowExtent);
             Swapchain(Device &deviceRef, VkExtent2D windowExtent, std::shared_ptr<Swapchain> previous);

@@ -17,7 +17,7 @@ namespace mari {
             Renderer &operator=(const Renderer &) = delete;
 
             VkRenderPass getSwapchainRenderPass() const { return swapchain->getRenderPass(); }
-
+            float getAspectRatio() const { return swapchain->extentAspectRatio(); }
             bool isFrameInProgress() const { return isFrameStarted; }
 
             VkCommandBuffer getCurrentCommandBuffer() const {
