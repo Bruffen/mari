@@ -24,13 +24,15 @@ namespace mari {
     void Mari::run() { 
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass()};
         Camera camera{};
+        //camera.setViewDirection(glm::vec3(0.0f), glm::vec3(0.5f, 0.0f, 1.0f));
+        camera.setViewTarget(glm::vec3(-1.0f, -2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 2.5f));
 
         while (!window.shouldClose()) {
             glfwPollEvents();
 
             float aspect = renderer.getAspectRatio();
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, -1, 1);
-            camera.setPerspectiveProjection(glm::radians(50.0f), aspect, 0.1f, 10.0f);
+            camera.setPerspectiveProjection(glm::radians(50.0f), aspect, 0.1f, 100.0f);
             
             if (auto commandBuffer = renderer.beginFrame()) {
                 renderer.beginSwapchainRenderPass(commandBuffer);
