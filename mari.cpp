@@ -25,9 +25,15 @@ namespace mari {
 
     void Mari::run() { 
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass()};
+        
         Camera camera{};
+        
+        // TODO how do I keep multiple pointers for each callback
+        //glfwSetWindowUserPointer(window.getGLFWwindow(), &camera);
+        //glfwSetScrollCallback(window.getGLFWwindow(), camera.scrollCallback);
+        glfwSetWindowUserPointer(window.getGLFWwindow(), &window);
 
-        auto viewerObject = GameObject::createGameObject();
+        auto cameraObject = GameObject::createGameObject();
         KeyboardController cameraController{};
 
         auto currentTime = std::chrono::high_resolution_clock::now();
@@ -39,12 +45,13 @@ namespace mari {
             float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
             currentTime = newTime;
 
-            cameraController.moveInPlaneXZ(window.getGLFWwindow(), frameTime, viewerObject);
-            camera.setViewYXZ(viewerObject.transform.translation, viewerObject.transform.rotation);
+            cameraController.rotateCamera(window.getGLFWwindow(), frameTime, cameraObject);
+            cameraController.moveCamera(window.getGLFWwindow(), frameTime, cameraObject);
+            camera.setViewYXZ(cameraObject.transform.translation, cameraObject.transform.rotation);
 
             float aspect = renderer.getAspectRatio();
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, -1, 1);
-            camera.setPerspectiveProjection(glm::radians(50.0f), aspect, 0.1f, 100.0f);
+            camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
             
             if (auto commandBuffer = renderer.beginFrame()) {
                 renderer.beginSwapchainRenderPass(commandBuffer);

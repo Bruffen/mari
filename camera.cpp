@@ -6,6 +6,10 @@
 #include <limits>
 
 namespace mari {
+    Camera::Camera() {
+
+    }
+
     void Camera::setOrthographicProjection(float left, float right, float top, float bottom, float near, float far) {
         projectionMatrix = glm::mat4{1.0f};
         projectionMatrix[0][0] = 2.f / (right - left);
@@ -16,15 +20,19 @@ namespace mari {
         projectionMatrix[3][2] = -near / (far - near);
     }
     
-    void Camera::setPerspectiveProjection(float fovy, float aspect, float near, float far) {
+    void Camera::setPerspectiveProjection(float fov, float aspect, float near, float far) {
         assert(glm::abs(aspect - std::numeric_limits<float>::epsilon()) > 0.0f);
-        const float tanHalfFovy = tan(fovy / 2.f);
+        const float tanHalfFovy = tan(fov / 2.f);
         projectionMatrix = glm::mat4{0.0f};
         projectionMatrix[0][0] = 1.f / (aspect * tanHalfFovy);
         projectionMatrix[1][1] = 1.f / (tanHalfFovy);
         projectionMatrix[2][2] = far / (far - near);
         projectionMatrix[2][3] = 1.f;
         projectionMatrix[3][2] = -(far * near) / (far - near);
+    }
+
+    void Camera::setPerspectiveProjection(float aspect, float near, float far) {
+        setPerspectiveProjection(fov, aspect, near, far);    
     }
 
     void Camera::setViewDirection(glm::vec3 position, glm::vec3 direction, glm::vec3 up) {
@@ -74,5 +82,14 @@ namespace mari {
         viewMatrix[3][0] = -glm::dot(u, position);
         viewMatrix[3][1] = -glm::dot(v, position);
         viewMatrix[3][2] = -glm::dot(w, position);
+    }
+
+    void Camera::changeFOV(float value) {
+        fov = glm::clamp(fov - value * zoomSpeed, MIN_FOV, MAX_FOV); // TODO needs deltatime
+    }
+
+    void Camera::scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+        auto camera = reinterpret_cast<Camera*>(glfwGetWindowUserPointer(window));
+        camera->changeFOV(static_cast<float>(yoffset));
     }
 }
