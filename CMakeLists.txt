@@ -62,6 +62,7 @@ add_executable(
     renderer.cpp
     simple_render_system.cpp
     camera.cpp
+    keyboard_controller.cpp
 )
 
 #add_executable(mari)

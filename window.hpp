@@ -13,10 +13,11 @@ namespace mari {
             Window(const Window &) = delete;
             Window &operator=(const Window &) = delete;
 
-            bool shouldClose() { return glfwWindowShouldClose(window); }
-            VkExtent2D getExtent() { return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)}; }
-            bool wasWindowResized() { return framebufferResized; }
-            void resetWindowsResizedFlag() { framebufferResized = false; }
+            bool shouldClose()                  { return glfwWindowShouldClose(window); }
+            VkExtent2D getExtent()              { return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)}; }
+            bool wasWindowResized()             { return framebufferResized; }
+            void resetWindowsResizedFlag()      { framebufferResized = false; }
+            GLFWwindow *getGLFWwindow() const   { return window; }
             
             void createWindowSurface(VkInstance instance, VkSurfaceKHR *surface);
         private:

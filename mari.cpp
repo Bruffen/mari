@@ -1,5 +1,6 @@
 #include "mari.hpp"
 
+#include "keyboard_controller.hpp"
 #include "camera.hpp"
 #include "simple_render_system.hpp"
 
@@ -9,6 +10,7 @@
 #include <glm/gtc/constants.hpp>
 
 #include <array>
+#include <chrono>
 #include <cassert>
 #include <stdexcept>
 
@@ -24,11 +26,21 @@ namespace mari {
     void Mari::run() { 
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass()};
         Camera camera{};
-        //camera.setViewDirection(glm::vec3(0.0f), glm::vec3(0.5f, 0.0f, 1.0f));
-        camera.setViewTarget(glm::vec3(-1.0f, -2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 2.5f));
+
+        auto viewerObject = GameObject::createGameObject();
+        KeyboardController cameraController{};
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
 
         while (!window.shouldClose()) {
             glfwPollEvents();
+
+            auto newTime = std::chrono::high_resolution_clock::now();
+            float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
+            currentTime = newTime;
+
+            cameraController.moveInPlaneXZ(window.getGLFWwindow(), frameTime, viewerObject);
+            camera.setViewYXZ(viewerObject.transform.translation, viewerObject.transform.rotation);
 
             float aspect = renderer.getAspectRatio();
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, -1, 1);
