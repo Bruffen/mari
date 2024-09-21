@@ -35,19 +35,6 @@ namespace mari {
     }
 
     void KeyboardController::moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject) {
-        glm::vec3 rotate{0.0f};
-        if (glfwGetKey(window, keys.lookRight)  == GLFW_PRESS) rotate.y += 1.0f;
-        if (glfwGetKey(window, keys.lookLeft)   == GLFW_PRESS) rotate.y -= 1.0f;
-        if (glfwGetKey(window, keys.lookUp)     == GLFW_PRESS) rotate.x += 1.0f;
-        if (glfwGetKey(window, keys.lookDown)   == GLFW_PRESS) rotate.x -= 1.0f;
-
-        if (glm::dot(rotate, rotate) > glm::epsilon<float>()) {
-            gameObject.transform.rotation += lookSpeed * deltatime * glm::normalize(rotate);
-        }
-
-        gameObject.transform.rotation.x = glm::clamp(gameObject.transform.rotation.x, -1.5f, 1.5f);
-        gameObject.transform.rotation.y = glm::mod(gameObject.transform.rotation.y, glm::two_pi<float>());
-
         glm::vec3 f = gameObject.transform.forward();
         glm::vec3 r = gameObject.transform.right();
         glm::vec3 u = gameObject.transform.up();
@@ -79,7 +66,6 @@ namespace mari {
         if (mouse.cameraDragDown) {
             glm::vec2 movement{static_cast<float>(x - mouse.lastPositionX), static_cast<float>(y - mouse.lastPositionY)};
             if (glm::dot(movement, movement) > glm::epsilon<float>()) {
-                //movement = glm::normalize(movement);
                 gameObject.transform.rotation.x -= movement.y * lookSpeed * deltatime;
                 gameObject.transform.rotation.y += movement.x * lookSpeed * deltatime;
 
