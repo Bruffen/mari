@@ -451,7 +451,7 @@ namespace mari {
         submitInfo.pCommandBuffers = &commandBuffer;
 
         vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(graphicsQueue_);
+        vkQueueWaitIdle(graphicsQueue_); // TODO memory barrier instead of waiting for everything to be finished
 
         vkFreeCommandBuffers(device_, commandPool, 1, &commandBuffer);
     }
