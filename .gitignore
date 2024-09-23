@@ -2,5 +2,6 @@ build
 include
 
 .vscode
+.env.cmake
 
 *.spv
