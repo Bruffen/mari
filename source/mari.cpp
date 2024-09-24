@@ -116,12 +116,14 @@ namespace mari {
     }
 
     void Mari::loadGameObjects() {
-        std::shared_ptr<Model> model = createCubeModel(device, {0.0f, 0.0f, 0.0f});
+        //std::shared_ptr<Model> model = createCubeModel(device, {0.0f, 0.0f, 0.0f});
+        std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../models/lucy.obj");
 
-        auto cube = GameObject::createGameObject();
-        cube.model = model;
-        cube.transform.translation = {0.0f, 0.0f, 2.5f};
-        cube.transform.scale = {0.5f, 0.5f, 0.5f};
-        gameObjects.push_back(std::move(cube));
+        auto gameObject = GameObject::createGameObject();
+        gameObject.model = model;
+        gameObject.transform.translation = {0.0f, 0.0f, 2.5f};
+        gameObject.transform.rotation = {glm::radians(90.0f), glm::radians(180.0f), 0.0f};
+        gameObject.transform.scale = glm::vec3{0.001f};
+        gameObjects.push_back(std::move(gameObject));
     }
 }
