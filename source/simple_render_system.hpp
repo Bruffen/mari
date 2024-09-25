@@ -4,6 +4,7 @@
 #include "device.hpp"
 #include "pipeline.hpp"
 #include "game_object.hpp"
+#include "frame_info.hpp"
 
 #include <memory>
 #include <vector>
@@ -11,12 +12,12 @@
 namespace mari {
     class SimpleRenderSystem {
         public:
-            SimpleRenderSystem(Device &device, VkRenderPass renderPass);
+            SimpleRenderSystem(Device &device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout);
             ~SimpleRenderSystem();
 
-            void renderGameObjects(VkCommandBuffer commandBuffer, std::vector<GameObject> &gameObjects, const Camera &camera) ;
+            void renderGameObjects(FrameInfo &frameInfo, std::vector<GameObject> &gameObjects) ;
         private:
-            void createPipelineLayout();
+            void createPipelineLayout(VkDescriptorSetLayout globalSetLayout);
             void createPipeline(VkRenderPass renderPass);
 
             Device &device;

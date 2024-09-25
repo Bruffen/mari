@@ -1,7 +1,7 @@
 #version 450
 
 layout(push_constant) uniform Push {
-    mat4 transform;
+    mat4 modelMatrix;
     mat4 normalMatrix;
 } push;
 

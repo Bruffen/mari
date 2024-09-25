@@ -3,6 +3,7 @@
 #include "keyboard_controller.hpp"
 #include "camera.hpp"
 #include "simple_render_system.hpp"
+#include "buffer.hpp"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -15,7 +16,17 @@
 #include <stdexcept>
 
 namespace mari {
+    struct GlobalUbo {
+        glm::mat4 projectionView{1.0f};
+        glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -3.0f, -1.0f));
+    };
+
     Mari::Mari() {
+        globalPool = DescriptorPool::Builder(device)
+            .setMaxSets(Swapchain::MAX_FRAMES_IN_FLIGHT)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT)
+            .build();
+        
         loadGameObjects();
     }
 
@@ -24,8 +35,32 @@ namespace mari {
     }
 
     void Mari::run() { 
-        SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass()};
-        
+        std::vector<std::unique_ptr<Buffer>> uboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
+
+        for (int i = 0; i < uboBuffers.size(); i++) {
+            uboBuffers[i] = std::make_unique<Buffer>(
+                device,
+                sizeof(GlobalUbo),
+                1,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            );
+            uboBuffers[i]->map();
+        }
+
+        auto globalSetLayout = DescriptorSetLayout::Builder(device)
+            .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+            .build();
+
+        std::vector<VkDescriptorSet> globalDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
+        for (int i = 0; i < globalDescriptorSets.size(); i++) {
+            auto bufferInfo = uboBuffers[i]->descriptorInfo();
+            DescriptorWriter(*globalSetLayout, *globalPool)
+                .writeBuffer(0, &bufferInfo)
+                .build(globalDescriptorSets[i]);
+        }
+
+        SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), globalSetLayout->getDescriptorSetLayout()};
         Camera camera{};
         
         // TODO how do I keep multiple pointers for each callback
@@ -54,8 +89,24 @@ namespace mari {
             camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
             
             if (auto commandBuffer = renderer.beginFrame()) {
+                int frameIndex = renderer.getFrameIndex();
+                FrameInfo frameInfo {
+                    frameIndex,
+                    frameTime,
+                    commandBuffer,
+                    camera,
+                    globalDescriptorSets[frameIndex]
+                };
+                
+                // update
+                GlobalUbo ubo{};
+                ubo.projectionView = camera.getProjection() * camera.getView();
+                uboBuffers[frameIndex]->writeToBuffer(&ubo);
+                uboBuffers[frameIndex]->flush();
+
+                // render
                 renderer.beginSwapchainRenderPass(commandBuffer);
-                simpleRenderSystem.renderGameObjects(commandBuffer, gameObjects, camera);
+                simpleRenderSystem.renderGameObjects(frameInfo, gameObjects);
                 renderer.endSwapchainRenderPass(commandBuffer);
                 renderer.endFrame();
             }
@@ -117,12 +168,12 @@ namespace mari {
 
     void Mari::loadGameObjects() {
         //std::shared_ptr<Model> model = createCubeModel(device, {0.0f, 0.0f, 0.0f});
-        std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../models/smooth_vase.obj");
+        std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
 
         auto gameObject = GameObject::createGameObject();
         gameObject.model = model;
         gameObject.transform.translation = {0.0f, 0.5f, 2.5f};
-        //gameObject.transform.rotation = {0.0f, 0.0f, glm::radians(180.0f)};
+        gameObject.transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(180.0f)};
         gameObject.transform.scale = glm::vec3{3.0f};
         gameObjects.push_back(std::move(gameObject));
     }
