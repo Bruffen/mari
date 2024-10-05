@@ -1,9 +1,10 @@
 #include "mari.hpp"
 
 #include "keyboard_controller.hpp"
-#include "camera.hpp"
-#include "simple_render_system.hpp"
 #include "buffer.hpp"
+#include "camera.hpp"
+#include "systems/simple_render_system.hpp"
+#include "systems/point_light_system.hpp"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -17,7 +18,8 @@
 
 namespace mari {
     struct GlobalUbo {
-        glm::mat4 projectionView{1.0f};
+        glm::mat4 projection{1.0f};
+        glm::mat4 view{1.0f};
         //glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -3.0f, -1.0f));
         glm::vec4 ambientLightColor{1.0f, 1.0f, 1.0f, 0.1f};
         glm::vec3 lightPosition{-1.0f, -1.0f, -1.0f};
@@ -64,6 +66,7 @@ namespace mari {
         }
 
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), globalSetLayout->getDescriptorSetLayout()};
+        PointLightSystem pointLightSystem{device, renderer.getSwapchainRenderPass(), globalSetLayout->getDescriptorSetLayout()};
         Camera camera{};
         
         // TODO how do I keep multiple pointers for each callback
@@ -106,13 +109,15 @@ namespace mari {
                 
                 // update
                 GlobalUbo ubo{};
-                ubo.projectionView = camera.getProjection() * camera.getView();
+                ubo.projection = camera.getProjection();
+                ubo.view = camera.getView();
                 uboBuffers[frameIndex]->writeToBuffer(&ubo);
                 uboBuffers[frameIndex]->flush();
 
                 // render
                 renderer.beginSwapchainRenderPass(commandBuffer);
                 simpleRenderSystem.renderGameObjects(frameInfo);
+                pointLightSystem.render(frameInfo);
                 renderer.endSwapchainRenderPass(commandBuffer);
                 renderer.endFrame();
             }
