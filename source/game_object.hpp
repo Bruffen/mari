@@ -50,6 +50,10 @@ namespace mari {
         glm::vec3 up()      { return matrixRotation() * glm::vec3{0.0f, 1.0f, 0.0f}; }
     };
 
+    struct PointLightComponent {
+        float lightIntensity = 1.0f;
+    };
+
     // TODO https://austinmorlan.com/posts/entity_component_system/
     class GameObject {
         public:
@@ -61,6 +65,8 @@ namespace mari {
                 return GameObject{currentId++};
             }
 
+            static GameObject makePointLight(float intensity = 10.0f, float radius = 0.1, glm::vec3 color = glm::vec3(1.0f));
+
             GameObject(const GameObject &) = delete;
             GameObject &operator=(const GameObject &) = delete;
             GameObject(GameObject &&) = default;
@@ -68,10 +74,13 @@ namespace mari {
 
             const id_t getId() { return id; }
 
-            std::shared_ptr<Model> model{};
             glm::vec3 color{};
             TransformComponent transform{};
             float fovy{50.0f};
+
+            // Optional pointer components
+            std::shared_ptr<Model> model{};
+            std::unique_ptr<PointLightComponent> pointLight = nullptr;
 
             private:
                 GameObject(id_t objId) : id{objId} {}

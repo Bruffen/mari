@@ -17,14 +17,6 @@
 #include <stdexcept>
 
 namespace mari {
-    struct GlobalUbo {
-        glm::mat4 projection{1.0f};
-        glm::mat4 view{1.0f};
-        //glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -3.0f, -1.0f));
-        glm::vec4 ambientLightColor{1.0f, 1.0f, 1.0f, 0.1f};
-        glm::vec3 lightPosition{-1.0f, -1.0f, -1.0f};
-        alignas(16) glm::vec4 lightColor{1.0f};
-    };
 
     Mari::Mari() {
         globalPool = DescriptorPool::Builder(device)
@@ -79,13 +71,15 @@ namespace mari {
         cameraObject.transform.translation.z = -2.5f;
         KeyboardController cameraController{};
 
-        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = startTime;
 
         while (!window.shouldClose()) {
             glfwPollEvents();
 
             auto newTime = std::chrono::high_resolution_clock::now();
             float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
+            float elapsedTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - startTime).count();
             currentTime = newTime;
 
             cameraController.rotateCamera(window.getGLFWwindow(), frameTime, cameraObject);
@@ -101,6 +95,7 @@ namespace mari {
                 FrameInfo frameInfo {
                     frameIndex,
                     frameTime,
+                    elapsedTime,
                     commandBuffer,
                     camera,
                     globalDescriptorSets[frameIndex],
@@ -111,6 +106,7 @@ namespace mari {
                 GlobalUbo ubo{};
                 ubo.projection = camera.getProjection();
                 ubo.view = camera.getView();
+                pointLightSystem.update(frameInfo, ubo);
                 uboBuffers[frameIndex]->writeToBuffer(&ubo);
                 uboBuffers[frameIndex]->flush();
 
@@ -212,5 +208,26 @@ namespace mari {
         floor.transform.rotation = glm::vec3{0.0f};
         floor.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(floor.getId(), std::move(floor));
+
+        std::vector<glm::vec3> lightColors {
+            {1.f, .1f, .1f},
+            {.1f, .1f, 1.f},
+            {.1f, 1.f, .1f},
+            {1.f, 1.f, .1f},
+            {.1f, 1.f, 1.f},
+            {1.f, 1.f, 1.f}
+        };
+
+        for (int i = 0; i < lightColors.size(); i++) {
+            auto pointLight = GameObject::makePointLight(0.2f);
+            pointLight.color = lightColors[i];
+            auto rotateLight = glm::rotate(
+                glm::mat4(1.0f),
+                (i * glm::two_pi<float>()) / lightColors.size(),
+                {0.0f, -1.0f, 0.0f}
+            );
+            pointLight.transform.translation = glm::vec3(rotateLight * glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f));
+            gameObjects.emplace(pointLight.getId(), std::move(pointLight));
+        }
     }
 }

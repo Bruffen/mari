@@ -11,20 +11,29 @@ const vec2 OFFSETS[6] = vec2[](
 
 layout (location = 0) out vec2 fragOffset;
 
+struct PointLight {
+    vec4 position;
+    vec4 color;
+};
+
 layout (set = 0, binding = 0) uniform GlobalUbo {
     mat4 projection;
     mat4 view;
     vec4 ambientLightColor;
-    vec3 lightPosition;
-    vec4 lightColor;
+    PointLight pointLights[10]; // TODO look at specialization constants
+    int numLights;
 } ubo;
 
-const float LIGHT_RADIUS = 0.1;
+layout(push_constant) uniform Push {
+    vec4 position;
+    vec4 color;
+    float radius;
+} push;
 
 void main() {
     fragOffset = OFFSETS[gl_VertexIndex];
 
-    vec4 lightPositionView = ubo.view * vec4(ubo.lightPosition, 1.0);
-    lightPositionView.xy += fragOffset * LIGHT_RADIUS;
+    vec4 lightPositionView = ubo.view * push.position;
+    lightPositionView.xy += fragOffset * push.radius;
     gl_Position =  ubo.projection * lightPositionView;
 }
