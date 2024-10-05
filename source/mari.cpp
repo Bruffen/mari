@@ -18,7 +18,10 @@
 namespace mari {
     struct GlobalUbo {
         glm::mat4 projectionView{1.0f};
-        glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -3.0f, -1.0f));
+        //glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -3.0f, -1.0f));
+        glm::vec4 ambientLightColor{1.0f, 1.0f, 1.0f, 0.1f};
+        glm::vec3 lightPosition{-1.0f, -1.0f, -1.0f};
+        alignas(16) glm::vec4 lightColor{1.0f};
     };
 
     Mari::Mari() {
@@ -49,7 +52,7 @@ namespace mari {
         }
 
         auto globalSetLayout = DescriptorSetLayout::Builder(device)
-            .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+            .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS)
             .build();
 
         std::vector<VkDescriptorSet> globalDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
@@ -69,6 +72,8 @@ namespace mari {
         glfwSetWindowUserPointer(window.getGLFWwindow(), &window);
 
         auto cameraObject = GameObject::createGameObject();
+        cameraObject.transform.translation.y = -0.5f;
+        cameraObject.transform.translation.z = -2.5f;
         KeyboardController cameraController{};
 
         auto currentTime = std::chrono::high_resolution_clock::now();
@@ -95,7 +100,8 @@ namespace mari {
                     frameTime,
                     commandBuffer,
                     camera,
-                    globalDescriptorSets[frameIndex]
+                    globalDescriptorSets[frameIndex],
+                    gameObjects
                 };
                 
                 // update
@@ -106,7 +112,7 @@ namespace mari {
 
                 // render
                 renderer.beginSwapchainRenderPass(commandBuffer);
-                simpleRenderSystem.renderGameObjects(frameInfo, gameObjects);
+                simpleRenderSystem.renderGameObjects(frameInfo);
                 renderer.endSwapchainRenderPass(commandBuffer);
                 renderer.endFrame();
             }
@@ -168,13 +174,38 @@ namespace mari {
 
     void Mari::loadGameObjects() {
         //std::shared_ptr<Model> model = createCubeModel(device, {0.0f, 0.0f, 0.0f});
-        std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
+        //std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/CornellBox/CornellBox-Original.obj");
 
+        std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
         auto gameObject = GameObject::createGameObject();
         gameObject.model = model;
-        gameObject.transform.translation = {0.0f, 0.5f, 2.5f};
+        gameObject.transform.translation = {0.0f, -0.01f, 0.0f};
         gameObject.transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(180.0f)};
         gameObject.transform.scale = glm::vec3{3.0f};
-        gameObjects.push_back(std::move(gameObject));
+        gameObjects.emplace(gameObject.getId(), std::move(gameObject));
+
+        model = Model::createModelFromFile(device, "../../models/flat_vase.obj");
+        auto gfvase = GameObject::createGameObject();
+        gfvase.model = model;
+        gfvase.transform.translation = {1.0f, 0.0f, 0.0f};
+        gfvase.transform.rotation = glm::vec3{0.0f};
+        gfvase.transform.scale = glm::vec3{3.0f};
+        gameObjects.emplace(gfvase.getId(), std::move(gfvase));
+
+        model = Model::createModelFromFile(device, "../../models/smooth_vase.obj");
+        auto gsvase = GameObject::createGameObject();
+        gsvase.model = model;
+        gsvase.transform.translation = {1.8f, 0.0f, 0.0f};
+        gsvase.transform.rotation = glm::vec3{0.0f};
+        gsvase.transform.scale = glm::vec3{3.0f};
+        gameObjects.emplace(gsvase.getId(), std::move(gsvase));
+
+        model = Model::createModelFromFile(device, "../../models/quad.obj");
+        auto floor = GameObject::createGameObject();
+        floor.model = model;
+        floor.transform.translation = {0.0f, 0.0f, 0.0f};
+        floor.transform.rotation = glm::vec3{0.0f};
+        floor.transform.scale = glm::vec3{3.0f};
+        gameObjects.emplace(floor.getId(), std::move(floor));
     }
 }

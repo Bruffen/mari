@@ -56,7 +56,7 @@ namespace mari {
         pipeline = std::make_unique<Pipeline>(device, "../../shaders/simple.vert.spv", "../../shaders/simple.frag.spv", pipelineConfig);
     }
 
-    void SimpleRenderSystem::renderGameObjects(FrameInfo &frameInfo, std::vector<GameObject> &gameObjects) {
+    void SimpleRenderSystem::renderGameObjects(FrameInfo &frameInfo) {
         pipeline->bind(frameInfo.commandBuffer);
 
         vkCmdBindDescriptorSets(
@@ -70,7 +70,10 @@ namespace mari {
             nullptr
         );
 
-        for (auto& obj : gameObjects) {
+        for (auto& kv : frameInfo.gameObjects) {
+            auto& obj = kv.second;
+            if (obj.model == nullptr) continue;
+            
             SimplePushConstantData push{};
             auto modelMatrix = obj.transform.mat4();
             push.modelMatrix = modelMatrix;
