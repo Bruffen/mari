@@ -7,8 +7,8 @@
 
 namespace mari {
     struct PipelineConfigInfo {
-        PipelineConfigInfo(const PipelineConfigInfo&) = delete;
         PipelineConfigInfo() = default;
+        PipelineConfigInfo(const PipelineConfigInfo&) = delete;
         PipelineConfigInfo& operator=(const PipelineConfigInfo&) = delete;
 
         std::vector<VkVertexInputBindingDescription> bindingDescriptions{};
@@ -43,6 +43,7 @@ namespace mari {
 
             void bind(VkCommandBuffer commandBuffer);
             static void defaultPipelineConfigInfo(PipelineConfigInfo &configInfo);
+            static void enableAlphaBlending(PipelineConfigInfo &configInfo);
 
         private:
             static std::vector<char> readFile(const std::string &filepath);

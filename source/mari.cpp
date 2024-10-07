@@ -87,7 +87,7 @@ namespace mari {
             camera.setViewYXZ(cameraObject.transform.translation, cameraObject.transform.rotation);
 
             float aspect = renderer.getAspectRatio();
-            //camera.setOrthographicProjection(-aspect, aspect, -1, 1, -1, 1);
+            //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 100.0f);
             camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
             
             if (auto commandBuffer = renderer.beginFrame()) {
@@ -113,8 +113,10 @@ namespace mari {
 
                 // render
                 renderer.beginSwapchainRenderPass(commandBuffer);
+
                 simpleRenderSystem.renderGameObjects(frameInfo);
                 pointLightSystem.render(frameInfo);
+                
                 renderer.endSwapchainRenderPass(commandBuffer);
                 renderer.endFrame();
             }
