@@ -44,6 +44,7 @@ namespace mari {
             Model &operator=(const Model &) = delete;
 
             static std::unique_ptr<Model> createModelFromFile(Device &device, const std::string &filepath);
+            static std::unique_ptr<Model> createCubeModel(Device& device, glm::vec3 offset);
 
             void bind(VkCommandBuffer commandBuffer);
             void draw(VkCommandBuffer commandBuffer);
