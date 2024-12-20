@@ -23,7 +23,7 @@ namespace mari {
     }
 
     SimpleRenderSystem::~SimpleRenderSystem() {
-        vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
+        vkDestroyPipelineLayout(device.handle(), pipelineLayout, nullptr);
     }
 
     void SimpleRenderSystem::createPipelineLayout(VkDescriptorSetLayout globalSetLayout) {
@@ -41,7 +41,7 @@ namespace mari {
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-        if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(device.handle(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create pipeline layout");
         }
     }

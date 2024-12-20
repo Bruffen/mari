@@ -26,6 +26,7 @@ namespace mari {
             const glm::mat4& getProjection() const { return projectionMatrix; }
             const glm::mat4& getView() const { return viewMatrix; }
             const glm::mat4& getInverseView() const { return inverseViewMatrix; }
+            const glm::mat4  getInverseProjection() const { return glm::inverse(projectionMatrix); } // TODO
 
             void changeFOV(float value);
             static void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);

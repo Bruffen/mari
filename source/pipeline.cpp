@@ -13,9 +13,9 @@ namespace mari {
     }
 
     Pipeline::~Pipeline() {
-        vkDestroyShaderModule(device.device(), vertShaderModule, nullptr);
-        vkDestroyShaderModule(device.device(), fragShaderModule, nullptr);
-        vkDestroyPipeline(device.device(), graphicsPipeline, nullptr);
+        vkDestroyShaderModule(device.handle(), vertShaderModule, nullptr);
+        vkDestroyShaderModule(device.handle(), fragShaderModule, nullptr);
+        vkDestroyPipeline(device.handle(), graphicsPipeline, nullptr);
     }
 
     std::vector<char> Pipeline::readFile(const std::string &filepath) {
@@ -35,6 +35,20 @@ namespace mari {
         return buffer;
     }
 
+    VkShaderModule Pipeline::createShaderModule(Device &device, const std::vector<char> &code) {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device.handle(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shader module.");
+        }
+
+        return shaderModule;
+    }
+
     void Pipeline::createGraphicsPipeline(const std::string &vertFilepath, const std::string &fragFilepath, const PipelineConfigInfo &configInfo) {
         assert(configInfo.pipelineLayout != VK_NULL_HANDLE && "Cannot create graphics pipeline: No pipelineLayout provided in configInfo");
         assert(configInfo.renderPass     != VK_NULL_HANDLE && "Cannot create graphics pipeline: No renderPass provided in configInfo");
@@ -42,8 +56,8 @@ namespace mari {
         auto vertCode = readFile(vertFilepath);
         auto fragCode = readFile(fragFilepath);
 
-        createShaderModule(vertCode, &vertShaderModule);
-        createShaderModule(fragCode, &fragShaderModule);
+        vertShaderModule = createShaderModule(device, vertCode);
+        fragShaderModule = createShaderModule(device, fragCode);
 
         VkPipelineShaderStageCreateInfo shaderStages[2];
         shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -90,19 +104,8 @@ namespace mari {
         pipelineInfo.basePipelineIndex = -1;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-        if (vkCreateGraphicsPipelines(device.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create graphics pipeline");
-        }
-    }
-
-    void Pipeline::createShaderModule(const std::vector<char> &code, VkShaderModule *shaderModule) {
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-        if (vkCreateShaderModule(device.device(), &createInfo, nullptr, shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create shader module.");
         }
     }
 

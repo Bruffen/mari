@@ -28,6 +28,18 @@ namespace mari {
         const bool enableValidationLayers = true;
         #endif
 
+        // TODO rt get these out of here
+        PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
+        PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR;
+        PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR;
+        PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR;
+        PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
+        PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR;
+        PFN_vkBuildAccelerationStructuresKHR vkBuildAccelerationStructuresKHR;
+        PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR;
+        PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR;
+        PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR;
+
         Device(Window &window);
         ~Device();
 
@@ -38,7 +50,8 @@ namespace mari {
         Device &operator=(Device &&) = delete;
 
         VkCommandPool getCommandPool() { return commandPool; }
-        VkDevice device() { return device_; }
+        VkDevice handle() { return device_; }
+        VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
         VkSurfaceKHR surface() { return surface_; }
         VkQueue graphicsQueue() { return graphicsQueue_; }
         VkQueue presentQueue() { return presentQueue_; }
@@ -48,29 +61,26 @@ namespace mari {
         QueueFamilyIndices findPhysicalQueueFamilies() { return findQueueFamilies(physicalDevice); }
         VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
-    void createBuffer(
-        VkDeviceSize size,
-        VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties,
-        VkBuffer &buffer,
-        VkDeviceMemory &bufferMemory);
+        void createBuffer( /* TODO should this be in device? */
+            VkDeviceSize size,
+            VkBufferUsageFlags usage,
+            VkMemoryPropertyFlags properties,
+            VkBuffer &buffer,
+            VkDeviceMemory &bufferMemory);
 
-    VkCommandBuffer beginSingleTimeCommands();
+        VkCommandBuffer beginSingleTimeCommands();
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
 
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void createImageWithInfo(
+            const VkImageCreateInfo &imageInfo,
+            VkMemoryPropertyFlags properties,
+            VkImage &image,
+            VkDeviceMemory &imageMemory);
 
-    void copyBufferToImage(
-        VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
-
-    void createImageWithInfo(
-        const VkImageCreateInfo &imageInfo,
-        VkMemoryPropertyFlags properties,
-        VkImage &image,
-        VkDeviceMemory &imageMemory);
-
-    VkPhysicalDeviceProperties properties;
+        VkPhysicalDeviceProperties properties;
 
     private:
         void createInstance();
@@ -89,6 +99,8 @@ namespace mari {
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
         SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device);
 
+        void addRayTracingExtensions();
+
         VkInstance instance;
         VkDebugUtilsMessengerEXT debugMessenger;
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -101,6 +113,8 @@ namespace mari {
         VkQueue presentQueue_;
 
         const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
-        const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        std::vector<const char *> deviceExtensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        };
     };
 }

@@ -17,6 +17,7 @@ namespace mari {
             Renderer &operator=(const Renderer &) = delete;
 
             VkRenderPass getSwapchainRenderPass() const { return swapchain->getRenderPass(); }
+            Swapchain& getSwapchain() { return *swapchain; }
             float getAspectRatio() const { return swapchain->extentAspectRatio(); }
             bool isFrameInProgress() const { return isFrameStarted; }
 
@@ -30,11 +31,12 @@ namespace mari {
                 return currentFrameIndex;
             }
 
-            VkCommandBuffer beginFrame();
-            void endFrame();
+            VkCommandBuffer beginFrame(bool record);
+            void endFrame(bool record);
             void beginSwapchainRenderPass(VkCommandBuffer commandBuffer);
             void endSwapchainRenderPass(VkCommandBuffer commandBuffer);
 
+            std::vector<VkCommandBuffer> commandBuffers; // TODO rt move to private
         private:
             void createCommandBuffers();
             void freeCommandBuffers();
@@ -43,7 +45,6 @@ namespace mari {
             Window& window;
             Device& device;
             std::unique_ptr<Swapchain> swapchain;
-            std::vector<VkCommandBuffer> commandBuffers;
 
             uint32_t currentImageIndex;
             int currentFrameIndex{0};

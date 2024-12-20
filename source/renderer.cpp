@@ -24,7 +24,7 @@ namespace mari {
             glfwWaitEvents();
         }
 
-        vkDeviceWaitIdle(device.device());
+        vkDeviceWaitIdle(device.handle());
         if (swapchain == nullptr) {
             swapchain = std::make_unique<Swapchain>(device, extent);
         } else {
@@ -46,14 +46,14 @@ namespace mari {
         allocInfo.commandPool = device.getCommandPool();
         allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
-        if (vkAllocateCommandBuffers(device.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+        if (vkAllocateCommandBuffers(device.handle(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate command buffers");
         }
     }
 
     void Renderer::freeCommandBuffers() {
         vkFreeCommandBuffers(
-            device.device(), 
+            device.handle(), 
             device.getCommandPool(), 
             static_cast<uint32_t>(commandBuffers.size()), 
             commandBuffers.data()
@@ -61,7 +61,7 @@ namespace mari {
         commandBuffers.clear();
     }
 
-    VkCommandBuffer Renderer::beginFrame() {
+    VkCommandBuffer Renderer::beginFrame(bool record) {
         assert(!isFrameStarted && "Can't call beginFrame while already in progress");
 
         auto result = swapchain->acquireNextImage(&currentImageIndex);
@@ -78,20 +78,25 @@ namespace mari {
         isFrameStarted = true;
 
         auto commandBuffer = getCurrentCommandBuffer();
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to begin recording command buffer");
+
+        if (record) { // TODO maybe make start recording a different method
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to begin recording command buffer");
+            }
         }
         return commandBuffer;
     }
 
-    void Renderer::endFrame() {
+    void Renderer::endFrame(bool record) {
         assert(isFrameStarted && "Can't call endFrame while frame is not in progress");
 
         auto commandBuffer = getCurrentCommandBuffer();
-        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to record command buffer");
+        if (record) {
+            if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to record command buffer");
+            }
         }
 
         auto result = swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex);

@@ -12,23 +12,7 @@
 #include <cstring>
  
 namespace mari {
- 
-    /**
-     * Returns the minimum instance size required to be compatible with devices minOffsetAlignment
-     *
-     * @param instanceSize The size of an instance
-     * @param minOffsetAlignment The minimum required alignment, in bytes, for the offset member (eg
-     * minUniformBufferOffsetAlignment)
-     *
-     * @return VkResult of the buffer mapping call
-     */
-    VkDeviceSize Buffer::getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment) {
-        if (minOffsetAlignment > 0) {
-            return (instanceSize + minOffsetAlignment - 1) & ~(minOffsetAlignment - 1);
-        }
-        return instanceSize;
-    }
-        
+
     Buffer::Buffer(
             Device &device,
             VkDeviceSize instanceSize,
@@ -48,8 +32,17 @@ namespace mari {
  
     Buffer::~Buffer() {
         unmap();
-        vkDestroyBuffer(device.device(), buffer, nullptr);
-        vkFreeMemory(device.device(), memory, nullptr);
+        vkDestroyBuffer(device.handle(), buffer, nullptr);
+        vkFreeMemory(device.handle(), memory, nullptr);
+    }
+
+    void* Buffer::getMappedMemory() {
+        if (!mapped) {
+            map();
+        }
+
+        assert(mapped && "Memory is not mapped");
+        return mapped;
     }
  
     /**
@@ -63,7 +56,7 @@ namespace mari {
      */
     VkResult Buffer::map(VkDeviceSize size, VkDeviceSize offset) {
         assert(buffer && memory && "Called map on buffer before create");
-        return vkMapMemory(device.device(), memory, offset, size, 0, &mapped);
+        return vkMapMemory(device.handle(), memory, offset, size, 0, &mapped);
     }
     
     /**
@@ -73,7 +66,7 @@ namespace mari {
      */
     void Buffer::unmap() {
         if (mapped) {
-            vkUnmapMemory(device.device(), memory);
+            vkUnmapMemory(device.handle(), memory);
             mapped = nullptr;
         }
     }
@@ -116,7 +109,7 @@ namespace mari {
         mappedRange.memory = memory;
         mappedRange.offset = offset;
         mappedRange.size = size;
-        return vkFlushMappedMemoryRanges(device.device(), 1, &mappedRange);
+        return vkFlushMappedMemoryRanges(device.handle(), 1, &mappedRange);
     }
     
     /**
@@ -136,7 +129,7 @@ namespace mari {
         mappedRange.memory = memory;
         mappedRange.offset = offset;
         mappedRange.size = size;
-        return vkInvalidateMappedMemoryRanges(device.device(), 1, &mappedRange);
+        return vkInvalidateMappedMemoryRanges(device.handle(), 1, &mappedRange);
     }
     
     /**
@@ -196,6 +189,31 @@ namespace mari {
      */
     VkResult Buffer::invalidateIndex(int index) {
         return invalidate(alignmentSize, index * alignmentSize);
+    }
+     
+    /**
+     * Returns the minimum instance size required to be compatible with devices minOffsetAlignment
+     *
+     * @param instanceSize The size of an instance
+     * @param minOffsetAlignment The minimum required alignment, in bytes, for the offset member (eg
+     * minUniformBufferOffsetAlignment)
+     *
+     * @return VkResult of the buffer mapping call
+     */
+    VkDeviceSize Buffer::getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment) {
+        if (minOffsetAlignment > 0) {
+            return (instanceSize + minOffsetAlignment - 1) & ~(minOffsetAlignment - 1);
+        }
+        return instanceSize;
+    }
+
+    uint64_t Buffer::deviceAddress() {
+        assert(buffer && "Buffer is null while trying to get its device address.");
+
+        VkBufferDeviceAddressInfoKHR bufferDeviceAddressInfo{};
+		bufferDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+		bufferDeviceAddressInfo.buffer = buffer;
+		return device.vkGetBufferDeviceAddressKHR(device.handle(), &bufferDeviceAddressInfo);
     }
     
 }

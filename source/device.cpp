@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 namespace mari {
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback( // TODO add different messages by severity
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,
         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
@@ -46,6 +46,7 @@ namespace mari {
         createInstance();
         setupDebugMessenger();
         createSurface();
+        addRayTracingExtensions();
         pickPhysicalDevice();
         createLogicalDevice();
         createCommandPool();
@@ -74,7 +75,7 @@ namespace mari {
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Mari";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_MAKE_API_VERSION(0, 1, 3, 280);
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -91,6 +92,20 @@ namespace mari {
 
             populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
+
+            // Disable specific validation features //TODO not working?
+            std::vector<VkValidationFeatureDisableEXT> validationFeaturesToDisable{
+                VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT        // Needed for profiling with Nsight
+            };
+
+            VkValidationFeaturesEXT validationFeatures{};
+            validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+            validationFeatures.enabledValidationFeatureCount    = 0;
+            validationFeatures.pEnabledValidationFeatures       = nullptr;
+            validationFeatures.disabledValidationFeatureCount   = static_cast<uint32_t>(validationFeaturesToDisable.size());
+            validationFeatures.pDisabledValidationFeatures      = validationFeaturesToDisable.data();
+
+            debugCreateInfo.pNext = &validationFeatures;
         } else {
             createInfo.enabledLayerCount = 0;
             createInfo.pNext = nullptr;
@@ -109,14 +124,17 @@ namespace mari {
         if (deviceCount == 0) {
             throw std::runtime_error("Failed to find GPUs with Vulkan support!");
         }
-        std::cout << "Device count: " << deviceCount << std::endl;
+
         std::vector<VkPhysicalDevice> devices(deviceCount);
         vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
+        std::cout << "Device count: " << deviceCount << std::endl;
         for (const auto &device : devices) {
-            if (isDeviceSuitable(device)) {
+            vkGetPhysicalDeviceProperties(device, &properties);
+            std::cout << "\t" << properties.deviceName << std::endl;
+
+            if (!physicalDevice && isDeviceSuitable(device)) {
                 physicalDevice = device;
-                break;
             }
         }
 
@@ -125,7 +143,7 @@ namespace mari {
         }
 
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-        std::cout << "Physical device: " << properties.deviceName << std::endl;
+        std::cout << "Using: " << properties.deviceName << std::endl;
     }
 
     void Device::createLogicalDevice() {
@@ -136,7 +154,7 @@ namespace mari {
 
         float queuePriority = 1.0f;
         for (uint32_t queueFamily : uniqueQueueFamilies) {
-            VkDeviceQueueCreateInfo queueCreateInfo = {};
+            VkDeviceQueueCreateInfo queueCreateInfo{};
             queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             queueCreateInfo.queueFamilyIndex = queueFamily;
             queueCreateInfo.queueCount = 1;
@@ -144,10 +162,10 @@ namespace mari {
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        VkPhysicalDeviceFeatures deviceFeatures = {};
+        VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
 
-        VkDeviceCreateInfo createInfo = {};
+        VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
@@ -157,14 +175,29 @@ namespace mari {
         createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-        // might not really be necessary anymore because device specific validation layers
-        // have been deprecated
-        if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-        } else {
-            createInfo.enabledLayerCount = 0;
-        }
+        /* Ray tracing features */
+        VkPhysicalDeviceBufferDeviceAddressFeaturesKHR featuresBDA{};
+        featuresBDA.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+        featuresBDA.bufferDeviceAddress = VK_TRUE;
+
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR featureRT{};
+        featureRT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+        featureRT.rayTracingPipeline = VK_TRUE;
+        featureRT.pNext = &featuresBDA;
+
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR featureAS{};
+        featureAS.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+        featureAS.accelerationStructure = VK_TRUE;
+        featureAS.pNext = &featureRT;
+
+        VkPhysicalDeviceRayTracingValidationFeaturesNV featureRTV{};
+        featureRTV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV;
+        featureRTV.rayTracingValidation = VK_TRUE;
+        featureRTV.pNext = &featureAS;
+
+        createInfo.pNext = &featureRTV;
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
 
         if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device_) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create logical device!");
@@ -177,7 +210,7 @@ namespace mari {
     void Device::createCommandPool() {
         QueueFamilyIndices queueFamilyIndices = findPhysicalQueueFamilies();
 
-        VkCommandPoolCreateInfo poolInfo = {};
+        VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -206,8 +239,7 @@ namespace mari {
         return indices.isComplete() && extensionsSupported && swapchainAdequate && supportedFeatures.samplerAnisotropy;
     }
 
-    void Device::populateDebugMessengerCreateInfo(
-        VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
+    void Device::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         createInfo.messageSeverity = 
@@ -275,14 +307,14 @@ namespace mari {
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        std::cout << "Available extensions:" << std::endl;
+        std::cout << "Available instance extensions:" << std::endl;
         std::unordered_set<std::string> available;
         for (const auto &extension : extensions) {
             std::cout << "\t" << extension.extensionName << std::endl;
             available.insert(extension.extensionName);
         }
 
-        std::cout << "Required extensions:" << std::endl;
+        std::cout << "Required instance extensions:" << std::endl;
         auto requiredExtensions = getRequiredExtensions();
         for (const auto &required : requiredExtensions) {
             std::cout << "\t" << required << std::endl;
@@ -292,20 +324,39 @@ namespace mari {
         }
     }
 
+    void Device::addRayTracingExtensions() {
+        std::vector<const char*> rtExtensions = { 
+            VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+            VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+
+            // Required by VK_KHR_acceleration_structure
+            VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+            VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+            VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+
+            // Required for VK_KHR_ray_tracing_pipeline     // TODO Re check if actually required
+            VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+
+            // Required by VK_KHR_spirv_1_4
+            VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
+
+            // Optional useful ray tracing validation layour // TODO use it only in debug mode
+            VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME       
+        };
+        
+        deviceExtensions.insert(deviceExtensions.begin(), rtExtensions.begin(), rtExtensions.end());
+    }
+
     bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device) {
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-        vkEnumerateDeviceExtensionProperties(
-            device,
-            nullptr,
-            &extensionCount,
-            availableExtensions.data());
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
         std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
         for (const auto &extension : availableExtensions) {
+            std::cout << "\t\t" << extension.extensionName << std::endl;
             requiredExtensions.erase(extension.extensionName);
         }
 
@@ -406,7 +457,7 @@ namespace mari {
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create vertex buffer!");
+            throw std::runtime_error("Failed to create buffer!");
         }
 
         VkMemoryRequirements memRequirements;
@@ -417,8 +468,17 @@ namespace mari {
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
+        /**/
+        // TODO ray tracing specific
+        VkMemoryAllocateFlagsInfo flagsInfo{};
+        flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+        flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        
+        allocInfo.pNext = &flagsInfo;
+        /**/
+
         if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate vertex buffer memory!");
+            throw std::runtime_error("Failed to allocate buffer memory!");
         }
 
         vkBindBufferMemory(device_, buffer, bufferMemory, 0);

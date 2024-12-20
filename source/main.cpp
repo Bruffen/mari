@@ -1,11 +1,11 @@
-#include "mari.hpp"
+#include "mari_rt.hpp"
 
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 
 int main() {
-    mari::Mari mari{};
+    mari::MariRT mari{};
 
     try {
         mari.run();

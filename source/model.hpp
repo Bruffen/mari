@@ -38,6 +38,16 @@ namespace mari {
                 void loadModel(const std::string &filepath);
             };
 
+            
+            /**/ // TODO public members for now for ray tracing testing
+            std::unique_ptr<Buffer> vertexBuffer;
+            uint32_t vertexCount;
+
+            bool hasIndexBuffer = false;
+            std::unique_ptr<Buffer> indexBuffer;
+            uint32_t indexCount;
+            /**/
+
             Model(Device &device, const Builder &builder);
             ~Model();
             Model(const Model &) = delete;
@@ -53,12 +63,5 @@ namespace mari {
             void createIndexBuffers(const std::vector<uint32_t> &indices);
 
             Device &device;
-
-            std::unique_ptr<Buffer> vertexBuffer;
-            uint32_t vertexCount;
-
-            bool hasIndexBuffer = false;
-            std::unique_ptr<Buffer> indexBuffer;
-            uint32_t indexCount;
     };
 }

@@ -45,19 +45,22 @@ namespace mari {
             static void defaultPipelineConfigInfo(PipelineConfigInfo &configInfo);
             static void enableAlphaBlending(PipelineConfigInfo &configInfo);
 
-        private:
+            // TODO rt move to private and remove device from args
+            //static void loadShader(const std::string &filepath, VkShaderStageFlagBits flag, VkPipelineShaderStageCreateInfo *stage);
             static std::vector<char> readFile(const std::string &filepath);
+            static VkShaderModule createShaderModule(Device &device, const std::vector<char> &code);
+        private:
 
+            // TODO rt change name to rasterization pipeline
             void createGraphicsPipeline(
                 const std::string &vertFilepath, 
                 const std::string &fragFilepath, 
                 const PipelineConfigInfo &configInfo);
 
-            void createShaderModule(const std::vector<char> &code, VkShaderModule *shaderModule);
 
             Device &device;
             VkPipeline graphicsPipeline;
-            VkShaderModule vertShaderModule;
-            VkShaderModule fragShaderModule;
+            VkShaderModule vertShaderModule; // TODO rt
+            VkShaderModule fragShaderModule; // TODO rt
     };
 }

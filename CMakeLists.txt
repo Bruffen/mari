@@ -125,6 +125,9 @@ find_program(GLSL_VALIDATOR glslangValidator HINTS
 file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.frag"
     "${PROJECT_SOURCE_DIR}/shaders/*.vert"
+    "${PROJECT_SOURCE_DIR}/shaders/*.rgen"
+    "${PROJECT_SOURCE_DIR}/shaders/*.rchit"
+    "${PROJECT_SOURCE_DIR}/shaders/*.rmiss"
 )
  
 foreach(GLSL ${GLSL_SOURCE_FILES})
@@ -132,7 +135,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
     set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/${FILE_NAME}.spv")
     add_custom_command(
         OUTPUT ${SPIRV}
-        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
+        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}  --target-env vulkan1.3 
         DEPENDS ${GLSL})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)

@@ -43,7 +43,7 @@ namespace mari {
         descriptorSetLayoutInfo.pBindings = setLayoutBindings.data();
  
         if (vkCreateDescriptorSetLayout(
-                device.device(),
+                device.handle(),
                 &descriptorSetLayoutInfo,
                 nullptr,
                 &descriptorSetLayout) != VK_SUCCESS) {
@@ -52,7 +52,7 @@ namespace mari {
     }
  
     DescriptorSetLayout::~DescriptorSetLayout() {
-        vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(device.handle(), descriptorSetLayout, nullptr);
     }
     
     // *************** Descriptor Pool Builder *********************
@@ -92,13 +92,13 @@ namespace mari {
         descriptorPoolInfo.maxSets = maxSets;
         descriptorPoolInfo.flags = poolFlags;
     
-        if (vkCreateDescriptorPool(device.device(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(device.handle(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
         }
     }
  
     DescriptorPool::~DescriptorPool() {
-        vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
+        vkDestroyDescriptorPool(device.handle(), descriptorPool, nullptr);
     }
  
     bool DescriptorPool::allocateDescriptor(
@@ -111,7 +111,7 @@ namespace mari {
     
         // Might want to create a "DescriptorPoolManager" class that handles this case, and builds
         // a new pool whenever an old pool fills up. But this is beyond our current scope
-        if (vkAllocateDescriptorSets(device.device(), &allocInfo, &descriptor) != VK_SUCCESS) {
+        if (vkAllocateDescriptorSets(device.handle(), &allocInfo, &descriptor) != VK_SUCCESS) {
             return false;
         }
         return true;
@@ -119,7 +119,7 @@ namespace mari {
  
     void DescriptorPool::freeDescriptors(std::vector<VkDescriptorSet> &descriptors) const {
         vkFreeDescriptorSets(
-            device.device(),
+            device.handle(),
             descriptorPool,
             static_cast<uint32_t>(descriptors.size()),
             descriptors.data()
@@ -127,7 +127,7 @@ namespace mari {
     }
  
     void DescriptorPool::resetPool() {
-        vkResetDescriptorPool(device.device(), descriptorPool, 0);
+        vkResetDescriptorPool(device.handle(), descriptorPool, 0);
     }
  
     // *************** Descriptor Writer *********************
@@ -190,7 +190,7 @@ namespace mari {
         for (auto &write : writes) {
             write.dstSet = set;
         }
-        vkUpdateDescriptorSets(pool.device.device(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+        vkUpdateDescriptorSets(pool.device.handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
  
 }

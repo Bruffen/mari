@@ -14,7 +14,7 @@ namespace mari
     class Swapchain
     {
         public:
-            static constexpr int MAX_FRAMES_IN_FLIGHT = 3;
+            static constexpr int MAX_FRAMES_IN_FLIGHT = 3; // TODO rt
 
             Swapchain(Device &deviceRef, VkExtent2D windowExtent);
             Swapchain(Device &deviceRef, VkExtent2D windowExtent, std::shared_ptr<Swapchain> previous);
@@ -24,17 +24,18 @@ namespace mari
             Swapchain(const Swapchain &) = delete;
             Swapchain &operator=(const Swapchain &) = delete;
 
-            VkFramebuffer getFrameBuffer(int index) { return swapchainFramebuffers[index]; }
-            VkRenderPass getRenderPass() { return renderPass; }
-            VkImageView getImageView(int index) { return swapchainImageViews[index]; }
-            size_t imageCount() { return swapchainImages.size(); }
-            VkFormat getSwapchainImageFormat() { return swapchainImageFormat; }
-            VkExtent2D getSwapchainExtent() { return swapchainExtent; }
-            uint32_t width() { return swapchainExtent.width; }
-            uint32_t height() { return swapchainExtent.height; }
+            VkSwapchainKHR              handle()                        const { return swapchain; }
+            VkFramebuffer               getFrameBuffer(int index)       const { return swapchainFramebuffers[index]; }
+            VkRenderPass                getRenderPass()                 const { return renderPass; }
+            VkImageView                 getImageView(int index)         const { return swapchainImageViews[index]; }
+            std::vector<VkImage>&       getImages()                           { return swapchainImages; }
+            size_t                      imageCount()                    const { return swapchainImages.size(); }
+            VkFormat                    getSwapchainImageFormat()       const { return swapchainImageFormat; }
+            VkExtent2D                  getSwapchainExtent()            const { return swapchainExtent; }
+            uint32_t                    width()                         const { return swapchainExtent.width; }
+            uint32_t                    height()                        const { return swapchainExtent.height; }
 
-            float extentAspectRatio()
-            {
+            float extentAspectRatio() {
                 return static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height);
             }
             VkFormat findDepthFormat();

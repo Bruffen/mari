@@ -90,7 +90,7 @@ namespace mari {
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 100.0f);
             camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
             
-            if (auto commandBuffer = renderer.beginFrame()) {
+            if (auto commandBuffer = renderer.beginFrame(true)) {
                 int frameIndex = renderer.getFrameIndex();
                 FrameInfo frameInfo {
                     frameIndex,
@@ -118,11 +118,11 @@ namespace mari {
                 pointLightSystem.render(frameInfo);
                 
                 renderer.endSwapchainRenderPass(commandBuffer);
-                renderer.endFrame();
+                renderer.endFrame(true);
             }
         }
 
-        vkDeviceWaitIdle(device.device());
+        vkDeviceWaitIdle(device.handle());
     };
 
     void Mari::loadGameObjects() {

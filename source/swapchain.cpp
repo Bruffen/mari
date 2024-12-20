@@ -34,49 +34,49 @@ namespace mari
     Swapchain::~Swapchain() {
         for (auto imageView : swapchainImageViews)
         {
-            vkDestroyImageView(device.device(), imageView, nullptr);
+            vkDestroyImageView(device.handle(), imageView, nullptr);
         }
         swapchainImageViews.clear();
 
         if (swapchain != nullptr)
         {
-            vkDestroySwapchainKHR(device.device(), swapchain, nullptr);
+            vkDestroySwapchainKHR(device.handle(), swapchain, nullptr);
             swapchain = nullptr;
         }
 
         for (int i = 0; i < depthImages.size(); i++)
         {
-            vkDestroyImageView(device.device(), depthImageViews[i], nullptr);
-            vkDestroyImage(device.device(), depthImages[i], nullptr);
-            vkFreeMemory(device.device(), depthImageMemorys[i], nullptr);
+            vkDestroyImageView(device.handle(), depthImageViews[i], nullptr);
+            vkDestroyImage(device.handle(), depthImages[i], nullptr);
+            vkFreeMemory(device.handle(), depthImageMemorys[i], nullptr);
         }
 
         for (auto framebuffer : swapchainFramebuffers)
         {
-            vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
+            vkDestroyFramebuffer(device.handle(), framebuffer, nullptr);
         }
 
-        vkDestroyRenderPass(device.device(), renderPass, nullptr);
+        vkDestroyRenderPass(device.handle(), renderPass, nullptr);
 
         // cleanup synchronization objects
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            vkDestroySemaphore(device.device(), renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device.device(), imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device.device(), inFlightFences[i], nullptr);
+            vkDestroySemaphore(device.handle(), renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device.handle(), imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device.handle(), inFlightFences[i], nullptr);
         }
     }
 
     VkResult Swapchain::acquireNextImage(uint32_t *imageIndex) {
         vkWaitForFences(
-            device.device(),
+            device.handle(),
             1,
             &inFlightFences[currentFrame],
             VK_TRUE,
             std::numeric_limits<uint64_t>::max());
 
         VkResult result = vkAcquireNextImageKHR(
-            device.device(),
+            device.handle(),
             swapchain,
             std::numeric_limits<uint64_t>::max(),
             imageAvailableSemaphores[currentFrame], // must be a not signaled semaphore
@@ -89,7 +89,7 @@ namespace mari
     VkResult Swapchain::submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex) {
         if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE)
         {
-            vkWaitForFences(device.device(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
+            vkWaitForFences(device.handle(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
         }
         imagesInFlight[*imageIndex] = inFlightFences[currentFrame];
 
@@ -97,11 +97,10 @@ namespace mari
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
         VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR}; //TODO rt
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
-
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = buffers;
 
@@ -109,7 +108,7 @@ namespace mari
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
+        vkResetFences(device.handle(), 1, &inFlightFences[currentFrame]);
         if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) !=
             VK_SUCCESS)
         {
@@ -118,15 +117,11 @@ namespace mari
 
         VkPresentInfoKHR presentInfo = {};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
-
-        VkSwapchainKHR Swapchains[] = {swapchain};
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = Swapchains;
-
-        presentInfo.pImageIndices = imageIndex;
+        presentInfo.waitSemaphoreCount  = 1;
+        presentInfo.pWaitSemaphores     = signalSemaphores;
+        presentInfo.swapchainCount      = 1;
+        presentInfo.pSwapchains         = &swapchain;
+        presentInfo.pImageIndices       = imageIndex;
 
         auto result = vkQueuePresentKHR(device.presentQueue(), &presentInfo);
 
@@ -158,19 +153,17 @@ namespace mari
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
         createInfo.imageExtent = extent;
         createInfo.imageArrayLayers = 1;
-        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; // TODO rt for rasterization use only VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
         QueueFamilyIndices indices = device.findPhysicalQueueFamilies();
         uint32_t queueFamilyIndices[] = {indices.graphicsFamily, indices.presentFamily};
 
-        if (indices.graphicsFamily != indices.presentFamily)
-        {
+        if (indices.graphicsFamily != indices.presentFamily) {
             createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             createInfo.queueFamilyIndexCount = 2;
             createInfo.pQueueFamilyIndices = queueFamilyIndices;
         }
-        else
-        {
+        else {
             createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
             createInfo.queueFamilyIndexCount = 0;     // Optional
             createInfo.pQueueFamilyIndices = nullptr; // Optional
@@ -184,8 +177,7 @@ namespace mari
 
         createInfo.oldSwapchain = oldSwapchain == nullptr ? VK_NULL_HANDLE : oldSwapchain->swapchain;
 
-        if (vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapchain) != VK_SUCCESS)
-        {
+        if (vkCreateSwapchainKHR(device.handle(), &createInfo, nullptr, &swapchain) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create swap chain");
         }
 
@@ -193,9 +185,9 @@ namespace mari
         // allowed to create a swap chain with more. That's why we'll first query the final number of
         // images with vkGetSwapchainImagesKHR, then resize the container and finally call it again to
         // retrieve the handles.
-        vkGetSwapchainImagesKHR(device.device(), swapchain, &imageCount, nullptr);
+        vkGetSwapchainImagesKHR(device.handle(), swapchain, &imageCount, nullptr);
         swapchainImages.resize(imageCount);
-        vkGetSwapchainImagesKHR(device.device(), swapchain, &imageCount, swapchainImages.data());
+        vkGetSwapchainImagesKHR(device.handle(), swapchain, &imageCount, swapchainImages.data());
 
         swapchainImageFormat = surfaceFormat.format;
         swapchainExtent = extent;
@@ -216,7 +208,7 @@ namespace mari
             viewInfo.subresourceRange.baseArrayLayer = 0;
             viewInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(device.device(), &viewInfo, nullptr, &swapchainImageViews[i]) !=
+            if (vkCreateImageView(device.handle(), &viewInfo, nullptr, &swapchainImageViews[i]) !=
                 VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to create texture image view!");
@@ -280,7 +272,7 @@ namespace mari
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
 
-        if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
+        if (vkCreateRenderPass(device.handle(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
         {
             throw std::runtime_error("Failed to create render pass!");
         }
@@ -303,7 +295,7 @@ namespace mari
             framebufferInfo.layers = 1;
 
             if (vkCreateFramebuffer(
-                    device.device(),
+                    device.handle(),
                     &framebufferInfo,
                     nullptr,
                     &swapchainFramebuffers[i]) != VK_SUCCESS)
@@ -356,7 +348,7 @@ namespace mari
             viewInfo.subresourceRange.baseArrayLayer = 0;
             viewInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(device.device(), &viewInfo, nullptr, &depthImageViews[i]) != VK_SUCCESS)
+            if (vkCreateImageView(device.handle(), &viewInfo, nullptr, &depthImageViews[i]) != VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to create texture image view!");
             }
@@ -378,11 +370,11 @@ namespace mari
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            if (vkCreateSemaphore(device.device(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) !=
+            if (vkCreateSemaphore(device.handle(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) !=
                     VK_SUCCESS ||
-                vkCreateSemaphore(device.device(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) !=
+                vkCreateSemaphore(device.handle(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) !=
                     VK_SUCCESS ||
-                vkCreateFence(device.device(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
+                vkCreateFence(device.handle(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to create synchronization objects for a frame!");
             }
