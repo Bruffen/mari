@@ -2,34 +2,47 @@
 
 #include <vulkan/vulkan.h>
 
-namespace vkhelper {
+namespace mari {
+    extern PFN_vkGetBufferDeviceAddressKHR                vkGetBufferDeviceAddressKHR;                   // TODO try and get a better way of doing this
+    extern PFN_vkCreateAccelerationStructureKHR           vkCreateAccelerationStructureKHR;              // TODO group these by extensions and features
+    extern PFN_vkDestroyAccelerationStructureKHR          vkDestroyAccelerationStructureKHR;
+    extern PFN_vkGetAccelerationStructureBuildSizesKHR    vkGetAccelerationStructureBuildSizesKHR;
+    extern PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
+    extern PFN_vkCmdBuildAccelerationStructuresKHR        vkCmdBuildAccelerationStructuresKHR;
+    extern PFN_vkBuildAccelerationStructuresKHR           vkBuildAccelerationStructuresKHR;
+    extern PFN_vkCmdTraceRaysKHR                          vkCmdTraceRaysKHR;
+    extern PFN_vkGetRayTracingShaderGroupHandlesKHR       vkGetRayTracingShaderGroupHandlesKHR;
+    extern PFN_vkCreateRayTracingPipelinesKHR             vkCreateRayTracingPipelinesKHR;
 
-    VkAccessFlags           getAccessFlags(VkImageLayout layout);
-    VkPipelineStageFlags    getPipelineStageFlags(VkImageLayout layout);
+    void                                                  getRayTracingFunctionPointers(VkDevice device);
 
-    void                    transitionImageLayout(
-                                VkCommandBuffer                commandBuffer,
-                                VkImage                        image,
-                                VkPipelineStageFlags           srcStageMask,
-                                VkPipelineStageFlags           dstStageMask,
-                                VkAccessFlags                  srcAccessMask,
-                                VkAccessFlags                  dstAccessMask,
-                                VkImageLayout                  oldLayout,
-                                VkImageLayout                  newLayout,
-                                VkImageSubresourceRange const &subresourceRange);
+    namespace vkhelper {
 
-    void                    transitionImageLayout(
-                                VkCommandBuffer                commandBuffer,
-                                VkImage                        image,
-                                VkImageLayout                  oldLayout,
-                                VkImageLayout                  newLayout,
-                                VkImageSubresourceRange const &subresourceRange);
+        VkAccessFlags           getAccessFlags(VkImageLayout layout);
+        VkPipelineStageFlags    getPipelineStageFlags(VkImageLayout layout);
 
-    void                    transitionImageLayout(
-                                VkCommandBuffer                commandBuffer,
-                                VkImage                        image,
-                                VkImageLayout                  oldLayout,
-                                VkImageLayout                  newLayout);
+        void                    transitionImageLayout(
+                                    VkCommandBuffer                commandBuffer,
+                                    VkImage                        image,
+                                    VkPipelineStageFlags           srcStageMask,
+                                    VkPipelineStageFlags           dstStageMask,
+                                    VkAccessFlags                  srcAccessMask,
+                                    VkAccessFlags                  dstAccessMask,
+                                    VkImageLayout                  oldLayout,
+                                    VkImageLayout                  newLayout,
+                                    VkImageSubresourceRange const &subresourceRange);
 
+        void                    transitionImageLayout(
+                                    VkCommandBuffer                commandBuffer,
+                                    VkImage                        image,
+                                    VkImageLayout                  oldLayout,
+                                    VkImageLayout                  newLayout,
+                                    VkImageSubresourceRange const &subresourceRange);
 
+        void                    transitionImageLayout(
+                                    VkCommandBuffer                commandBuffer,
+                                    VkImage                        image,
+                                    VkImageLayout                  oldLayout,
+                                    VkImageLayout                  newLayout);
+    }
 }

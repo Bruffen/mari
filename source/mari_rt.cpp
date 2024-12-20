@@ -1,3 +1,5 @@
+#pragma once
+
 #include "mari_rt.hpp"
 
 #include "keyboard_controller.hpp"
@@ -31,8 +33,6 @@ namespace mari {
         loadGameObjects();
         std::cout << "Initializing ray tracing..." << std::endl;
         initializeRayTracing();
-        std::cout << "Get function pointers..." << std::endl;
-        getRayTracingFunctionPointers();
         std::cout << "Creating storage image..." << std::endl;
         createStorageImage();
         std::cout << "Building BLAS..." << std::endl;
@@ -128,7 +128,7 @@ namespace mari {
         std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
         auto gameObject = GameObject::createGameObject();
         gameObject.model = model;
-        gameObject.transform.translation = {3.0f, -0.01f, 0.0f};
+        gameObject.transform.translation = {0.0f, -0.01f, 0.0f};
         gameObject.transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(180.0f)};
         gameObject.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gameObject.getId(), std::move(gameObject));
@@ -201,19 +201,8 @@ namespace mari {
 		deviceFeatures2.pNext = &accelerationStructureFeatures;
 		vkGetPhysicalDeviceFeatures2(device.getPhysicalDevice(), &deviceFeatures2)
         */
-    }
 
-    void MariRT::getRayTracingFunctionPointers() {
-        device.vkGetBufferDeviceAddressKHR = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(device.handle(), "vkGetBufferDeviceAddressKHR"));
-        device.vkCmdBuildAccelerationStructuresKHR = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(device.handle(), "vkCmdBuildAccelerationStructuresKHR"));
-        device.vkBuildAccelerationStructuresKHR = reinterpret_cast<PFN_vkBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(device.handle(), "vkBuildAccelerationStructuresKHR"));
-        device.vkCreateAccelerationStructureKHR = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(vkGetDeviceProcAddr(device.handle(), "vkCreateAccelerationStructureKHR"));
-        device.vkDestroyAccelerationStructureKHR = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(vkGetDeviceProcAddr(device.handle(), "vkDestroyAccelerationStructureKHR"));
-        device.vkGetAccelerationStructureBuildSizesKHR = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(vkGetDeviceProcAddr(device.handle(), "vkGetAccelerationStructureBuildSizesKHR"));
-        device.vkGetAccelerationStructureDeviceAddressKHR = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(vkGetDeviceProcAddr(device.handle(), "vkGetAccelerationStructureDeviceAddressKHR"));
-        device.vkCmdTraceRaysKHR = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(device.handle(), "vkCmdTraceRaysKHR"));
-        device.vkGetRayTracingShaderGroupHandlesKHR = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(vkGetDeviceProcAddr(device.handle(), "vkGetRayTracingShaderGroupHandlesKHR"));
-        device.vkCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(device.handle(), "vkCreateRayTracingPipelinesKHR"));
+        getRayTracingFunctionPointers(device.handle());
     }
 
     void MariRT::createStorageImage() {
@@ -324,7 +313,7 @@ namespace mari {
         VkBufferDeviceAddressInfoKHR bufferDeviceAddressInfo{};
         bufferDeviceAddressInfo.sType  = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
         bufferDeviceAddressInfo.buffer = scratchBuffer.handle;
-        scratchBuffer.device_address   = device.vkGetBufferDeviceAddressKHR(device.handle(), &bufferDeviceAddressInfo);
+        scratchBuffer.device_address   = vkGetBufferDeviceAddressKHR(device.handle(), &bufferDeviceAddressInfo);
 
         return scratchBuffer;
     }
@@ -339,12 +328,11 @@ namespace mari {
     }
 
     void MariRT::buildBottomLevelAccelerationStructure() {
+        GameObject* marie = &gameObjects.at(0); // TODO run through every scene gameobject and create respective blas
+
         // Test identity transform matrix TODO rt use gameobject's
-        VkTransformMatrixKHR transformMatrix = {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f
-        };
+        
+        VkTransformMatrixKHR transformMatrix = marie->transform.matKHR();
 
         Buffer stagingBuffer{
             device,
@@ -371,8 +359,6 @@ namespace mari {
         VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
         VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
         VkDeviceOrHostAddressConstKHR transformBufferDeviceAddress{};
-
-        GameObject* marie = &gameObjects.at(0);
         
         vertexBufferDeviceAddress.deviceAddress = marie->model->vertexBuffer->deviceAddress();
         indexBufferDeviceAddress.deviceAddress = marie->model->indexBuffer->deviceAddress();
@@ -387,10 +373,10 @@ namespace mari {
         accelerationStructureGeometry.geometry.triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
         accelerationStructureGeometry.geometry.triangles.vertexData    = vertexBufferDeviceAddress;
         accelerationStructureGeometry.geometry.triangles.maxVertex     = marie->model->vertexCount - 1;
-        accelerationStructureGeometry.geometry.triangles.vertexStride  = sizeof(Model::Vertex::position);
+        accelerationStructureGeometry.geometry.triangles.vertexStride  = sizeof(Model::Vertex);
         accelerationStructureGeometry.geometry.triangles.indexType     = VK_INDEX_TYPE_UINT32;
         accelerationStructureGeometry.geometry.triangles.indexData     = indexBufferDeviceAddress;
-        //accelerationStructureGeometry.geometry.triangles.transformData.deviceAddress = 0;
+        accelerationStructureGeometry.geometry.triangles.transformData.deviceAddress = transformBufferDeviceAddress.deviceAddress;
         //accelerationStructureGeometry.geometry.triangles.transformData.hostAddress = nullptr;
         accelerationStructureGeometry.geometry.triangles.transformData = transformBufferDeviceAddress;
         
@@ -405,7 +391,7 @@ namespace mari {
         const uint32_t numTriangles = marie->model->indexCount / 3;
         VkAccelerationStructureBuildSizesInfoKHR accelerationStructureBuildSizesInfo{};
         accelerationStructureBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-        device.vkGetAccelerationStructureBuildSizesKHR(
+        vkGetAccelerationStructureBuildSizesKHR(
             device.handle(),
             VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
             &accelerationStructureBuildGeometryInfo,
@@ -425,7 +411,7 @@ namespace mari {
         accelerationStructureCreateInfo.buffer = bottomLevelAS.buffer->handle();
         accelerationStructureCreateInfo.size   = accelerationStructureBuildSizesInfo.accelerationStructureSize;
         accelerationStructureCreateInfo.type   = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-        if (device.vkCreateAccelerationStructureKHR(device.handle(), &accelerationStructureCreateInfo, nullptr, &bottomLevelAS.handle)) {
+        if (vkCreateAccelerationStructureKHR(device.handle(), &accelerationStructureCreateInfo, nullptr, &bottomLevelAS.handle)) {
             throw std::runtime_error("Could not create blas");
         }
 
@@ -443,7 +429,7 @@ namespace mari {
         std::vector<VkAccelerationStructureBuildRangeInfoKHR *> accelerationStructureBuildRangeInfos = {&accelerationStructureBuildRangeInfo};
 
         VkCommandBuffer cmdBuffer = device.beginSingleTimeCommands();
-        device.vkCmdBuildAccelerationStructuresKHR(cmdBuffer, 1, &accelerationStructureBuildGeometryInfo, accelerationStructureBuildRangeInfos.data());
+        vkCmdBuildAccelerationStructuresKHR(cmdBuffer, 1, &accelerationStructureBuildGeometryInfo, accelerationStructureBuildRangeInfos.data());
         device.endSingleTimeCommands(cmdBuffer);
 
         deleteScratchBuffer(scratchBuffer);
@@ -451,7 +437,7 @@ namespace mari {
         VkAccelerationStructureDeviceAddressInfoKHR accelerationStructureDeviceAddressInfo{};
         accelerationStructureDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
         accelerationStructureDeviceAddressInfo.accelerationStructure = bottomLevelAS.handle;
-        bottomLevelAS.device_address = device.vkGetAccelerationStructureDeviceAddressKHR(device.handle(), &accelerationStructureDeviceAddressInfo);
+        bottomLevelAS.device_address = vkGetAccelerationStructureDeviceAddressKHR(device.handle(), &accelerationStructureDeviceAddressInfo);
     }
 
     VkPipelineShaderStageCreateInfo MariRT::loadShader(const std::string &filepath, VkShaderStageFlagBits stage) {
@@ -527,7 +513,7 @@ namespace mari {
         
         VkAccelerationStructureBuildSizesInfoKHR accelerationStructureBuildSizesInfo{};
         accelerationStructureBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-        device.vkGetAccelerationStructureBuildSizesKHR(
+        vkGetAccelerationStructureBuildSizesKHR(
             device.handle(),
             VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
             &accelerationStructureBuildGeometryInfo,
@@ -548,7 +534,7 @@ namespace mari {
         accelerationStructureCreateInfo.buffer = topLevelAS.buffer->handle();
         accelerationStructureCreateInfo.size   = accelerationStructureBuildSizesInfo.accelerationStructureSize;
         accelerationStructureCreateInfo.type   = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-        if (device.vkCreateAccelerationStructureKHR(device.handle(), &accelerationStructureCreateInfo, nullptr, &topLevelAS.handle)) {
+        if (vkCreateAccelerationStructureKHR(device.handle(), &accelerationStructureCreateInfo, nullptr, &topLevelAS.handle)) {
             throw std::runtime_error("Could not create tlas");
         };
 
@@ -566,7 +552,7 @@ namespace mari {
         std::vector<VkAccelerationStructureBuildRangeInfoKHR *> accelerationStructureBuildRangeInfos = {&accelerationStructureBuildRangeInfo};
 
         VkCommandBuffer cmdBuffer = device.beginSingleTimeCommands();
-        device.vkCmdBuildAccelerationStructuresKHR(cmdBuffer, 1, &accelerationStructureBuildGeometryInfo, accelerationStructureBuildRangeInfos.data());
+        vkCmdBuildAccelerationStructuresKHR(cmdBuffer, 1, &accelerationStructureBuildGeometryInfo, accelerationStructureBuildRangeInfos.data());
         device.endSingleTimeCommands(cmdBuffer);
 
         deleteScratchBuffer(scratchBuffer);
@@ -574,7 +560,7 @@ namespace mari {
         VkAccelerationStructureDeviceAddressInfoKHR accelerationStructureDeviceAddressInfo{};
         accelerationStructureDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
         accelerationStructureDeviceAddressInfo.accelerationStructure = topLevelAS.handle;
-        topLevelAS.device_address = device.vkGetAccelerationStructureDeviceAddressKHR(device.handle(), &accelerationStructureDeviceAddressInfo);
+        topLevelAS.device_address = vkGetAccelerationStructureDeviceAddressKHR(device.handle(), &accelerationStructureDeviceAddressInfo);
     }
 
     void MariRT::createRayTracingPipeline() {
@@ -664,7 +650,7 @@ namespace mari {
         rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
         rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = 1;
         rayTracingPipelineCreateInfo.layout                 = pipelineLayout;
-        if (device.vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &pipeline)) {
+        if (vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &pipeline)) {
             throw std::runtime_error("Failed to create ray tracing pipeline");
         }
 
@@ -688,7 +674,7 @@ namespace mari {
         hitSBT    = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
         std::vector<uint8_t> shaderHandleStorage(sbtSize);
-        if (device.vkGetRayTracingShaderGroupHandlesKHR(device.handle(), pipeline, 0, groupCount, sbtSize, shaderHandleStorage.data())) {
+        if (vkGetRayTracingShaderGroupHandlesKHR(device.handle(), pipeline, 0, groupCount, sbtSize, shaderHandleStorage.data())) {
             throw std::runtime_error("Failed to get ray tracing shader group handles");
         }
 
@@ -814,7 +800,7 @@ namespace mari {
 
             vkCmdBindPipeline(renderer.commandBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
             vkCmdBindDescriptorSets(renderer.commandBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &descriptorSets[i], 0, 0);
-            device.vkCmdTraceRaysKHR(renderer.commandBuffers[i], &raygenSBTEntry, &missSBTEntry, &hitSBTEntry, &callableSBTEntry, WIDTH, HEIGHT, 1);
+            vkCmdTraceRaysKHR(renderer.commandBuffers[i], &raygenSBTEntry, &missSBTEntry, &hitSBTEntry, &callableSBTEntry, WIDTH, HEIGHT, 1);
 
             vkhelper::transitionImageLayout(
                 renderer.commandBuffers[i], 

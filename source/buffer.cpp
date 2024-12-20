@@ -6,6 +6,7 @@
  */
  
 #include "buffer.hpp"
+#include "vk_helper.hpp"
  
 // std
 #include <cassert>
@@ -211,10 +212,9 @@ namespace mari {
         assert(buffer && "Buffer is null while trying to get its device address.");
 
         VkBufferDeviceAddressInfoKHR bufferDeviceAddressInfo{};
-		bufferDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-		bufferDeviceAddressInfo.buffer = buffer;
-		return device.vkGetBufferDeviceAddressKHR(device.handle(), &bufferDeviceAddressInfo);
+        bufferDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        bufferDeviceAddressInfo.buffer = buffer;
+        return vkGetBufferDeviceAddressKHR(device.handle(), &bufferDeviceAddressInfo);
     }
-    
 }
  

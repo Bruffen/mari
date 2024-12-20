@@ -76,7 +76,6 @@ namespace mari {
             std::vector<std::unique_ptr<Buffer>>    uboBuffers;
 
             void initializeRayTracing();
-            void getRayTracingFunctionPointers();
             void createStorageImage();
             void createUniformBuffers();
             void buildBottomLevelAccelerationStructure();

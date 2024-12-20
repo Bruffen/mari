@@ -28,18 +28,6 @@ namespace mari {
         const bool enableValidationLayers = true;
         #endif
 
-        // TODO rt get these out of here
-        PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
-        PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR;
-        PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR;
-        PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR;
-        PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
-        PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR;
-        PFN_vkBuildAccelerationStructuresKHR vkBuildAccelerationStructuresKHR;
-        PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR;
-        PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR;
-        PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR;
-
         Device(Window &window);
         ~Device();
 
