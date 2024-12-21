@@ -143,6 +143,13 @@ namespace mari {
         }
 
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+        //TODO VkPhysicalDeviceProperties2 encapsulates VkPhysicalDeviceProperties
+        //TODO also make sure the device we request has these features during the previous loop
+        VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2}; 
+        prop2.pNext = &propertiesRT;
+        vkGetPhysicalDeviceProperties2(physicalDevice, &prop2);
+
         std::cout << "Using: " << properties.deviceName << std::endl;
     }
 
@@ -469,7 +476,7 @@ namespace mari {
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
         /**/
-        // TODO ray tracing specific
+        // TODO rt ray tracing specific
         VkMemoryAllocateFlagsInfo flagsInfo{};
         flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
         flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;

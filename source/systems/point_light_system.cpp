@@ -58,7 +58,8 @@ namespace mari {
         pipelineConfig.bindingDescriptions.clear();
         pipelineConfig.renderPass = renderPass;
         pipelineConfig.pipelineLayout = pipelineLayout;
-        pipeline = std::make_unique<Pipeline>(device, "../../shaders/point_light.vert.spv", "../../shaders/point_light.frag.spv", pipelineConfig);
+        pipeline = std::make_unique<Pipeline>(device);
+        pipeline->createGraphicsPipeline("../../shaders/point_light.vert.spv", "../../shaders/point_light.frag.spv", pipelineConfig);
     }
 
     void PointLightSystem::update(FrameInfo &frameInfo, GlobalUbo &ubo) {

@@ -37,17 +37,17 @@ namespace mari {
         Device(Device &&) = delete;
         Device &operator=(Device &&) = delete;
 
-        VkCommandPool getCommandPool() { return commandPool; }
-        VkDevice handle() { return device_; }
-        VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
-        VkSurfaceKHR surface() { return surface_; }
-        VkQueue graphicsQueue() { return graphicsQueue_; }
-        VkQueue presentQueue() { return presentQueue_; }
+        VkDevice                    handle()                { return device_; }
+        VkSurfaceKHR                surface()               { return surface_; }
+        VkQueue                     graphicsQueue()         { return graphicsQueue_; }
+        VkQueue                     presentQueue()          { return presentQueue_; }
+        VkCommandPool               getCommandPool()        { return commandPool; }
+        VkPhysicalDevice            getPhysicalDevice()     { return physicalDevice; }
+        SwapchainSupportDetails     getSwapchainSupport()   { return querySwapchainSupport(physicalDevice); }
 
-        SwapchainSupportDetails getSwapchainSupport() { return querySwapchainSupport(physicalDevice); }
-        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-        QueueFamilyIndices findPhysicalQueueFamilies() { return findQueueFamilies(physicalDevice); }
-        VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+        uint32_t                    findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+        QueueFamilyIndices          findPhysicalQueueFamilies() { return findQueueFamilies(physicalDevice); }
+        VkFormat                    findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
         void createBuffer( /* TODO should this be in device? */
             VkDeviceSize size,
@@ -69,6 +69,9 @@ namespace mari {
             VkDeviceMemory &imageMemory);
 
         VkPhysicalDeviceProperties properties;
+        VkPhysicalDeviceRayTracingPipelinePropertiesKHR propertiesRT{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
+
 
     private:
         void createInstance();
@@ -89,16 +92,16 @@ namespace mari {
 
         void addRayTracingExtensions();
 
-        VkInstance instance;
-        VkDebugUtilsMessengerEXT debugMessenger;
-        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-        Window &window;
-        VkCommandPool commandPool;
+        VkInstance                  instance;
+        VkDebugUtilsMessengerEXT    debugMessenger;
+        VkPhysicalDevice            physicalDevice = VK_NULL_HANDLE;
+        Window                      &window;
+        VkCommandPool               commandPool;
 
-        VkDevice device_;
-        VkSurfaceKHR surface_;
-        VkQueue graphicsQueue_;
-        VkQueue presentQueue_;
+        VkDevice                    device_;
+        VkSurfaceKHR                surface_;
+        VkQueue                     graphicsQueue_;
+        VkQueue                     presentQueue_;
 
         const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
         std::vector<const char *> deviceExtensions = {

@@ -114,7 +114,7 @@ namespace mari {
                 // render
                 renderer.beginSwapchainRenderPass(commandBuffer);
 
-                simpleRenderSystem.renderGameObjects(frameInfo);
+                simpleRenderSystem.render(frameInfo);
                 pointLightSystem.render(frameInfo);
                 
                 renderer.endSwapchainRenderPass(commandBuffer);
@@ -129,33 +129,33 @@ namespace mari {
         //std::shared_ptr<Model> model = Model::createCubeModel(device, {0.0f, 0.0f, 0.0f});
         //std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/CornellBox/CornellBox-Original.obj");
 
-        std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
+        std::shared_ptr<Model> modelMarie = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
         auto gameObject = GameObject::createGameObject();
-        gameObject.model = model;
+        gameObject.model = modelMarie;
         gameObject.transform.translation = {0.0f, -0.01f, 0.0f};
         gameObject.transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(180.0f)};
         gameObject.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gameObject.getId(), std::move(gameObject));
 
-        model = Model::createModelFromFile(device, "../../models/flat_vase.obj");
+        std::shared_ptr<Model> modelVaseF = Model::createModelFromFile(device, "../../models/flat_vase.obj");
         auto gfvase = GameObject::createGameObject();
-        gfvase.model = model;
+        gfvase.model = modelVaseF;
         gfvase.transform.translation = {1.0f, 0.0f, 0.0f};
         gfvase.transform.rotation = glm::vec3{0.0f};
         gfvase.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gfvase.getId(), std::move(gfvase));
 
-        model = Model::createModelFromFile(device, "../../models/smooth_vase.obj");
+        std::shared_ptr<Model> modelVaseS = Model::createModelFromFile(device, "../../models/smooth_vase.obj");
         auto gsvase = GameObject::createGameObject();
-        gsvase.model = model;
+        gsvase.model = modelVaseS;
         gsvase.transform.translation = {1.8f, 0.0f, 0.0f};
         gsvase.transform.rotation = glm::vec3{0.0f};
         gsvase.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gsvase.getId(), std::move(gsvase));
 
-        model = Model::createModelFromFile(device, "../../models/quad.obj");
+        std::shared_ptr<Model> modelFloor = Model::createModelFromFile(device, "../../models/quad.obj");
         auto floor = GameObject::createGameObject();
-        floor.model = model;
+        floor.model = modelFloor;
         floor.transform.translation = {0.0f, 0.0f, 0.0f};
         floor.transform.rotation = glm::vec3{0.0f};
         floor.transform.scale = glm::vec3{3.0f};

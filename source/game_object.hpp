@@ -16,7 +16,7 @@ namespace mari {
 
         glm::mat4  mat4();
         glm::mat3  normalMatrix();
-        VkTransformMatrixKHR matKHR();
+        VkTransformMatrixKHR matKHR() const;
 
         glm::mat3 matrixRotation() {
             glm::vec3 forward{0.0f, 0.0f, 1.0f};

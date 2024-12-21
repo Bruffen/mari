@@ -53,10 +53,11 @@ namespace mari {
         Pipeline::defaultPipelineConfigInfo(pipelineConfig);
         pipelineConfig.renderPass = renderPass;
         pipelineConfig.pipelineLayout = pipelineLayout;
-        pipeline = std::make_unique<Pipeline>(device, "../../shaders/simple.vert.spv", "../../shaders/simple.frag.spv", pipelineConfig);
+        pipeline = std::make_unique<Pipeline>(device);
+        pipeline->createGraphicsPipeline("../../shaders/simple.vert.spv", "../../shaders/simple.frag.spv", pipelineConfig);
     }
 
-    void SimpleRenderSystem::renderGameObjects(FrameInfo &frameInfo) {
+    void SimpleRenderSystem::render(FrameInfo &frameInfo) {
         pipeline->bind(frameInfo.commandBuffer);
 
         vkCmdBindDescriptorSets(

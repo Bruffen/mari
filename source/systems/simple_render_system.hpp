@@ -1,6 +1,5 @@
 #pragma once
 
-#include "camera.hpp"
 #include "device.hpp"
 #include "pipeline.hpp"
 #include "game_object.hpp"
@@ -15,7 +14,7 @@ namespace mari {
             SimpleRenderSystem(Device &device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout);
             ~SimpleRenderSystem();
 
-            void renderGameObjects(FrameInfo &frameInfo) ;
+            void render(FrameInfo &frameInfo) ;
         private:
             void createPipelineLayout(VkDescriptorSetLayout globalSetLayout);
             void createPipeline(VkRenderPass renderPass);

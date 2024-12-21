@@ -1,6 +1,6 @@
 #include "pipeline.hpp"
-
 #include "model.hpp"
+#include "vk_helper.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -8,14 +8,13 @@
 #include <cassert>
 
 namespace mari {
-    Pipeline::Pipeline(Device &device, const std::string &vertFilepath, const std::string &fragFilepath, const PipelineConfigInfo &configInfo) : device{device} {
-        createGraphicsPipeline(vertFilepath, fragFilepath, configInfo);
-    }
+    Pipeline::Pipeline(Device &device) : device{device} {}
 
     Pipeline::~Pipeline() {
-        vkDestroyShaderModule(device.handle(), vertShaderModule, nullptr);
-        vkDestroyShaderModule(device.handle(), fragShaderModule, nullptr);
-        vkDestroyPipeline(device.handle(), graphicsPipeline, nullptr);
+        for (VkShaderModule shader : shaderModules) {
+            vkDestroyShaderModule(device.handle(), shader, nullptr);
+        }
+        vkDestroyPipeline(device.handle(), handle, nullptr);
     }
 
     std::vector<char> Pipeline::readFile(const std::string &filepath) {
@@ -35,7 +34,7 @@ namespace mari {
         return buffer;
     }
 
-    VkShaderModule Pipeline::createShaderModule(Device &device, const std::vector<char> &code) {
+    VkShaderModule Pipeline::createShaderModule(const std::vector<char> &code) {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         createInfo.codeSize = code.size();
@@ -49,31 +48,31 @@ namespace mari {
         return shaderModule;
     }
 
+    VkPipelineShaderStageCreateInfo Pipeline::loadShader(const std::string &filepath, VkShaderStageFlagBits stage) {
+        VkShaderModule shaderModule = Pipeline::createShaderModule(Pipeline::readFile(filepath));
+
+        VkPipelineShaderStageCreateInfo shaderStage{};
+        shaderStage.sType                   = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        shaderStage.stage                   = stage;
+        shaderStage.module                  = shaderModule;
+        shaderStage.pName                   = "main";
+        shaderStage.flags                   = 0;
+        shaderStage.pNext                   = nullptr;
+        shaderStage.pSpecializationInfo     = nullptr;
+        assert(shaderStage.module != VK_NULL_HANDLE);
+
+        shaderModules.push_back(std::move(shaderModule));
+        return shaderStage;
+    }
+
     void Pipeline::createGraphicsPipeline(const std::string &vertFilepath, const std::string &fragFilepath, const PipelineConfigInfo &configInfo) {
         assert(configInfo.pipelineLayout != VK_NULL_HANDLE && "Cannot create graphics pipeline: No pipelineLayout provided in configInfo");
         assert(configInfo.renderPass     != VK_NULL_HANDLE && "Cannot create graphics pipeline: No renderPass provided in configInfo");
-        
-        auto vertCode = readFile(vertFilepath);
-        auto fragCode = readFile(fragFilepath);
 
-        vertShaderModule = createShaderModule(device, vertCode);
-        fragShaderModule = createShaderModule(device, fragCode);
-
-        VkPipelineShaderStageCreateInfo shaderStages[2];
-        shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        shaderStages[0].module = vertShaderModule;
-        shaderStages[0].pName = "main";
-        shaderStages[0].flags = 0;
-        shaderStages[0].pNext = nullptr;
-        shaderStages[0].pSpecializationInfo = nullptr;
-        shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        shaderStages[1].module = fragShaderModule;
-        shaderStages[1].pName = "main";
-        shaderStages[1].flags = 0;
-        shaderStages[1].pNext = nullptr;
-        shaderStages[1].pSpecializationInfo = nullptr;
+        VkPipelineShaderStageCreateInfo shaderStages[] = {
+            loadShader(vertFilepath, VK_SHADER_STAGE_VERTEX_BIT),
+            loadShader(fragFilepath, VK_SHADER_STAGE_FRAGMENT_BIT)
+        };
 
         auto &bindingDescriptions = configInfo.bindingDescriptions;
         auto &attributeDescriptions = configInfo.attributeDescriptions;
@@ -104,13 +103,67 @@ namespace mari {
         pipelineInfo.basePipelineIndex = -1;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-        if (vkCreateGraphicsPipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &handle) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create graphics pipeline");
         }
     }
 
+    void Pipeline::createRayTracingPipeline(VkPipelineLayout &pipelineLayout) {
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        // TODO this function should be generic, therefore shader information should be passed here from ray_tracing_system
+        {
+            shaderStages.push_back(loadShader("../../shaders/raygen.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR));
+            VkRayTracingShaderGroupCreateInfoKHR raygenGroupCreateInfo{};
+            raygenGroupCreateInfo.sType                     = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            raygenGroupCreateInfo.type                      = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+            raygenGroupCreateInfo.generalShader             = static_cast<uint32_t>(shaderStages.size() - 1);
+            raygenGroupCreateInfo.closestHitShader          = VK_SHADER_UNUSED_KHR;
+            raygenGroupCreateInfo.anyHitShader              = VK_SHADER_UNUSED_KHR;
+            raygenGroupCreateInfo.intersectionShader        = VK_SHADER_UNUSED_KHR;
+            shaderGroups.push_back(raygenGroupCreateInfo);
+        }
+
+        {
+            shaderStages.push_back(loadShader("../../shaders/miss.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
+            VkRayTracingShaderGroupCreateInfoKHR missGroupCreateInfo{};
+            missGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            missGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+            missGroupCreateInfo.generalShader               = static_cast<uint32_t>(shaderStages.size() - 1);
+            missGroupCreateInfo.closestHitShader            = VK_SHADER_UNUSED_KHR;
+            missGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
+            missGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
+            shaderGroups.push_back(missGroupCreateInfo);
+        }
+
+        {
+            shaderStages.push_back(loadShader("../../shaders/closesthit.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
+            VkRayTracingShaderGroupCreateInfoKHR chitGroupCreateInfo{};
+            chitGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            chitGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+            chitGroupCreateInfo.generalShader               = VK_SHADER_UNUSED_KHR;
+            chitGroupCreateInfo.closestHitShader            = static_cast<uint32_t>(shaderStages.size() - 1);
+            chitGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
+            chitGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
+            shaderGroups.push_back(chitGroupCreateInfo);
+        }
+
+        VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
+        rayTracingPipelineCreateInfo.sType                  = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+        rayTracingPipelineCreateInfo.stageCount             = static_cast<uint32_t>(shaderStages.size());
+        rayTracingPipelineCreateInfo.pStages                = shaderStages.data();
+        rayTracingPipelineCreateInfo.groupCount             = static_cast<uint32_t>(shaderGroups.size());
+        rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
+        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = 1;
+        rayTracingPipelineCreateInfo.layout                 = pipelineLayout;
+        if (vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &handle)) {
+            throw std::runtime_error("Failed to create ray tracing pipeline");
+        }
+
+        createShaderBindingTables();
+    }
+
     void Pipeline::bind(VkCommandBuffer commandBuffer) {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, handle);
     }
 
     void Pipeline::defaultPipelineConfigInfo(PipelineConfigInfo &configInfo) {
@@ -197,5 +250,130 @@ namespace mari {
         configInfo.colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         configInfo.colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
         configInfo.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    }
+
+    inline uint32_t alignedSize(uint32_t value, uint32_t alignment) {
+        return (value + alignment - 1) & ~(alignment - 1);
+    }
+
+    void Pipeline::createShaderBindingTables() {
+        const uint32_t              handleSize          = device.propertiesRT.shaderGroupHandleSize;
+        const uint32_t              handleSizeAligned   = alignedSize(device.propertiesRT.shaderGroupHandleSize, device.propertiesRT.shaderGroupHandleAlignment);
+        const uint32_t              handleAlignment     = device.propertiesRT.shaderGroupHandleAlignment;
+        const uint32_t              groupCount          = static_cast<uint32_t>(shaderGroups.size());
+        const uint32_t              sbtSize             = groupCount * handleSizeAligned;
+        const VkBufferUsageFlags    sbtBufferUsageFlags = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        // TODO vma
+
+        raygenSBT = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        missSBT   = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        hitSBT    = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+        std::vector<uint8_t> shaderHandleStorage(sbtSize);
+        if (vkGetRayTracingShaderGroupHandlesKHR(device.handle(), handle, 0, groupCount, sbtSize, shaderHandleStorage.data())) {
+            throw std::runtime_error("Failed to get ray tracing shader group handles");
+        }
+
+        uint8_t *data = static_cast<uint8_t *>(raygenSBT->getMappedMemory());
+        memcpy(data, shaderHandleStorage.data(), handleSize);
+        data = static_cast<uint8_t *>(missSBT->getMappedMemory());
+        memcpy(data, shaderHandleStorage.data() + handleSizeAligned, handleSize);
+        data = static_cast<uint8_t *>(hitSBT->getMappedMemory());
+        memcpy(data, shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
+
+        raygenSBT->unmap();
+        missSBT->unmap();
+        hitSBT->unmap();
+    }
+
+    // TODO improve this
+    void Pipeline::buildCommandBuffers(VkPipelineLayout &pipelineLayout, Renderer &renderer, std::vector<VkDescriptorSet> &descriptorSets, VkImage &image, uint32_t width, uint32_t height) {
+        VkCommandBufferBeginInfo cmdBufferBeginInfo{};
+        cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        
+        VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        const uint32_t handleSizeAligned = alignedSize(device.propertiesRT.shaderGroupHandleSize, device.propertiesRT.shaderGroupHandleAlignment);
+
+        VkStridedDeviceAddressRegionKHR raygenSBTEntry{};
+        raygenSBTEntry.deviceAddress    = raygenSBT->deviceAddress();
+        raygenSBTEntry.size             = handleSizeAligned;
+        raygenSBTEntry.stride           = handleSizeAligned;
+
+        VkStridedDeviceAddressRegionKHR missSBTEntry{};
+        missSBTEntry.deviceAddress      = missSBT->deviceAddress();
+        missSBTEntry.size               = handleSizeAligned;
+        missSBTEntry.stride             = handleSizeAligned;
+
+        VkStridedDeviceAddressRegionKHR hitSBTEntry{};
+        hitSBTEntry.deviceAddress       = hitSBT->deviceAddress();
+        hitSBTEntry.size                = handleSizeAligned;
+        hitSBTEntry.stride              = handleSizeAligned;
+
+        VkStridedDeviceAddressRegionKHR callableSBTEntry{};
+
+        for (int32_t i = 0; i < renderer.commandBuffers.size(); i++) {
+            if (vkBeginCommandBuffer(renderer.commandBuffers[i], &cmdBufferBeginInfo)) {
+                throw std::runtime_error("Failed to begin command buffer");
+            }
+
+            vkCmdBindPipeline(renderer.commandBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, handle);
+            vkCmdBindDescriptorSets(renderer.commandBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &descriptorSets[i], 0, 0);
+            vkCmdTraceRaysKHR(renderer.commandBuffers[i], &raygenSBTEntry, &missSBTEntry, &hitSBTEntry, &callableSBTEntry, width, height, 1);
+
+            vkhelper::transitionImageLayout(
+                renderer.commandBuffers[i], 
+                renderer.getSwapchain().getImages()[i], 
+                VK_IMAGE_LAYOUT_UNDEFINED, 
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+            );
+
+            vkhelper::transitionImageLayout(
+                renderer.commandBuffers[i], 
+                image, 
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                {},
+                VK_ACCESS_TRANSFER_READ_BIT,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                subresourceRange
+            );
+
+            VkImageCopy imageCopy{};
+            imageCopy.srcSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            imageCopy.srcOffset         = {0, 0, 0};
+            imageCopy.dstSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            imageCopy.dstOffset         = {0, 0, 0};
+            imageCopy.extent            = {width, height, 1};
+            
+            vkCmdCopyImage(
+                renderer.commandBuffers[i], image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                renderer.getSwapchain().getImages()[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy
+            );
+
+            vkhelper::transitionImageLayout(
+                renderer.commandBuffers[i], 
+                renderer.getSwapchain().getImages()[i], 
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+            );
+
+            vkhelper::transitionImageLayout(
+                renderer.commandBuffers[i], 
+                image, 
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+                VK_ACCESS_TRANSFER_READ_BIT,
+                {},
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_GENERAL,
+                subresourceRange
+            );
+
+            if (vkEndCommandBuffer(renderer.commandBuffers[i])) {
+                throw std::runtime_error("Failed to end command buffer");
+            }
+        }
     }
 }
