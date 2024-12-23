@@ -31,8 +31,8 @@ namespace mari {
                 return currentFrameIndex;
             }
 
-            VkCommandBuffer beginFrame(bool record);
-            void endFrame(bool record);
+            VkCommandBuffer beginFrame();
+            void endFrame();
             void beginSwapchainRenderPass(VkCommandBuffer commandBuffer);
             void endSwapchainRenderPass(VkCommandBuffer commandBuffer);
 

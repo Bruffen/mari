@@ -29,6 +29,7 @@ namespace mari
             VkRenderPass                getRenderPass()                 const { return renderPass; }
             VkImageView                 getImageView(int index)         const { return swapchainImageViews[index]; }
             std::vector<VkImage>&       getImages()                           { return swapchainImages; }
+            VkImage                     getImage(int index)             const { return swapchainImages[index]; }
             size_t                      imageCount()                    const { return swapchainImages.size(); }
             VkFormat                    getSwapchainImageFormat()       const { return swapchainImageFormat; }
             VkExtent2D                  getSwapchainExtent()            const { return swapchainExtent; }

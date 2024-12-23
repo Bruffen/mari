@@ -40,20 +40,8 @@ namespace mari {
             VkDescriptorPool                        descriptorPool;
             std::vector<VkDescriptorSet>            descriptorSets;
             VkDescriptorSetLayout                   descriptorSetLayout;
-            
-            struct StorageImage { // TODO move this out of here
-                VkDeviceMemory memory;
-                VkImage        image = VK_NULL_HANDLE;
-                VkImageView    view;
-                VkFormat       format;
-                uint32_t       width;
-                uint32_t       height;
-            } storageImage;
-
             std::vector<std::unique_ptr<Buffer>>    uboBuffers;
 
-            void initializeRayTracing();
-            void createStorageImage();
             void createUniformBuffers();
     };
 }

@@ -3,7 +3,7 @@
 #include <vulkan/vulkan.h>
 
 namespace mari {
-    extern PFN_vkGetBufferDeviceAddressKHR                vkGetBufferDeviceAddressKHR;                   // TODO try and get a better way of doing this
+    extern PFN_vkGetBufferDeviceAddressKHR                vkGetBufferDeviceAddressKHR;
     extern PFN_vkCreateAccelerationStructureKHR           vkCreateAccelerationStructureKHR;              // TODO group these by extensions and features
     extern PFN_vkDestroyAccelerationStructureKHR          vkDestroyAccelerationStructureKHR;
     extern PFN_vkGetAccelerationStructureBuildSizesKHR    vkGetAccelerationStructureBuildSizesKHR;

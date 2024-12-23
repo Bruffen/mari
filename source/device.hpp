@@ -37,16 +37,16 @@ namespace mari {
         Device(Device &&) = delete;
         Device &operator=(Device &&) = delete;
 
-        VkDevice                    handle()                { return device_; }
-        VkSurfaceKHR                surface()               { return surface_; }
-        VkQueue                     graphicsQueue()         { return graphicsQueue_; }
-        VkQueue                     presentQueue()          { return presentQueue_; }
-        VkCommandPool               getCommandPool()        { return commandPool; }
-        VkPhysicalDevice            getPhysicalDevice()     { return physicalDevice; }
-        SwapchainSupportDetails     getSwapchainSupport()   { return querySwapchainSupport(physicalDevice); }
+        VkDevice                    handle()                      { return device_; }
+        VkSurfaceKHR                surface()                     { return surface_; }
+        VkQueue                     graphicsQueue()               { return graphicsQueue_; }
+        VkQueue                     presentQueue()                { return presentQueue_; }
+        VkCommandPool               getCommandPool()              { return commandPool; }
+        VkPhysicalDevice            getPhysicalDevice()           { return physicalDevice; }
+        SwapchainSupportDetails     getSwapchainSupport()         { return querySwapchainSupport(physicalDevice); }
 
+        QueueFamilyIndices          findPhysicalQueueFamilies()   { return findQueueFamilies(physicalDevice); }
         uint32_t                    findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-        QueueFamilyIndices          findPhysicalQueueFamilies() { return findQueueFamilies(physicalDevice); }
         VkFormat                    findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
         void createBuffer( /* TODO should this be in device? */

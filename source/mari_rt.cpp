@@ -20,8 +20,6 @@
 #include <cassert>
 #include <stdexcept>
 
-#include <iostream>
-
 namespace mari {
 
     MariRT::MariRT() {
@@ -33,8 +31,6 @@ namespace mari {
 
     void MariRT::run() { 
         loadGameObjects();
-        getRayTracingFunctionPointers(device.handle());
-        createStorageImage();
         createUniformBuffers();
 
         // Create layout for descriptor sets
@@ -70,9 +66,7 @@ namespace mari {
             throw std::runtime_error("Failed to create descriptor set layout");
         }
 
-        RayTracingSystem rayTracingSystem{device, gameObjects, descriptorSetLayout};
-
-        std::cout << "Creating shader binding tables..." << std::endl;
+        RayTracingSystem rayTracingSystem{device, window, gameObjects, descriptorSetLayout};
 
         /** Create descriptor sets */ // TODO
         std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -91,9 +85,7 @@ namespace mari {
             throw std::runtime_error("Failed to create descriptor pool");
         }
 
-        descriptorSets = std::vector<VkDescriptorSet>();
-        descriptorSets.resize(3);
-
+        descriptorSets = std::vector<VkDescriptorSet>(Swapchain::MAX_FRAMES_IN_FLIGHT);
         std::vector<VkDescriptorSetLayout> descriptorSetLayouts{ // TODO
             descriptorSetLayout,
             descriptorSetLayout,
@@ -110,29 +102,20 @@ namespace mari {
         }
 
         for (int i = 0; i < descriptorSets.size(); i++) {
-            VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureSet{};
-            accelerationStructureSet.sType                      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-            accelerationStructureSet.accelerationStructureCount = 1;
-            accelerationStructureSet.pAccelerationStructures    = &rayTracingSystem.tlas.handle;
-
             VkWriteDescriptorSet accelerationStructureWrite{};
             accelerationStructureWrite.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             accelerationStructureWrite.dstSet           = descriptorSets[i];
             accelerationStructureWrite.dstBinding       = 0;
             accelerationStructureWrite.descriptorType   = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
             accelerationStructureWrite.descriptorCount  = 1;
-            accelerationStructureWrite.pNext            = &accelerationStructureSet;
-
-            VkDescriptorImageInfo imageDescriptor{};
-            imageDescriptor.imageView                   = storageImage.view;
-            imageDescriptor.imageLayout                 = VK_IMAGE_LAYOUT_GENERAL;
+            accelerationStructureWrite.pNext            = &rayTracingSystem.tlas.descriptor();
 
             VkWriteDescriptorSet imageWriteSet{};
             imageWriteSet.sType                         = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             imageWriteSet.dstSet                        = descriptorSets[i];
             imageWriteSet.dstBinding                    = 1;
             imageWriteSet.descriptorType                = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            imageWriteSet.pImageInfo                    = &imageDescriptor;
+            imageWriteSet.pImageInfo                    = &rayTracingSystem.accumImage->descriptorInfo();
             imageWriteSet.descriptorCount               = 1;
 
             VkWriteDescriptorSet uniformWriteSet{};
@@ -150,9 +133,6 @@ namespace mari {
             vkUpdateDescriptorSets(device.handle(), static_cast<uint32_t>(writeSets.size()), writeSets.data(), 0, VK_NULL_HANDLE);
         }
         /** */
-
-        std::cout << "Building command buffers..." << std::endl;
-        rayTracingSystem.buildCommandBuffers(renderer, descriptorSets, storageImage.image, WIDTH, HEIGHT);
 
         Camera camera{};
         
@@ -185,7 +165,7 @@ namespace mari {
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 100.0f);
             camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
             
-            if (auto commandBuffer = renderer.beginFrame(false)) {
+            if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
                 FrameInfo frameInfo {
                     frameIndex,
@@ -193,7 +173,7 @@ namespace mari {
                     elapsedTime,
                     commandBuffer,
                     camera,
-                    0,
+                    descriptorSets[frameIndex],
                     gameObjects
                 };
                 
@@ -205,7 +185,27 @@ namespace mari {
                 uboBuffers[frameIndex]->writeToBuffer(&ubo);
                 uboBuffers[frameIndex]->flush();
 
-                renderer.endFrame(false);
+                rayTracingSystem.render(frameInfo, renderer.getSwapchain());
+
+                renderer.endFrame();
+
+                if (window.wasWindowResized()) { // TODO make this cleaner
+                    window.resetWindowsResizedFlag();
+
+                    VkExtent2D e = window.getExtent();
+                    rayTracingSystem.accumImage->resize(e.width, e.height);
+
+                    for (int i = 0; i < descriptorSets.size(); i++) {
+                        VkWriteDescriptorSet imageWriteSet{};
+                        imageWriteSet.sType                         = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        imageWriteSet.dstSet                        = descriptorSets[i];
+                        imageWriteSet.dstBinding                    = 1;
+                        imageWriteSet.descriptorType                = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                        imageWriteSet.pImageInfo                    = &rayTracingSystem.accumImage->descriptorInfo();
+                        imageWriteSet.descriptorCount               = 1;
+                        vkUpdateDescriptorSets(device.handle(), 1, &imageWriteSet, 0, VK_NULL_HANDLE);
+                    }
+                }
             }
         }
 
@@ -269,59 +269,7 @@ namespace mari {
             gameObjects.emplace(pointLight.getId(), std::move(pointLight));
         }
     }
-
-    void MariRT::createStorageImage() {
-        storageImage.width  = WIDTH;
-        storageImage.height = HEIGHT;
-
-        VkImageCreateInfo imageCreateInfo{};
-        imageCreateInfo.sType           = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCreateInfo.imageType       = VK_IMAGE_TYPE_2D;
-        imageCreateInfo.format          = VK_FORMAT_B8G8R8A8_UNORM;
-        imageCreateInfo.extent.width    = storageImage.width;
-        imageCreateInfo.extent.height   = storageImage.height;
-        imageCreateInfo.extent.depth    = 1;
-        imageCreateInfo.mipLevels       = 1;
-        imageCreateInfo.arrayLayers     = 1;
-        imageCreateInfo.samples         = VK_SAMPLE_COUNT_1_BIT;
-        imageCreateInfo.tiling          = VK_IMAGE_TILING_OPTIMAL;
-        imageCreateInfo.usage           = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-        imageCreateInfo.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
-        device.createImageWithInfo(imageCreateInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, storageImage.image, storageImage.memory);
-
-        // TODO make a device createimageview method
-        VkImageViewCreateInfo imageViewCreateInfo{};
-        imageViewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format                          = VK_FORMAT_B8G8R8A8_UNORM;
-        imageViewCreateInfo.subresourceRange                = {};
-        imageViewCreateInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageViewCreateInfo.subresourceRange.baseMipLevel   = 0;
-        imageViewCreateInfo.subresourceRange.levelCount     = 1;
-        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        imageViewCreateInfo.subresourceRange.layerCount     = 1;
-        imageViewCreateInfo.image                           = storageImage.image;
-        if (vkCreateImageView(device.handle(), &imageViewCreateInfo, nullptr, &storageImage.view)) {
-            throw std::runtime_error("Failed to create image view");
-        }
-
-        // TODO study barriers and try to incorporate it into single time command method
-        VkCommandBuffer cmdBuffer = device.beginSingleTimeCommands();
-        VkImageMemoryBarrier imgBarrier{};
-        imgBarrier.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imgBarrier.srcAccessMask        = {};
-        imgBarrier.dstAccessMask        = {};
-        imgBarrier.oldLayout            = VK_IMAGE_LAYOUT_UNDEFINED;
-        imgBarrier.newLayout            = VK_IMAGE_LAYOUT_GENERAL;
-        imgBarrier.srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
-        imgBarrier.dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
-        imgBarrier.image                = storageImage.image;
-        imgBarrier.subresourceRange     = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-        vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imgBarrier);
-        device.endSingleTimeCommands(cmdBuffer);
-    }
-
+    
     void MariRT::createUniformBuffers() {
         uboBuffers = std::vector<std::unique_ptr<Buffer>>{Swapchain::MAX_FRAMES_IN_FLIGHT};
 

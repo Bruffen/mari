@@ -27,10 +27,6 @@ namespace mari {
         loadGameObjects();
     }
 
-    Mari::~Mari() {
-
-    }
-
     void Mari::run() { 
         std::vector<std::unique_ptr<Buffer>> uboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
 
@@ -90,7 +86,7 @@ namespace mari {
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 100.0f);
             camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
             
-            if (auto commandBuffer = renderer.beginFrame(true)) {
+            if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
                 FrameInfo frameInfo {
                     frameIndex,
@@ -118,7 +114,7 @@ namespace mari {
                 pointLightSystem.render(frameInfo);
                 
                 renderer.endSwapchainRenderPass(commandBuffer);
-                renderer.endFrame(true);
+                renderer.endFrame();
             }
         }
 

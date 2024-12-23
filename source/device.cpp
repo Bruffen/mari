@@ -363,7 +363,7 @@ namespace mari {
         std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
         for (const auto &extension : availableExtensions) {
-            std::cout << "\t\t" << extension.extensionName << std::endl;
+            //std::cout << "\t\t" << extension.extensionName << std::endl;
             requiredExtensions.erase(extension.extensionName);
         }
 

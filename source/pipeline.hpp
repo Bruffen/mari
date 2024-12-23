@@ -46,8 +46,7 @@ namespace mari {
                                                 const std::string &fragFilepath, 
                                                 const PipelineConfigInfo &configInfo);
             void                            createRayTracingPipeline(VkPipelineLayout &pipelineLayout);
-            // TODO make this private after improving
-            void                            buildCommandBuffers(VkPipelineLayout &pipelineLayout, Renderer &renderer, std::vector<VkDescriptorSet> &descriptorSets, VkImage &image, uint32_t width, uint32_t height);
+            VkStridedDeviceAddressRegionKHR raygenSBTEntry, missSBTEntry, hitSBTEntry, callableSBTEntry; // TODO private?
         private:
             VkPipelineShaderStageCreateInfo loadShader(const std::string &filepath, VkShaderStageFlagBits flag);
             std::vector<char>               readFile(const std::string &filepath);
@@ -57,8 +56,9 @@ namespace mari {
 
             Device &device;
             VkPipeline handle;
+            VkPipelineBindPoint pipelineBindPoint;
             std::vector<VkShaderModule> shaderModules;
             std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups; // TODO not sure if it's best in here. look into it
-            std::unique_ptr<Buffer> raygenSBT, missSBT, hitSBT;
+            std::unique_ptr<Buffer> raygenSBT, missSBT, hitSBT; // TODO group sbt with sbtentries in a struct?
     };
 }

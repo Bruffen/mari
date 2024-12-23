@@ -18,6 +18,7 @@ namespace mari {
                 int lookRight = GLFW_KEY_RIGHT;
                 int lookUp = GLFW_KEY_UP;
                 int lookDown = GLFW_KEY_DOWN;
+                int leftShift = GLFW_KEY_LEFT_SHIFT;
             };
 
             struct Mouse {
@@ -27,7 +28,6 @@ namespace mari {
                 double lastPositionY;
             };
 
-            void moveInPlaneXZ(GLFWwindow *window, float deltatime, GameObject &gameObject);
             void moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
             void rotateCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
 

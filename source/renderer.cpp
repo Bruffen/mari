@@ -61,7 +61,7 @@ namespace mari {
         commandBuffers.clear();
     }
 
-    VkCommandBuffer Renderer::beginFrame(bool record) {
+    VkCommandBuffer Renderer::beginFrame() {
         assert(!isFrameStarted && "Can't call beginFrame while already in progress");
 
         auto result = swapchain->acquireNextImage(&currentImageIndex);
@@ -79,29 +79,25 @@ namespace mari {
 
         auto commandBuffer = getCurrentCommandBuffer();
 
-        if (record) { // TODO maybe make start recording a different method
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to begin recording command buffer");
-            }
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to begin recording command buffer");
         }
+
         return commandBuffer;
     }
 
-    void Renderer::endFrame(bool record) {
+    void Renderer::endFrame() {
         assert(isFrameStarted && "Can't call endFrame while frame is not in progress");
 
         auto commandBuffer = getCurrentCommandBuffer();
-        if (record) {
-            if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to record command buffer");
-            }
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to record command buffer");
         }
 
         auto result = swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasWindowResized()) {
-            window.resetWindowsResizedFlag();
             recreateSwapchain();
         }
         else if (result != VK_SUCCESS) {

@@ -69,6 +69,8 @@ namespace mari {
         assert(configInfo.pipelineLayout != VK_NULL_HANDLE && "Cannot create graphics pipeline: No pipelineLayout provided in configInfo");
         assert(configInfo.renderPass     != VK_NULL_HANDLE && "Cannot create graphics pipeline: No renderPass provided in configInfo");
 
+        pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
         VkPipelineShaderStageCreateInfo shaderStages[] = {
             loadShader(vertFilepath, VK_SHADER_STAGE_VERTEX_BIT),
             loadShader(fragFilepath, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -109,6 +111,10 @@ namespace mari {
     }
 
     void Pipeline::createRayTracingPipeline(VkPipelineLayout &pipelineLayout) {
+        assert(pipelineLayout != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
+
+        pipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+
         std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
         // TODO this function should be generic, therefore shader information should be passed here from ray_tracing_system
         {
@@ -153,8 +159,9 @@ namespace mari {
         rayTracingPipelineCreateInfo.pStages                = shaderStages.data();
         rayTracingPipelineCreateInfo.groupCount             = static_cast<uint32_t>(shaderGroups.size());
         rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
-        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = 1;
         rayTracingPipelineCreateInfo.layout                 = pipelineLayout;
+        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = device.propertiesRT.maxRayRecursionDepth;
+        std::cout << "Maximum recursion depth of: " << rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth << std::endl;
         if (vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &handle)) {
             throw std::runtime_error("Failed to create ray tracing pipeline");
         }
@@ -163,7 +170,7 @@ namespace mari {
     }
 
     void Pipeline::bind(VkCommandBuffer commandBuffer) {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, handle);
+        vkCmdBindPipeline(commandBuffer, pipelineBindPoint, handle);
     }
 
     void Pipeline::defaultPipelineConfigInfo(PipelineConfigInfo &configInfo) {
@@ -284,96 +291,18 @@ namespace mari {
         raygenSBT->unmap();
         missSBT->unmap();
         hitSBT->unmap();
-    }
 
-    // TODO improve this
-    void Pipeline::buildCommandBuffers(VkPipelineLayout &pipelineLayout, Renderer &renderer, std::vector<VkDescriptorSet> &descriptorSets, VkImage &image, uint32_t width, uint32_t height) {
-        VkCommandBufferBeginInfo cmdBufferBeginInfo{};
-        cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        
-        VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-        const uint32_t handleSizeAligned = alignedSize(device.propertiesRT.shaderGroupHandleSize, device.propertiesRT.shaderGroupHandleAlignment);
-
-        VkStridedDeviceAddressRegionKHR raygenSBTEntry{};
+        // Create sbt entries for the pipeline
         raygenSBTEntry.deviceAddress    = raygenSBT->deviceAddress();
         raygenSBTEntry.size             = handleSizeAligned;
         raygenSBTEntry.stride           = handleSizeAligned;
 
-        VkStridedDeviceAddressRegionKHR missSBTEntry{};
         missSBTEntry.deviceAddress      = missSBT->deviceAddress();
         missSBTEntry.size               = handleSizeAligned;
         missSBTEntry.stride             = handleSizeAligned;
 
-        VkStridedDeviceAddressRegionKHR hitSBTEntry{};
         hitSBTEntry.deviceAddress       = hitSBT->deviceAddress();
         hitSBTEntry.size                = handleSizeAligned;
         hitSBTEntry.stride              = handleSizeAligned;
-
-        VkStridedDeviceAddressRegionKHR callableSBTEntry{};
-
-        for (int32_t i = 0; i < renderer.commandBuffers.size(); i++) {
-            if (vkBeginCommandBuffer(renderer.commandBuffers[i], &cmdBufferBeginInfo)) {
-                throw std::runtime_error("Failed to begin command buffer");
-            }
-
-            vkCmdBindPipeline(renderer.commandBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, handle);
-            vkCmdBindDescriptorSets(renderer.commandBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &descriptorSets[i], 0, 0);
-            vkCmdTraceRaysKHR(renderer.commandBuffers[i], &raygenSBTEntry, &missSBTEntry, &hitSBTEntry, &callableSBTEntry, width, height, 1);
-
-            vkhelper::transitionImageLayout(
-                renderer.commandBuffers[i], 
-                renderer.getSwapchain().getImages()[i], 
-                VK_IMAGE_LAYOUT_UNDEFINED, 
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-            );
-
-            vkhelper::transitionImageLayout(
-                renderer.commandBuffers[i], 
-                image, 
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                {},
-                VK_ACCESS_TRANSFER_READ_BIT,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                subresourceRange
-            );
-
-            VkImageCopy imageCopy{};
-            imageCopy.srcSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            imageCopy.srcOffset         = {0, 0, 0};
-            imageCopy.dstSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            imageCopy.dstOffset         = {0, 0, 0};
-            imageCopy.extent            = {width, height, 1};
-            
-            vkCmdCopyImage(
-                renderer.commandBuffers[i], image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                renderer.getSwapchain().getImages()[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy
-            );
-
-            vkhelper::transitionImageLayout(
-                renderer.commandBuffers[i], 
-                renderer.getSwapchain().getImages()[i], 
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-            );
-
-            vkhelper::transitionImageLayout(
-                renderer.commandBuffers[i], 
-                image, 
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
-                VK_ACCESS_TRANSFER_READ_BIT,
-                {},
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_GENERAL,
-                subresourceRange
-            );
-
-            if (vkEndCommandBuffer(renderer.commandBuffers[i])) {
-                throw std::runtime_error("Failed to end command buffer");
-            }
-        }
     }
 }

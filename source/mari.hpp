@@ -16,7 +16,6 @@ namespace mari {
             static constexpr int HEIGHT = 600;
 
             Mari();
-            ~Mari();
             Mari(const Mari &) = delete;
             Mari &operator=(const Mari &) = delete;
 
