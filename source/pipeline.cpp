@@ -304,5 +304,9 @@ namespace mari {
         hitSBTEntry.deviceAddress       = hitSBT->deviceAddress();
         hitSBTEntry.size                = handleSizeAligned;
         hitSBTEntry.stride              = handleSizeAligned;
+
+        callableSBTEntry.deviceAddress  = VkDeviceAddress(0);
+        callableSBTEntry.size           = handleSizeAligned;
+        callableSBTEntry.stride         = handleSizeAligned;
     }
 }

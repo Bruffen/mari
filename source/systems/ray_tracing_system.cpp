@@ -24,9 +24,12 @@ namespace mari {
 
     RayTracingSystem::~RayTracingSystem() {
         vkDestroyPipelineLayout(device.handle(), pipelineLayout, nullptr);
+        vkDestroyAccelerationStructureKHR(device.handle(), tlas.handle, nullptr);
+        for (auto &blas : blases) {
+            vkDestroyAccelerationStructureKHR(device.handle(), blas.handle, nullptr);
+        }
     }
 
-    // TODO could this be a generic image class function
     void RayTracingSystem::createImages(uint32_t width, uint32_t height) {
         accumImage   = std::make_unique<Image>(device, width, height, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
         presentImage = std::make_unique<Image>(device, width, height, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
@@ -39,8 +42,6 @@ namespace mari {
                 buildBLAS(object);
             }
         }
-
-        //buildBLAS(scene.at(0));
 
         buildTLAS();
     }

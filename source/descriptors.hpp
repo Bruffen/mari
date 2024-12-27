@@ -33,7 +33,7 @@ namespace mari {
             DescriptorSetLayout(const DescriptorSetLayout &) = delete;
             DescriptorSetLayout &operator=(const DescriptorSetLayout &) = delete;
         
-            VkDescriptorSetLayout getDescriptorSetLayout() const { return descriptorSetLayout; }
+            VkDescriptorSetLayout handle() const { return descriptorSetLayout; }
     
         private:
             Device &device;
@@ -90,6 +90,7 @@ namespace mari {
     
             DescriptorWriter &writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo);
             DescriptorWriter &writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo);
+            DescriptorWriter &writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *accelerationStructureDescriptor);
             
             bool build(VkDescriptorSet &set);
             void overwrite(VkDescriptorSet &set);

@@ -62,7 +62,7 @@ namespace mari {
         pipeline->createGraphicsPipeline("../../shaders/point_light.vert.spv", "../../shaders/point_light.frag.spv", pipelineConfig);
     }
 
-    void PointLightSystem::update(FrameInfo &frameInfo, GlobalUbo &ubo) {
+    void PointLightSystem::update(FrameInfo &frameInfo, RasterizationUbo &ubo) {
         auto rotateLight = glm::rotate(
             glm::mat4(1.0f),
             frameInfo.frameTime,

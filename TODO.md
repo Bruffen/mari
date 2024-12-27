@@ -9,7 +9,7 @@
 - tinygltf / fastgltf
 - Double check which methods should be const
 - Tonemapping compute shader
-
-# Research
 - Figure out how to handle multiple glfw window callbacks
 
+# Research
+- Ray tracing Shader Execution Reordering (SER) VK_RAY_TRACING_INVOCATION_REORDER_MODE_REORDER_NV / GL_NV_shader_invocation_reorder

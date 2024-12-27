@@ -25,114 +25,47 @@ namespace mari {
     MariRT::MariRT() {
         globalPool = DescriptorPool::Builder(device)
             .setMaxSets(Swapchain::MAX_FRAMES_IN_FLIGHT)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, Swapchain::MAX_FRAMES_IN_FLIGHT)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, Swapchain::MAX_FRAMES_IN_FLIGHT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT)
             .build();
+    }
+        
+    void MariRT::createUniformBuffers() {
+        uboBuffers = std::vector<std::unique_ptr<Buffer>>{Swapchain::MAX_FRAMES_IN_FLIGHT};
+
+        for (int i = 0; i < uboBuffers.size(); i++) {
+            uboBuffers[i] = std::make_unique<Buffer>(
+                device,
+                sizeof(uniformData),
+                1,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            );
+            uboBuffers[i]->map();
+        }
     }
 
     void MariRT::run() { 
         loadGameObjects();
         createUniformBuffers();
 
-        // Create layout for descriptor sets
-        VkDescriptorSetLayoutBinding accelerationStructureLayoutBinding{};
-        accelerationStructureLayoutBinding.binding          = 0;
-        accelerationStructureLayoutBinding.descriptorType   = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-        accelerationStructureLayoutBinding.descriptorCount  = 1;
-        accelerationStructureLayoutBinding.stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        std::unique_ptr<mari::DescriptorSetLayout> globalSetLayout = DescriptorSetLayout::Builder(device)
+            .addBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .build();
 
-        VkDescriptorSetLayoutBinding resultImageLayoutBinding{};
-        resultImageLayoutBinding.binding                    = 1;
-        resultImageLayoutBinding.descriptorType             = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        resultImageLayoutBinding.descriptorCount            = 1;
-        resultImageLayoutBinding.stageFlags                 = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        RayTracingSystem rayTracingSystem{device, window, gameObjects, globalSetLayout->handle()};
 
-        VkDescriptorSetLayoutBinding uniformBufferLayoutBinding{};
-        uniformBufferLayoutBinding.binding                  = 2;
-        uniformBufferLayoutBinding.descriptorType           = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uniformBufferLayoutBinding.descriptorCount          = 1;
-        uniformBufferLayoutBinding.stageFlags               = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-        std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            accelerationStructureLayoutBinding,
-            resultImageLayoutBinding,
-            uniformBufferLayoutBinding
-        };
-
-        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-        descriptorSetLayoutCreateInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        descriptorSetLayoutCreateInfo.bindingCount          = static_cast<uint32_t>(bindings.size());
-        descriptorSetLayoutCreateInfo.pBindings             = bindings.data();
-        if (vkCreateDescriptorSetLayout(device.handle(), &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout)) {
-            throw std::runtime_error("Failed to create descriptor set layout");
+        std::vector<VkDescriptorSet> globalDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
+        for (int i = 0; i < globalDescriptorSets.size(); i++) {
+            DescriptorWriter(*globalSetLayout, *globalPool)
+                .writeAccelerationStructure(0, &rayTracingSystem.tlas.descriptor())
+                .writeImage(                1, &rayTracingSystem.accumImage->descriptorInfo())
+                .writeBuffer(               2, &uboBuffers[i]->descriptorInfo())
+                .build(globalDescriptorSets[i]);
         }
-
-        RayTracingSystem rayTracingSystem{device, window, gameObjects, descriptorSetLayout};
-
-        /** Create descriptor sets */ // TODO
-        std::vector<VkDescriptorPoolSize> poolSizes = {
-            {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1},
-            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
-        };
-
-        // TODO rt inline function(?)
-        VkDescriptorPoolCreateInfo poolCreateInfo{};
-        poolCreateInfo.sType                        = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolCreateInfo.poolSizeCount                = static_cast<uint32_t>(poolSizes.size());
-        poolCreateInfo.pPoolSizes                   = poolSizes.data();
-        poolCreateInfo.maxSets                      = Swapchain::MAX_FRAMES_IN_FLIGHT;
-        if (vkCreateDescriptorPool(device.handle(), &poolCreateInfo, nullptr, &descriptorPool)) {
-            throw std::runtime_error("Failed to create descriptor pool");
-        }
-
-        descriptorSets = std::vector<VkDescriptorSet>(Swapchain::MAX_FRAMES_IN_FLIGHT);
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts{ // TODO
-            descriptorSetLayout,
-            descriptorSetLayout,
-            descriptorSetLayout
-        };
-
-        VkDescriptorSetAllocateInfo descriptorAllocateInfo{};
-        descriptorAllocateInfo.sType                = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        descriptorAllocateInfo.descriptorPool       = descriptorPool;
-        descriptorAllocateInfo.pSetLayouts          = descriptorSetLayouts.data();
-        descriptorAllocateInfo.descriptorSetCount   = static_cast<uint32_t>(descriptorSets.size());
-        if (vkAllocateDescriptorSets(device.handle(), &descriptorAllocateInfo, descriptorSets.data())) {
-            throw std::runtime_error("Failed to allocate descriptor sets");
-        }
-
-        for (int i = 0; i < descriptorSets.size(); i++) {
-            VkWriteDescriptorSet accelerationStructureWrite{};
-            accelerationStructureWrite.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            accelerationStructureWrite.dstSet           = descriptorSets[i];
-            accelerationStructureWrite.dstBinding       = 0;
-            accelerationStructureWrite.descriptorType   = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-            accelerationStructureWrite.descriptorCount  = 1;
-            accelerationStructureWrite.pNext            = &rayTracingSystem.tlas.descriptor();
-
-            VkWriteDescriptorSet imageWriteSet{};
-            imageWriteSet.sType                         = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            imageWriteSet.dstSet                        = descriptorSets[i];
-            imageWriteSet.dstBinding                    = 1;
-            imageWriteSet.descriptorType                = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            imageWriteSet.pImageInfo                    = &rayTracingSystem.accumImage->descriptorInfo();
-            imageWriteSet.descriptorCount               = 1;
-
-            VkWriteDescriptorSet uniformWriteSet{};
-            uniformWriteSet.sType                       = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            uniformWriteSet.dstSet                      = descriptorSets[i];
-            uniformWriteSet.dstBinding                  = 2;
-            uniformWriteSet.descriptorType              = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            uniformWriteSet.pBufferInfo                 = &uboBuffers[i]->descriptorInfo();
-            uniformWriteSet.descriptorCount             = 1;
-
-            std::vector<VkWriteDescriptorSet> writeSets = {
-                accelerationStructureWrite, imageWriteSet, uniformWriteSet
-            };
-
-            vkUpdateDescriptorSets(device.handle(), static_cast<uint32_t>(writeSets.size()), writeSets.data(), 0, VK_NULL_HANDLE);
-        }
-        /** */
 
         Camera camera{};
         
@@ -173,7 +106,7 @@ namespace mari {
                     elapsedTime,
                     commandBuffer,
                     camera,
-                    descriptorSets[frameIndex],
+                    globalDescriptorSets[frameIndex],
                     gameObjects
                 };
                 
@@ -195,15 +128,10 @@ namespace mari {
                     VkExtent2D e = window.getExtent();
                     rayTracingSystem.accumImage->resize(e.width, e.height);
 
-                    for (int i = 0; i < descriptorSets.size(); i++) {
-                        VkWriteDescriptorSet imageWriteSet{};
-                        imageWriteSet.sType                         = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        imageWriteSet.dstSet                        = descriptorSets[i];
-                        imageWriteSet.dstBinding                    = 1;
-                        imageWriteSet.descriptorType                = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-                        imageWriteSet.pImageInfo                    = &rayTracingSystem.accumImage->descriptorInfo();
-                        imageWriteSet.descriptorCount               = 1;
-                        vkUpdateDescriptorSets(device.handle(), 1, &imageWriteSet, 0, VK_NULL_HANDLE);
+                    for (int i = 0; i < globalDescriptorSets.size(); i++) {
+                        DescriptorWriter::DescriptorWriter(*globalSetLayout, *globalPool)
+                            .writeImage(1, &rayTracingSystem.accumImage->descriptorInfo())
+                            .overwrite(globalDescriptorSets[i]);
                     }
                 }
             }
@@ -267,21 +195,6 @@ namespace mari {
             );
             pointLight.transform.translation = glm::vec3(rotateLight * glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f));
             gameObjects.emplace(pointLight.getId(), std::move(pointLight));
-        }
-    }
-    
-    void MariRT::createUniformBuffers() {
-        uboBuffers = std::vector<std::unique_ptr<Buffer>>{Swapchain::MAX_FRAMES_IN_FLIGHT};
-
-        for (int i = 0; i < uboBuffers.size(); i++) {
-            uboBuffers[i] = std::make_unique<Buffer>(
-                device,
-                sizeof(uniformData),
-                1,
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            );
-            uboBuffers[i]->map();
         }
     }
 }

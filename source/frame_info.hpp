@@ -14,7 +14,7 @@ namespace mari {
         glm::vec4 color{};
     };
 
-    struct GlobalUbo {
+    struct RasterizationUbo {
         glm::mat4 projection{1.0f};
         glm::mat4 view{1.0f};
         glm::mat4 inverseView{1.0f};
@@ -22,6 +22,11 @@ namespace mari {
         glm::vec4 ambientLightColor{1.0f, 1.0f, 1.0f, 0.1f};
         PointLight pointLights[MAX_LIGHTS];
         int numLights;
+    };
+
+    struct RayTracingUbo {
+        glm::mat4 viewInverse;
+        glm::mat4 projInverse;
     };
 
     struct FrameInfo {

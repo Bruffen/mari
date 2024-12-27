@@ -14,7 +14,7 @@ namespace mari {
             PointLightSystem(Device &device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout);
             ~PointLightSystem();
 
-            void update(FrameInfo &frameInfo, GlobalUbo &ubo);
+            void update(FrameInfo &frameInfo, RasterizationUbo &ubo);
             void render(FrameInfo &frameInfo);
         private:
             void createPipelineLayout(VkDescriptorSetLayout globalSetLayout);

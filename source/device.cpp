@@ -92,20 +92,6 @@ namespace mari {
 
             populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
-
-            // Disable specific validation features //TODO not working?
-            std::vector<VkValidationFeatureDisableEXT> validationFeaturesToDisable{
-                VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT        // Needed for profiling with Nsight
-            };
-
-            VkValidationFeaturesEXT validationFeatures{};
-            validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-            validationFeatures.enabledValidationFeatureCount    = 0;
-            validationFeatures.pEnabledValidationFeatures       = nullptr;
-            validationFeatures.disabledValidationFeatureCount   = static_cast<uint32_t>(validationFeaturesToDisable.size());
-            validationFeatures.pDisabledValidationFeatures      = validationFeaturesToDisable.data();
-
-            debugCreateInfo.pNext = &validationFeatures;
         } else {
             createInfo.enabledLayerCount = 0;
             createInfo.pNext = nullptr;

@@ -37,9 +37,6 @@ namespace mari {
 
             VkPipeline                              pipeline;
             VkPipelineLayout                        pipelineLayout;
-            VkDescriptorPool                        descriptorPool;
-            std::vector<VkDescriptorSet>            descriptorSets;
-            VkDescriptorSetLayout                   descriptorSetLayout;
             std::vector<std::unique_ptr<Buffer>>    uboBuffers;
 
             void createUniformBuffers();

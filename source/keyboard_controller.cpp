@@ -15,7 +15,7 @@ namespace mari {
         if (glfwGetKey(window, keys.moveLeft)       == GLFW_PRESS) moveDir -= r;
         if (glfwGetKey(window, keys.moveUp)         == GLFW_PRESS) moveDir -= u;
         if (glfwGetKey(window, keys.moveDown)       == GLFW_PRESS) moveDir += u;
-        if (glfwGetKey(window, keys.leftShift)      == GLFW_PRESS) speed = 2.0f;
+        if (glfwGetKey(window, keys.sprint)         == GLFW_PRESS) speed = 2.0f;
 
         if (glm::dot(moveDir, moveDir) > glm::epsilon<float>()) {
             gameObject.transform.translation += moveSpeed * speed * deltatime * glm::normalize(moveDir);
@@ -46,5 +46,16 @@ namespace mari {
 
         mouse.lastPositionX = x;
         mouse.lastPositionY = y;
+    }
+
+    void KeyboardController::handleInput(GLFWwindow *window, bool &isRayTracingOn) {
+        if (glfwGetKey(window, keys.changePipeline) == GLFW_PRESS) {
+            changePipelinePressed = true;
+        }
+
+        if (glfwGetKey(window, keys.changePipeline) == GLFW_RELEASE && changePipelinePressed) {
+            changePipelinePressed = false;
+            isRayTracingOn = !isRayTracingOn;
+        }
     }
 }

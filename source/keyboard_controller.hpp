@@ -18,7 +18,8 @@ namespace mari {
                 int lookRight = GLFW_KEY_RIGHT;
                 int lookUp = GLFW_KEY_UP;
                 int lookDown = GLFW_KEY_DOWN;
-                int leftShift = GLFW_KEY_LEFT_SHIFT;
+                int sprint = GLFW_KEY_LEFT_SHIFT;
+                int changePipeline = GLFW_KEY_P;
             };
 
             struct Mouse {
@@ -30,11 +31,13 @@ namespace mari {
 
             void moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
             void rotateCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
+            void handleInput(GLFWwindow *window, bool &isRayTracingOn);
 
-            KeyMappings keys{};
+            const KeyMappings keys;
             Mouse mouse{};
             float moveSpeed{3.0f};
             float lookSpeed{0.25f};
+            bool  changePipelinePressed = false;// TODO
     };
     
 }

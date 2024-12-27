@@ -47,7 +47,7 @@ namespace mari {
                 &descriptorSetLayoutInfo,
                 nullptr,
                 &descriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout!");
+            throw std::runtime_error("Failed to create descriptor set layout!");
         }
     }
  
@@ -79,11 +79,7 @@ namespace mari {
     
     // *************** Descriptor Pool *********************
     
-    DescriptorPool::DescriptorPool(
-    Device &device,
-    uint32_t maxSets,
-    VkDescriptorPoolCreateFlags poolFlags,
-    const std::vector<VkDescriptorPoolSize> &poolSizes)
+    DescriptorPool::DescriptorPool(Device &device, uint32_t maxSets, VkDescriptorPoolCreateFlags poolFlags, const std::vector<VkDescriptorPoolSize> &poolSizes)
     : device{device} {
         VkDescriptorPoolCreateInfo descriptorPoolInfo{};
         descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -176,9 +172,31 @@ namespace mari {
         writes.push_back(write);
         return *this;
     }
+
+    DescriptorWriter &DescriptorWriter::writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *accelerationStructureDescriptor) {
+        assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
+        
+        auto &bindingDescription = setLayout.bindings[binding];
+        
+        assert(
+            bindingDescription.descriptorCount == 1 &&
+            "Binding single descriptor info, but binding expects multiple"
+        );
+        
+        VkWriteDescriptorSet write{};
+        write.sType             = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.descriptorType    = bindingDescription.descriptorType;
+        write.dstBinding        = binding;
+        write.descriptorCount   = 1;
+        write.pNext             = accelerationStructureDescriptor;
+        
+        writes.push_back(write);
+        return *this;
+    }
+
  
     bool DescriptorWriter::build(VkDescriptorSet &set) {
-        bool success = pool.allocateDescriptor(setLayout.getDescriptorSetLayout(), set);
+        bool success = pool.allocateDescriptor(setLayout.handle(), set);
         if (!success) {
             return false;
         }
@@ -192,6 +210,5 @@ namespace mari {
         }
         vkUpdateDescriptorSets(pool.device.handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
- 
 }
  
