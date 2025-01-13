@@ -1,4 +1,5 @@
 #include "device.hpp"
+#include "vk_helper.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -456,19 +457,16 @@ namespace mari {
         VkMemoryRequirements memRequirements;
         vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
 
+        // Set flag for exposing device address for the buffer
+        VkMemoryAllocateFlagsInfo flagsInfo{};
+        flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+        flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-        /**/
-        // TODO rt ray tracing specific
-        VkMemoryAllocateFlagsInfo flagsInfo{};
-        flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
-        flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-        
         allocInfo.pNext = &flagsInfo;
-        /**/
 
         if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate buffer memory!");
@@ -521,9 +519,10 @@ namespace mari {
         endSingleTimeCommands(commandBuffer);
     }
 
-    void Device::copyBufferToImage(
-        VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount) {
+    void Device::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D extent, uint32_t layerCount, VkImageLayout oldLayout) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        vkhelper::transitionImageLayout(commandBuffer, image, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -536,7 +535,7 @@ namespace mari {
         region.imageSubresource.layerCount = layerCount;
 
         region.imageOffset = {0, 0, 0};
-        region.imageExtent = {width, height, 1};
+        region.imageExtent = extent;
 
         vkCmdCopyBufferToImage(
             commandBuffer,
@@ -545,9 +544,13 @@ namespace mari {
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1,
             &region);
+
+        vkhelper::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, oldLayout);
+
         endSingleTimeCommands(commandBuffer);
     }
 
+    // TODO is this still needed
     void Device::createImageWithInfo(
         const VkImageCreateInfo &imageInfo,
         VkMemoryPropertyFlags properties,

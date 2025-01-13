@@ -2,13 +2,23 @@
 
 #include "image.hpp"
 
+#include <memory>
 #include <stdexcept>
+#include <iostream>
 
 namespace mari {
-    Image::Image(Device &device, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags flags)
-     : device{device}, width{width}, height{height}, format{format} {
+    Image::Image(Device &device, VkExtent3D size, VkFormat format, VkImageUsageFlags flags, VkImageLayout layout, void *data)
+     : device{device}, size{size}, format{format}, flags{flags}, layout{layout} {
         createImage();
         createImageView();
+
+        if (data) {
+            writeFromData(data);
+        }
+    }
+    
+    Image::Image(Device &device, VkExtent3D size, VkFormat format, VkImageUsageFlags flags, VkImageLayout layout)
+    : Image(device, size, format, flags, layout, nullptr) {
     }
 
     Image::~Image() {
@@ -19,15 +29,13 @@ namespace mari {
         VkImageCreateInfo imageCreateInfo{};
         imageCreateInfo.sType           = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageCreateInfo.imageType       = VK_IMAGE_TYPE_2D;
-        imageCreateInfo.format          = VK_FORMAT_B8G8R8A8_UNORM;
-        imageCreateInfo.extent.width    = width;
-        imageCreateInfo.extent.height   = height;
-        imageCreateInfo.extent.depth    = 1;
+        imageCreateInfo.format          = format;
+        imageCreateInfo.extent          = size;
         imageCreateInfo.mipLevels       = 1;
         imageCreateInfo.arrayLayers     = 1;
         imageCreateInfo.samples         = VK_SAMPLE_COUNT_1_BIT;
         imageCreateInfo.tiling          = VK_IMAGE_TILING_OPTIMAL;
-        imageCreateInfo.usage           = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+        imageCreateInfo.usage           = flags;
         imageCreateInfo.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
         device.createImageWithInfo(imageCreateInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, handle, memory);
 
@@ -38,7 +46,7 @@ namespace mari {
         imgBarrier.srcAccessMask        = {};
         imgBarrier.dstAccessMask        = {};
         imgBarrier.oldLayout            = VK_IMAGE_LAYOUT_UNDEFINED;
-        imgBarrier.newLayout            = VK_IMAGE_LAYOUT_GENERAL;
+        imgBarrier.newLayout            = layout;
         imgBarrier.srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
         imgBarrier.dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
         imgBarrier.image                = handle;
@@ -52,7 +60,7 @@ namespace mari {
         VkImageViewCreateInfo imageViewCreateInfo{};
         imageViewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         imageViewCreateInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format                          = VK_FORMAT_B8G8R8A8_UNORM;
+        imageViewCreateInfo.format                          = format;
         imageViewCreateInfo.subresourceRange                = {};
         imageViewCreateInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
         imageViewCreateInfo.subresourceRange.baseMipLevel   = 0;
@@ -75,11 +83,30 @@ namespace mari {
     void Image::resize(uint32_t width, uint32_t height) {
         cleanup();
 
-        this->width  = width;
-        this->height = height;
+        this->size = VkExtent3D{width, height, 1};
 
         createImage();
         createImageView();
+    }
+
+    void Image::writeFromData(void *data) {
+        size_t data_size = size.width * size.height * size.depth * 4; // TODO right now it's fixed to 4 bytes format, look up format for more informed data size
+        Buffer stagingBuffer = Buffer(
+            device, 
+            data_size, 
+            1, 
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        );
+
+        stagingBuffer.map();
+        stagingBuffer.writeToBuffer(data);
+
+        writeFromBuffer(stagingBuffer);
+    }
+
+    void Image::writeFromBuffer(Buffer &buffer) {
+        device.copyBufferToImage(buffer.handle(), handle, size, 1, layout);
     }
 
     void Image::cleanup() {

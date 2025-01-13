@@ -60,7 +60,7 @@ namespace mari {
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
+        void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D extent, uint32_t layerCount, VkImageLayout oldLayout);
 
         void createImageWithInfo(
             const VkImageCreateInfo &imageInfo,

@@ -31,23 +31,25 @@ namespace mari {
     }
 
     void RayTracingSystem::createImages(uint32_t width, uint32_t height) {
-        accumImage   = std::make_unique<Image>(device, width, height, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
-        presentImage = std::make_unique<Image>(device, width, height, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
+        accumImage   = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        presentImage = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
     }
 
     void RayTracingSystem::buildScene(const GameObject::Map &scene) {
         // TODO reuse the same blas if the object's geometry is the same
         for (auto const &[id, object] : scene) {
-            if (object.model) {
-                buildBLAS(object);
+            //if (object.mesh) {
+            //if (object.mesh.size() > 0) {
+            for (auto &mesh : object.mesh) {
+                buildBLAS(*mesh, object.transform);
             }
         }
 
         buildTLAS();
     }
 
-    void RayTracingSystem::buildBLAS(const GameObject &object) {
-        VkTransformMatrixKHR transformMatrix = object.transform.matKHR();
+    void RayTracingSystem::buildBLAS(const Mesh &mesh, const TransformComponent &transform) {
+        VkTransformMatrixKHR transformMatrix = transform.matKHR();
 
         AccelerationStructure blas{};
 
@@ -77,8 +79,8 @@ namespace mari {
         VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
         VkDeviceOrHostAddressConstKHR transformBufferDeviceAddress{};
         
-        vertexBufferDeviceAddress.deviceAddress = object.model->vertexBuffer->deviceAddress();
-        indexBufferDeviceAddress.deviceAddress  = object.model->indexBuffer->deviceAddress();
+        vertexBufferDeviceAddress.deviceAddress = mesh.vertexBuffer->deviceAddress();
+        indexBufferDeviceAddress.deviceAddress  = mesh.indexBuffer->deviceAddress();
         transformBufferDeviceAddress.deviceAddress = transformBuffer->deviceAddress();
 
         // Build
@@ -89,8 +91,8 @@ namespace mari {
         accelerationStructureGeometry.geometry.triangles.sType         = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
         accelerationStructureGeometry.geometry.triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
         accelerationStructureGeometry.geometry.triangles.vertexData    = vertexBufferDeviceAddress;
-        accelerationStructureGeometry.geometry.triangles.maxVertex     = object.model->vertexCount - 1;
-        accelerationStructureGeometry.geometry.triangles.vertexStride  = sizeof(Model::Vertex);
+        accelerationStructureGeometry.geometry.triangles.maxVertex     = mesh.vertexCount - 1;
+        accelerationStructureGeometry.geometry.triangles.vertexStride  = sizeof(Mesh::Vertex);
         accelerationStructureGeometry.geometry.triangles.indexType     = VK_INDEX_TYPE_UINT32;
         accelerationStructureGeometry.geometry.triangles.indexData     = indexBufferDeviceAddress;
         accelerationStructureGeometry.geometry.triangles.transformData = transformBufferDeviceAddress;
@@ -103,7 +105,7 @@ namespace mari {
         accelerationStructureBuildGeometryInfo.geometryCount = 1;
         accelerationStructureBuildGeometryInfo.pGeometries   = &accelerationStructureGeometry;
 
-        const uint32_t numTriangles = object.model->indexCount / 3;
+        const uint32_t numTriangles = mesh.indexCount / 3;
         VkAccelerationStructureBuildSizesInfoKHR accelerationStructureBuildSizesInfo{};
         accelerationStructureBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
         vkGetAccelerationStructureBuildSizesKHR(
@@ -298,6 +300,7 @@ namespace mari {
         vkCmdBindDescriptorSets(frameInfo.commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &frameInfo.globalDescriptorSet, 0, 0);
         vkCmdTraceRaysKHR(frameInfo.commandBuffer, &pipeline->raygenSBTEntry, &pipeline->missSBTEntry, &pipeline->hitSBTEntry, &pipeline->callableSBTEntry, width, height, 1);
 
+        // TODO could this copying of images be a generic function in device
         VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         vkhelper::transitionImageLayout(
             frameInfo.commandBuffer, 

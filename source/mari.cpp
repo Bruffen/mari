@@ -2,9 +2,9 @@
 
 #include "mari.hpp"
 
-#include "keyboard_controller.hpp"
 #include "buffer.hpp"
 #include "camera.hpp"
+#include "keyboard_controller.hpp"
 #include "systems/simple_render_system.hpp"
 #include "systems/point_light_system.hpp"
 #include "systems/ray_tracing_system.hpp"
@@ -32,7 +32,7 @@ namespace mari {
             .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT)
 
             .build();
-        
+
         loadGameObjects();
     }
 
@@ -121,8 +121,8 @@ namespace mari {
             camera.setViewYXZ(cameraObject.transform.translation, cameraObject.transform.rotation);
 
             float aspect = renderer.getAspectRatio();
-            //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 100.0f);
-            camera.setPerspectiveProjection(aspect, 0.1f, 100.0f);
+            //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 1000.0f);
+            camera.setPerspectiveProjection(aspect, 0.1f, 1000.0f);
             
             if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
@@ -186,41 +186,41 @@ namespace mari {
     };
 
     void Mari::loadGameObjects() {
-        //std::shared_ptr<Model> model = Model::createCubeModel(device, {0.0f, 0.0f, 0.0f});
-        //std::shared_ptr<Model> model = Model::createModelFromFile(device, "../../../../_Models/CornellBox/CornellBox-Original.obj");
-
-        std::shared_ptr<Model> modelMarie = Model::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
+        //std::shared_ptr<Mesh> model = Mesh::createCubeModel(device, {0.0f, 0.0f, 0.0f});
+        //std::shared_ptr<Mesh> model = Mesh::createModelFromFile(device, "../../../../_Models/CornellBox/CornellBox-Original.obj");
+/*
+        std::shared_ptr<Mesh> modelMarie = Mesh::createModelFromFile(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.obj");
         auto gameObject = GameObject::createGameObject();
-        gameObject.model = modelMarie;
+        gameObject.mesh = modelMarie;
         gameObject.transform.translation = {0.0f, -0.01f, 0.0f};
         gameObject.transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(180.0f)};
         gameObject.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gameObject.getId(), std::move(gameObject));
 
-        std::shared_ptr<Model> modelVaseF = Model::createModelFromFile(device, "../../models/flat_vase.obj");
+        std::shared_ptr<Mesh> modelVaseF = Mesh::createModelFromFile(device, "../../models/flat_vase.obj");
         auto gfvase = GameObject::createGameObject();
-        gfvase.model = modelVaseF;
+        gfvase.mesh = modelVaseF;
         gfvase.transform.translation = {1.0f, 0.0f, 0.0f};
         gfvase.transform.rotation = glm::vec3{0.0f};
         gfvase.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gfvase.getId(), std::move(gfvase));
 
-        std::shared_ptr<Model> modelVaseS = Model::createModelFromFile(device, "../../models/smooth_vase.obj");
+        std::shared_ptr<Mesh> modelVaseS = Mesh::createModelFromFile(device, "../../models/smooth_vase.obj");
         auto gsvase = GameObject::createGameObject();
-        gsvase.model = modelVaseS;
+        gsvase.mesh = modelVaseS;
         gsvase.transform.translation = {1.8f, 0.0f, 0.0f};
         gsvase.transform.rotation = glm::vec3{0.0f};
         gsvase.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(gsvase.getId(), std::move(gsvase));
 
-        std::shared_ptr<Model> modelFloor = Model::createModelFromFile(device, "../../models/quad.obj");
+        std::shared_ptr<Mesh> modelFloor = Mesh::createModelFromFile(device, "../../models/quad.obj");
         auto floor = GameObject::createGameObject();
-        floor.model = modelFloor;
+        floor.mesh = modelFloor;
         floor.transform.translation = {0.0f, 0.0f, 0.0f};
         floor.transform.rotation = glm::vec3{0.0f};
         floor.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(floor.getId(), std::move(floor));
-
+*/
         std::vector<glm::vec3> lightColors {
             {1.f, .1f, .1f},
             {.1f, .1f, 1.f},
@@ -241,5 +241,18 @@ namespace mari {
             pointLight.transform.translation = glm::vec3(rotateLight * glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f));
             gameObjects.emplace(pointLight.getId(), std::move(pointLight));
         }
+
+        auto gameObject = GameObject::createGameObject();
+        //scene = std::make_shared<Scene>(device, defaultObjects, "../../../../_Models/gltf/bistro_exterior.glb");
+        //scene = std::make_shared<Scene>(device, defaultObjects, "../../../../_Models/gltf/the-white-room/the-white-room.gltf");
+        scene = std::make_shared<Scene>(device, defaultObjects, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
+        gameObject.transform.translation = {0.0f, -0.01f, 0.0f};
+        gameObject.transform.rotation = {glm::radians(-90.0f), 0.0f, glm::radians(0.0f)};
+        gameObject.transform.scale = glm::vec3{3.0f};
+        gameObject.mesh.reserve(scene->meshes.size());
+        for (auto mesh : scene->meshes) {
+            gameObject.mesh.emplace_back(mesh.second);
+        }
+        gameObjects.emplace(gameObject.getId(), std::move(gameObject));
     }
 }

@@ -53,5 +53,5 @@ void main() {
         specularLight += intensity * ndoth;
     }
 
-    outColor = vec4(ambientLight + diffuseLight * fragColor + specularLight * fragColor, 1.0);
+    outColor = vec4((ambientLight + diffuseLight + specularLight) * fragColor, 1.0);
 }

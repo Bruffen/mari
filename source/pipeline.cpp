@@ -1,5 +1,5 @@
 #include "pipeline.hpp"
-#include "model.hpp"
+#include "mesh.hpp"
 #include "vk_helper.hpp"
 
 #include <fstream>
@@ -242,8 +242,8 @@ namespace mari {
         configInfo.dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(configInfo.dynamicStateEnables.size());
         configInfo.dynamicStateInfo.flags = 0;
 
-        configInfo.bindingDescriptions = Model::Vertex::getBindingDescriptions();
-        configInfo.attributeDescriptions = Model::Vertex::getAttributeDescriptions();
+        configInfo.bindingDescriptions = Mesh::Vertex::getBindingDescriptions();
+        configInfo.attributeDescriptions = Mesh::Vertex::getAttributeDescriptions();
     }
 
     void Pipeline::enableAlphaBlending(PipelineConfigInfo &configInfo) {

@@ -90,7 +90,7 @@ class Buffer {
         VkMemoryPropertyFlags   getMemoryPropertyFlags()    const { return memoryPropertyFlags; }
         VkDeviceSize            getBufferSize()             const { return bufferSize; }
     
-        uint64_t                deviceAddress();
+        uint64_t                deviceAddress(); // TODO always get buffer device address in creation and store it in a variable
 
     private:
         static VkDeviceSize     getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment);

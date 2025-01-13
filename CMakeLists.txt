@@ -61,7 +61,21 @@ if (NOT TINYOBJ_PATH)
     message(STATUS "TINYOBJ_PATH not specified in .env.cmake, using include/tinyobjloader")
     set(TINYOBJ_PATH include/tinyobjloader)
 endif()
- 
+
+# 2. Set GLFW_PATH in .env.cmake to target specific glfw
+if (DEFINED FASTGLTF_PATH)
+    message(STATUS "Using fastgltf path specified in .env")
+    set(FASTGLTF_INCLUDE_DIRS "${FASTGLTF_PATH}/include")
+    add_subdirectory("${FASTGLTF_PATH}") # TODO
+endif()
+if (NOT FASTGLTF_INCLUDE_DIRS)
+    message(FATAL_ERROR "Could not find fastgltf!")
+endif()
+
+if (NOT DEFINED STB_PATH)
+    message(FATAL_ERROR "Could not find stb!")
+endif()
+
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
  
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -69,7 +83,8 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
  
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
- 
+
+
 if (WIN32)
   message(STATUS "CREATING BUILD FOR WINDOWS")
  
@@ -88,14 +103,16 @@ if (WIN32)
         ${TINYOBJ_PATH}
         ${GLFW_INCLUDE_DIRS}
         ${GLM_PATH}
+        ${FASTGLTF_INCLUDE_DIRS}
+        ${STB_PATH}
     )
- 
+
     target_link_directories(${PROJECT_NAME} PUBLIC
         ${Vulkan_LIBRARIES}
         ${GLFW_LIB}
     )
  
-    target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1)
+    target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf)
 elseif (UNIX)
     message(STATUS "CREATING BUILD FOR UNIX")
     target_include_directories(${PROJECT_NAME} PUBLIC

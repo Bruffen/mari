@@ -1,6 +1,6 @@
 #pragma once
 
-#include "model.hpp"
+#include "mesh.hpp"
 #include "utils.hpp"
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -15,8 +15,8 @@
 
 namespace std {
     template <>
-    struct hash<mari::Model::Vertex> {
-        size_t operator() (mari::Model::Vertex const &vertex) const {
+    struct hash<mari::Mesh::Vertex> {
+        size_t operator() (mari::Mesh::Vertex const &vertex) const {
             size_t seed = 0;
             mari::hashCombine(seed, vertex.position, vertex.color, vertex.normal, vertex.uv);
             return seed;
@@ -25,23 +25,27 @@ namespace std {
 }
 
 namespace mari {
-    Model::Model(Device &device, const Builder &builder) : device{device} {
+    Mesh::Mesh(Device &device, const Builder &builder) : device{device} {
         createVertexBuffers(builder.vertices);
         createIndexBuffers(builder.indices);
     }
-   
-    Model::~Model() {}
 
-    std::unique_ptr<Model> Model::createModelFromFile(Device &device, const std::string &filepath) {
+    Mesh::Mesh(Device &device) : device{device} {
+        
+    }
+   
+    Mesh::~Mesh() {}
+
+    std::unique_ptr<Mesh> Mesh::createModelFromFile(Device &device, const std::string &filepath) {
         Builder builder{};
         builder.loadModel(filepath);
         std::cout << "Vertex count: " << builder.vertices.size() << std::endl;
         std::cout << "Triangles count: " << builder.indices.size() / 3 << std::endl;
-        return std::make_unique<Model>(device, builder);
+        return std::make_unique<Mesh>(device, builder);
     }
 
 
-    void Model::createVertexBuffers(const std::vector<Vertex> &vertices) {
+    void Mesh::createVertexBuffers(const std::vector<Vertex> &vertices) {
         vertexCount = static_cast<uint32_t>(vertices.size());
         assert(vertexCount >= 3 && "Vertex count must be at least 3");
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertexCount;
@@ -72,7 +76,7 @@ namespace mari {
         device.copyBuffer(stagingBuffer.handle(), vertexBuffer->handle(), bufferSize);
     }
 
-    void Model::createIndexBuffers(const std::vector<uint32_t> &indices) {
+    void Mesh::createIndexBuffers(const std::vector<uint32_t> &indices) {
         indexCount = static_cast<uint32_t>(indices.size());
         hasIndexBuffer = indexCount > 0;
 
@@ -106,7 +110,7 @@ namespace mari {
         device.copyBuffer(stagingBuffer.handle(), indexBuffer->handle(), bufferSize);
     }
 
-    void Model::bind(VkCommandBuffer commandBuffer) {
+    void Mesh::bind(VkCommandBuffer commandBuffer) {
         VkBuffer buffers[] = {vertexBuffer->handle()};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers, offsets);
@@ -116,7 +120,7 @@ namespace mari {
         }
     }
 
-    void Model::draw(VkCommandBuffer commandBuffer) {
+    void Mesh::draw(VkCommandBuffer commandBuffer) {
         if (hasIndexBuffer) {
             vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
         } else {
@@ -124,7 +128,7 @@ namespace mari {
         }
     }
 
-    std::vector<VkVertexInputBindingDescription> Model::Vertex::getBindingDescriptions() {
+    std::vector<VkVertexInputBindingDescription> Mesh::Vertex::getBindingDescriptions() {
         std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
         bindingDescriptions[0].binding = 0;
         bindingDescriptions[0].stride = sizeof(Vertex);
@@ -132,18 +136,18 @@ namespace mari {
         return bindingDescriptions;
     }
 
-    std::vector<VkVertexInputAttributeDescription> Model::Vertex::getAttributeDescriptions() {
+    std::vector<VkVertexInputAttributeDescription> Mesh::Vertex::getAttributeDescriptions() {
         std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
 
-        attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position)});
-        attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color)});
-        attributeDescriptions.push_back({2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)});
-        attributeDescriptions.push_back({3, 0, VK_FORMAT_R32G32_SFLOAT   , offsetof(Vertex, uv)});
+        attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32B32_SFLOAT   , offsetof(Vertex, position)});
+        attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, color)});
+        attributeDescriptions.push_back({2, 0, VK_FORMAT_R32G32B32_SFLOAT   , offsetof(Vertex, normal)});
+        attributeDescriptions.push_back({3, 0, VK_FORMAT_R32G32_SFLOAT      , offsetof(Vertex, uv)});
 
         return attributeDescriptions;
     }
 
-    void Model::Builder::loadModel(const std::string &filepath) {
+    void Mesh::Builder::loadModel(const std::string &filepath) {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
@@ -173,6 +177,7 @@ namespace mari {
                         attrib.colors[3 * index.vertex_index + 0],
                         attrib.colors[3 * index.vertex_index + 1],
                         attrib.colors[3 * index.vertex_index + 2],
+                        1.0f
                     };
                 }
 
@@ -201,44 +206,44 @@ namespace mari {
         }
     }
 
-    std::unique_ptr<Model> Model::createCubeModel(Device& device, glm::vec3 offset) {
-        Model::Builder modelBuilder{};
+    std::unique_ptr<Mesh> Mesh::createCubeModel(Device& device, glm::vec3 offset) {
+        Mesh::Builder modelBuilder{};
         modelBuilder.vertices = {
             // left face (white)
-            {{-.5f, -.5f, -.5f}, {.9f, .9f, .9f}},
-            {{-.5f, .5f, .5f}, {.9f, .9f, .9f}},
-            {{-.5f, -.5f, .5f}, {.9f, .9f, .9f}},
-            {{-.5f, .5f, -.5f}, {.9f, .9f, .9f}},
+            {{-.5f, -.5f, -.5f}, {.9f, .9f, .9f, 1.f}, {-1.f, .0f, .0f}},
+            {{-.5f, .5f, .5f}  , {.9f, .9f, .9f, 1.f}, {-1.f, .0f, .0f}},
+            {{-.5f, -.5f, .5f} , {.9f, .9f, .9f, 1.f}, {-1.f, .0f, .0f}},
+            {{-.5f, .5f, -.5f} , {.9f, .9f, .9f, 1.f}, {-1.f, .0f, .0f}},
         
             // right face (yellow)
-            {{.5f, -.5f, -.5f}, {.8f, .8f, .1f}},
-            {{.5f, .5f, .5f}, {.8f, .8f, .1f}},
-            {{.5f, -.5f, .5f}, {.8f, .8f, .1f}},
-            {{.5f, .5f, -.5f}, {.8f, .8f, .1f}},
+            {{.5f, -.5f, -.5f} , {.8f, .8f, .1f, 1.f}, { 1.f, .0f, .0f}},
+            {{.5f, .5f, .5f}   , {.8f, .8f, .1f, 1.f}, { 1.f, .0f, .0f}},
+            {{.5f, -.5f, .5f}  , {.8f, .8f, .1f, 1.f}, { 1.f, .0f, .0f}},
+            {{.5f, .5f, -.5f}  , {.8f, .8f, .1f, 1.f}, { 1.f, .0f, .0f}},
         
             // top face (orange, remember y axis points down)
-            {{-.5f, -.5f, -.5f}, {.9f, .6f, .1f}},
-            {{.5f, -.5f, .5f}, {.9f, .6f, .1f}},
-            {{-.5f, -.5f, .5f}, {.9f, .6f, .1f}},
-            {{.5f, -.5f, -.5f}, {.9f, .6f, .1f}},
+            {{-.5f, -.5f, -.5f}, {.9f, .6f, .1f, 1.f}, {.0f, -1.f, .0f}},
+            {{.5f, -.5f, .5f}  , {.9f, .6f, .1f, 1.f}, {.0f, -1.f, .0f}},
+            {{-.5f, -.5f, .5f} , {.9f, .6f, .1f, 1.f}, {.0f, -1.f, .0f}},
+            {{.5f, -.5f, -.5f} , {.9f, .6f, .1f, 1.f}, {.0f, -1.f, .0f}},
         
             // bottom face (red)
-            {{-.5f, .5f, -.5f}, {.8f, .1f, .1f}},
-            {{.5f, .5f, .5f}, {.8f, .1f, .1f}},
-            {{-.5f, .5f, .5f}, {.8f, .1f, .1f}},
-            {{.5f, .5f, -.5f}, {.8f, .1f, .1f}},
+            {{-.5f, .5f, -.5f} , {.8f, .1f, .1f, 1.f}, { .0f, 1.f, .0f}},
+            {{.5f, .5f, .5f}   , {.8f, .1f, .1f, 1.f}, { .0f, 1.f, .0f}},
+            {{-.5f, .5f, .5f}  , {.8f, .1f, .1f, 1.f}, { .0f, 1.f, .0f}},
+            {{.5f, .5f, -.5f}  , {.8f, .1f, .1f, 1.f}, { .0f, 1.f, .0f}},
         
             // nose face (blue)
-            {{-.5f, -.5f, 0.5f}, {.1f, .1f, .8f}},
-            {{.5f, .5f, 0.5f}, {.1f, .1f, .8f}},
-            {{-.5f, .5f, 0.5f}, {.1f, .1f, .8f}},
-            {{.5f, -.5f, 0.5f}, {.1f, .1f, .8f}},
+            {{-.5f, -.5f, .5f} , {.1f, .1f, .8f, 1.f}, { .0f, .0f, 1.f}},
+            {{.5f, .5f, .5f}   , {.1f, .1f, .8f, 1.f}, { .0f, .0f, 1.f}},
+            {{-.5f, .5f, .5f}  , {.1f, .1f, .8f, 1.f}, { .0f, .0f, 1.f}},
+            {{.5f, -.5f, .5f}  , {.1f, .1f, .8f, 1.f}, { .0f, .0f, 1.f}},
         
             // tail face (green)
-            {{-.5f, -.5f, -0.5f}, {.1f, .8f, .1f}},
-            {{.5f, .5f, -0.5f}, {.1f, .8f, .1f}},
-            {{-.5f, .5f, -0.5f}, {.1f, .8f, .1f}},
-            {{.5f, -.5f, -0.5f}, {.1f, .8f, .1f}},
+            {{-.5f, -.5f, -.5f}, {.1f, .8f, .1f, 1.f}, { .0f, .0f, -1.f}},
+            {{.5f, .5f, -.5f}  , {.1f, .8f, .1f, 1.f}, { .0f, .0f, -1.f}},
+            {{-.5f, .5f, -.5f} , {.1f, .8f, .1f, 1.f}, { .0f, .0f, -1.f}},
+            {{.5f, -.5f, -.5f} , {.1f, .8f, .1f, 1.f}, { .0f, .0f, -1.f}},
         };
         for (auto& v : modelBuilder.vertices) {
             v.position += offset;
@@ -249,6 +254,6 @@ namespace mari {
             12, 13, 14, 12, 15, 13, 16, 17, 18, 16, 19, 17, 20, 21, 22, 20, 23, 21
         };
         
-        return std::make_unique<Model>(device, modelBuilder);
+        return std::make_unique<Mesh>(device, modelBuilder);
     }
 }

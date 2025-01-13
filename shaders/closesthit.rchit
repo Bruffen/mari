@@ -4,7 +4,7 @@
 #include "raycommon.glsl"
 
 layout(location = 0) rayPayloadInEXT payload prd;
-hitAttributeEXT vec3 attribs;
+hitAttributeEXT vec2 attribs;
 
 void main()
 {

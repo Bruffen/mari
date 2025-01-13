@@ -11,7 +11,7 @@
 namespace mari {
     class Renderer {
         public:
-            Renderer(Window& window, Device& device);
+            Renderer(Window &window, Device &device);
             ~Renderer();
             Renderer(const Renderer &) = delete;
             Renderer &operator=(const Renderer &) = delete;

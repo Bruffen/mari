@@ -33,7 +33,7 @@ namespace mari {
             std::unique_ptr<Image>                  accumImage;
         private:
             void                                    buildScene(const GameObject::Map &scene);
-            void                                    buildBLAS(const GameObject &object);
+            void                                    buildBLAS(const Mesh &mesh, const TransformComponent &transform);
             void                                    buildTLAS();
             void                                    createPipelineLayout(VkDescriptorSetLayout descriptorSetLayout);
             void                                    createPipeline();

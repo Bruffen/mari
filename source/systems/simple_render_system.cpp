@@ -73,8 +73,9 @@ namespace mari {
 
         for (auto& kv : frameInfo.gameObjects) {
             auto& obj = kv.second;
-            if (obj.model == nullptr) continue;
-            
+            //if (obj.mesh == nullptr) continue;
+            if (obj.mesh.size() == 0) continue;
+
             SimplePushConstantData push{};
             auto modelMatrix = obj.transform.mat4();
             push.modelMatrix = modelMatrix;
@@ -89,8 +90,10 @@ namespace mari {
                 &push
             );
 
-            obj.model->bind(frameInfo.commandBuffer);
-            obj.model->draw(frameInfo.commandBuffer);
+            for (auto &mesh : obj.mesh) {
+                mesh->bind(frameInfo.commandBuffer);
+                mesh->draw(frameInfo.commandBuffer);
+            }
         }
     }
 }
