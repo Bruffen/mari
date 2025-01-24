@@ -10,6 +10,10 @@ namespace mari {
 
     }
 
+    void Camera::update(Transform &transform) {
+        setViewYXZ(transform.position, transform.rotation);
+    }
+
     void Camera::setOrthographicProjection(float left, float right, float top, float bottom, float near, float far) {
         projectionMatrix = glm::mat4{1.0f};
         projectionMatrix[0][0] = 2.f / (right - left);

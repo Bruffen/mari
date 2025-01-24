@@ -6,7 +6,22 @@
 #include <array>
 
 namespace mari {
-    DefaultObjects::DefaultObjects(Device &device) : device{device} {
+    VkSampler              DefaultObjects::samplerNearest;
+    VkSampler              DefaultObjects::samplerLinear;
+    std::shared_ptr<Image> DefaultObjects::imageWhite;
+    std::shared_ptr<Image> DefaultObjects::imageBlack;
+    std::shared_ptr<Image> DefaultObjects::imageError;
+
+    void DefaultObjects::initialize(Device &device) {
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_NEAREST;
+        samplerInfo.minFilter = VK_FILTER_NEAREST;
+        vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerNearest);
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerLinear);
+
         uint32_t white   = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
         uint32_t black   = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
         uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
@@ -25,6 +40,9 @@ namespace mari {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             (void*)&white
         );
+        imageWhite->name = "default_white";
+        imageWhite->sampler = samplerLinear;
+
         imageBlack = std::make_shared<Image>(
             device, 
             VkExtent3D{1, 1, 1}, 
@@ -33,6 +51,9 @@ namespace mari {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             (void*)&black
         );
+        imageBlack->name = "default_black";
+        imageBlack->sampler = samplerLinear;
+
         imageError = std::make_shared<Image>(
             device, 
             VkExtent3D{size, size, 1}, 
@@ -41,20 +62,16 @@ namespace mari {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             pixels.data()
         );
-
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_NEAREST;
-        samplerInfo.minFilter = VK_FILTER_NEAREST;
-        vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerNearest);
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerLinear);
-
+        imageError->name = "default_error";
+        imageError->sampler = samplerLinear;
     }
 
-    DefaultObjects::~DefaultObjects() {
+    void DefaultObjects::cleanup(Device &device) {
         vkDestroySampler(device.handle(), samplerNearest, nullptr);
         vkDestroySampler(device.handle(), samplerLinear, nullptr);
-    }
+
+        imageWhite.reset();
+        imageBlack.reset();
+        imageError.reset();
+    } 
 }

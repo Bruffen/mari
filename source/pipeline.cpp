@@ -1,5 +1,5 @@
 #include "pipeline.hpp"
-#include "mesh.hpp"
+#include "components/mesh.hpp"
 #include "vk_helper.hpp"
 
 #include <fstream>

@@ -6,21 +6,26 @@
 #include <memory>
 
 namespace mari {
-    class DefaultObjects { // TODO static?
+    class DefaultObjects {
         public:
-            DefaultObjects(Device &device);
-            ~DefaultObjects();
+            DefaultObjects() = delete;
 
-            std::shared_ptr<Image>  getImageWhite()     const { return imageWhite; }
-            std::shared_ptr<Image>  getImageBlack()     const { return imageBlack; }
-            std::shared_ptr<Image>  getImageError()     const { return imageError; }
+            static void initialize(Device &device);
+            static void cleanup(Device &device);
 
-            const VkSampler         getSamplerNearest() const { return samplerNearest; }
-            const VkSampler         getSamplerLinear()  const { return samplerLinear;  }
+            static std::shared_ptr<Image> getImageWhite()     { return imageWhite; }
+            static std::shared_ptr<Image> getImageBlack()     { return imageBlack; }
+            static std::shared_ptr<Image> getImageError()     { return imageError; }
+
+            static VkSampler              getSamplerNearest() { return samplerNearest; }
+            static VkSampler              getSamplerLinear()  { return samplerLinear;  }
+
         private:
-            std::shared_ptr<Image> imageWhite, imageBlack, imageError;
-            VkSampler samplerNearest, samplerLinear; //samplerCubic requires extension;
-            
-            Device &device;
+            static VkSampler              samplerNearest;
+            static VkSampler              samplerLinear;
+            //static VkSampler            samplerCubic; requires extension;
+            static std::shared_ptr<Image> imageWhite;
+            static std::shared_ptr<Image> imageBlack;
+            static std::shared_ptr<Image> imageError;
     };
 }

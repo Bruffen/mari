@@ -5,38 +5,39 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/euler_angles.hpp>
 #include <fastgltf/math.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/util.hpp>
 #include <iostream>
+#include <omp.h>
 
 namespace mari {
 constexpr std::size_t recoverLastSeparatorPos(std::size_t firstSeparatorPos, std::size_t secondSeparatorPos, std::size_t invalidPos) {
-  if (firstSeparatorPos == invalidPos)
-    return secondSeparatorPos;
+    if (firstSeparatorPos == invalidPos)
+        return secondSeparatorPos;
 
-  // The first separator has been found
+    // The first separator has been found
+    if (secondSeparatorPos == invalidPos)
+        return firstSeparatorPos;
 
-  if (secondSeparatorPos == invalidPos)
-    return firstSeparatorPos;
-
-  // Both separators have been found; the max (rightmost) position must be picked
-
-  return std::max(firstSeparatorPos, secondSeparatorPos);
+    // Both separators have been found; the max (rightmost) position must be picked
+    return std::max(firstSeparatorPos, secondSeparatorPos);
 }
 
 inline std::size_t recoverLastSeparatorPos(const std::string& pathStr) {
-  const std::size_t lastSlashPos     = pathStr.find_last_of('/');
-  const std::size_t lastBackslashPos = pathStr.find_last_of('\\');
+    const std::size_t lastSlashPos     = pathStr.find_last_of('/');
+    const std::size_t lastBackslashPos = pathStr.find_last_of('\\');
 
-  return recoverLastSeparatorPos(lastSlashPos, lastBackslashPos, std::string::npos);
+    return recoverLastSeparatorPos(lastSlashPos, lastBackslashPos, std::string::npos);
 }
 
 std::string recoverPathToFile(const std::string& pathStr) {
-  return pathStr.substr(0, recoverLastSeparatorPos(pathStr) + 1);
+    return pathStr.substr(0, recoverLastSeparatorPos(pathStr) + 1);
 }
 
-    Scene::Scene(Device &device, const DefaultObjects &defaultObjects, const std::string &path) : device{device} {
+    Scene::Scene(Device &device, const std::string &path) : device{device} {
         constexpr auto gltfOptions = 
             fastgltf::Options::DontRequireValidAssetMember | 
             fastgltf::Options::AllowDouble | 
@@ -48,8 +49,8 @@ std::string recoverPathToFile(const std::string& pathStr) {
         if (data.error() != fastgltf::Error::None) {
             throw std::invalid_argument("Error: Could not load the glTF file.");
         }
-
-        fastgltf::Expected<fastgltf::Asset> asset = parser.loadGltf(data.get(), recoverPathToFile(path), gltfOptions);
+        const std::string folder = recoverPathToFile(path);
+        fastgltf::Expected<fastgltf::Asset> asset = parser.loadGltf(data.get(), folder, gltfOptions);
         if (asset.error() != fastgltf::Error::None) {
             throw std::invalid_argument("Error: Could not parse glTF file.");
         }
@@ -76,15 +77,37 @@ std::string recoverPathToFile(const std::string& pathStr) {
         }
 
         // Temporary arrays for all the objects to use while creating the GLTF data
-        std::vector<std::shared_ptr<Mesh>>      tmpMeshes;
-        std::vector<Node>                       tmpNodes;
-        std::vector<std::shared_ptr<Image>>     tmpImages;
-        std::vector<uint32_t>                   tmpImageIds;
-        std::vector<std::shared_ptr<Material>>  tmpMaterials;
+        std::vector<std::shared_ptr<Mesh>>       tmpMeshes;
+        std::vector<std::shared_ptr<GameObject>> tmpNodes;
+        std::vector<std::shared_ptr<Image>>      tmpImages;
+        std::vector<uint32_t>                    tmpImageIds;
+        std::vector<std::shared_ptr<Material>>   tmpMaterials;
+        std::vector<std::shared_ptr<Camera>>     tmpCameras;
 
         // load all textures
+        /* 
+         * TODO optimize image loading with multithreading. 
+         * Currently throws Validation Error: [ UNASSIGNED-Threading-MultipleThreads-Write ]
+         * object of type VkQueue is simultaneously used
+         */
+        //#pragma omp parallel for num_threads(16)
+        //for (int i = 0; i < gltf.images.size(); i++) { 
+        //    fastgltf::Image& image = gltf.images[i];
+        
         for (fastgltf::Image& image : gltf.images) {
-            tmpImages.emplace_back(defaultObjects.getImageError());
+            std::shared_ptr<Image> img = loadImage(folder, gltf, image);
+
+            if (img) {
+                img->name = image.name.c_str();
+                img->sampler = DefaultObjects::getSamplerLinear();
+                tmpImages.emplace_back(img);
+                images.emplace_back(img);
+                std::cout << img->name << '\n';
+            }
+            else {
+                tmpImages.emplace_back(DefaultObjects::getImageError());
+                std::cout << "glTF failed to load texture " << image.name << '\n';
+            }
         }
 
         // Create buffer to hold the material data
@@ -102,12 +125,13 @@ std::string recoverPathToFile(const std::string& pathStr) {
 
         for (fastgltf::Material& gltfMat : gltf.materials) {
             std::shared_ptr<Material> m = std::make_shared<Material>();
-            m->constants.color.x     = gltfMat.pbrData.baseColorFactor[0];
-            m->constants.color.y     = gltfMat.pbrData.baseColorFactor[1];
-            m->constants.color.z     = gltfMat.pbrData.baseColorFactor[2];
-            m->constants.color.w     = gltfMat.pbrData.baseColorFactor[3];
-            m->constants.metallic    = gltfMat.pbrData.metallicFactor;
-            m->constants.roughness   = gltfMat.pbrData.roughnessFactor;
+            m->name                 = gltfMat.name.c_str();
+            m->constants.color.x    = gltfMat.pbrData.baseColorFactor[0];
+            m->constants.color.y    = gltfMat.pbrData.baseColorFactor[1];
+            m->constants.color.z    = gltfMat.pbrData.baseColorFactor[2];
+            m->constants.color.w    = gltfMat.pbrData.baseColorFactor[3];
+            m->constants.metallic   = gltfMat.pbrData.metallicFactor;
+            m->constants.roughness  = gltfMat.pbrData.roughnessFactor;
 
             // Write material parameters to buffer
             materialDataPtr[data_index] = m->constants;
@@ -119,10 +143,10 @@ std::string recoverPathToFile(const std::string& pathStr) {
             */
 
             // default the material textures
-            m->resources.colorImage                  = defaultObjects.getImageWhite();
-            m->resources.colorSampler                = defaultObjects.getSamplerLinear();
-            m->resources.metallicRoughnessImage      = defaultObjects.getImageWhite();
-            m->resources.metallicRoughnessSampler    = defaultObjects.getSamplerLinear();
+            m->resources.colorImage                      = DefaultObjects::getImageWhite();
+            m->resources.colorImage->sampler             = DefaultObjects::getSamplerLinear();
+            m->resources.metallicRoughnessImage          = DefaultObjects::getImageWhite();
+            m->resources.metallicRoughnessImage->sampler = DefaultObjects::getSamplerLinear();
 
             // set the uniform buffer for the material data
             m->resources.dataBuffer = std::move(materialDataBuffer);
@@ -134,11 +158,12 @@ std::string recoverPathToFile(const std::string& pathStr) {
                 size_t sampler  = gltf.textures[gltfMat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
 
                 m->resources.colorImage = tmpImages[img];
-                m->resources.colorSampler = samplers[sampler];
+                m->resources.colorImageIndex = static_cast<int32_t>(img);
+                m->resources.colorImage->sampler = samplers[sampler];
             }
 
             tmpMaterials.emplace_back(m);
-            materials[gltfMat.name.c_str()] = std::move(m);
+            materials[m->name] = std::move(m);
 
             data_index++;
         }
@@ -157,8 +182,8 @@ std::string recoverPathToFile(const std::string& pathStr) {
             vertices.clear();
 
             for (fastgltf::Primitive &p : mesh.primitives) {
-                Primitive newPrimitive;
-                newPrimitive.startIndex = static_cast<uint32_t>(indices.size());
+                SubMesh newPrimitive;
+                newPrimitive.start = static_cast<uint32_t>(indices.size());
                 newPrimitive.count = static_cast<uint32_t>(gltf.accessors[p.indicesAccessor.value()].count);
 
                 uint32_t initial_vtx = static_cast<uint32_t>(vertices.size());
@@ -228,92 +253,105 @@ std::string recoverPathToFile(const std::string& pathStr) {
                     newPrimitive.material = tmpMaterials[0];
                 }
 
-                newMesh->primitives.push_back(newPrimitive);
+                newMesh->submeshes.push_back(newPrimitive);
             }
 
             newMesh->createVertexBuffers(vertices);
             newMesh->createIndexBuffers(indices);
         }
-/*
-        //> load_nodes
+
+        // load cameras
+        for (auto& camera : gltf.cameras) {
+            std::shared_ptr<Camera> newCamera = std::make_unique<Camera>();
+            tmpCameras.emplace_back(newCamera);
+            std::visit(fastgltf::visitor {
+                [&](fastgltf::Camera::Perspective& perspective) {
+                    newCamera->setPerspectiveProjection(
+                        perspective.yfov, 
+                        perspective.aspectRatio.value_or(16.0f/9.0f), 
+                        perspective.znear, 
+                        perspective.zfar.value_or(1000.0f)
+                    );
+                },
+                [&](fastgltf::Camera::Orthographic& orthographic) {
+                    newCamera->setOrthographicProjection(
+                        -orthographic.xmag * 0.5f, 
+                         orthographic.xmag * 0.5f, 
+                         orthographic.ymag * 0.5f, 
+                        -orthographic.ymag * 0.5f,
+                        orthographic.znear,
+                        orthographic.zfar
+                    );
+                },
+            }, camera.camera);
+        }
+
         // load all nodes and their meshes
         for (fastgltf::Node& node : gltf.nodes) {
-            std::shared_ptr<Node> newNode;
+            std::shared_ptr<GameObject> newNode = std::make_shared<GameObject>();
+            newNode->name = node.name.c_str();
 
-            // find if the node has a mesh, and if it does hook it to the mesh pointer and allocate it with the meshnode class
             if (node.meshIndex.has_value()) {
-                newNode = std::make_shared<MeshNode>();
-                static_cast<MeshNode*>(newNode.get())->mesh = meshes[*node.meshIndex];
-            } else {
-                newNode = std::make_shared<Node>();
+                newNode->mesh = tmpMeshes[*node.meshIndex];
+            }
+            if (node.cameraIndex.has_value()) {
+                newNode->camera = tmpCameras[*node.cameraIndex];
+                cameras.emplace_back(newNode);
             }
 
-            nodes.push_back(newNode);
-            file.nodes[node.name.c_str()];
+            tmpNodes.emplace_back(newNode);
+            nodes[newNode->name] = newNode;
 
-            std::visit(fastgltf::visitor { [&](fastgltf::Node::TransformMatrix matrix) {
-                                            memcpy(&newNode->localTransform, matrix.data(), sizeof(matrix));
-                                        },
-                        [&](fastgltf::Node::TRS transform) {
-                            glm::vec3 tl(transform.translation[0], transform.translation[1],
-                                transform.translation[2]);
-                            glm::quat rot(transform.rotation[3], transform.rotation[0], transform.rotation[1],
-                                transform.rotation[2]);
-                            glm::vec3 sc(transform.scale[0], transform.scale[1], transform.scale[2]);
+            std::visit(fastgltf::visitor { [&](fastgltf::math::fmat4x4 matrix) {
+                                            //memcpy(&newNode->, matrix.data(), sizeof(matrix));
+                                },
+                [&](fastgltf::TRS transform) {
+                    glm::vec3 tl(transform.translation[0], transform.translation[1], transform.translation[2]);
+                    glm::quat rot(transform.rotation[3], transform.rotation[0], transform.rotation[1], transform.rotation[2]);
+                    glm::vec3 sc(transform.scale[0], transform.scale[1], transform.scale[2]);
 
-                            glm::mat4 tm = glm::translate(glm::mat4(1.f), tl);
-                            glm::mat4 rm = glm::toMat4(rot);
-                            glm::mat4 sm = glm::scale(glm::mat4(1.f), sc);
-
-                            newNode->localTransform = tm * rm * sm;
-                        } },
-                node.transform);
+                    newNode->transform.position = glm::vec3(transform.translation.x(), transform.translation.y(), transform.translation.z());
+                    newNode->transform.rotation    = glm::eulerAngles(rot);
+                    newNode->transform.scale       = glm::vec3(transform.scale.x(), transform.scale.y(), transform.scale.z());
+                } },
+                node.transform
+            );
         }
-        //< load_nodes
-        //> load_graph
+
         // run loop again to setup transform hierarchy
         for (int i = 0; i < gltf.nodes.size(); i++) {
             fastgltf::Node& node = gltf.nodes[i];
-            std::shared_ptr<Node>& sceneNode = nodes[i];
+            std::shared_ptr<GameObject>& sceneNode = tmpNodes[i];
 
             for (auto& c : node.children) {
-                sceneNode->children.push_back(nodes[c]);
-                nodes[c]->parent = sceneNode;
+                sceneNode->children.emplace_back(tmpNodes[c]);
+                tmpNodes[c]->parent = sceneNode;
             }
         }
 
         // find the top nodes, with no parents
         for (auto& node : nodes) {
-            if (node->parent.lock() == nullptr) {
-                file.topNodes.push_back(node);
-                node->refreshTransform(glm::mat4 { 1.f });
-            }
-        }
-        return scene;
-        //< load_graph*/
-
-            // load all textures
-        for (fastgltf::Image& image : gltf.images) {
-            std::shared_ptr<Image> img = loadImage(gltf, image);
-
-            if (img) {
-                tmpImages.emplace_back(img);
-                images[image.name.c_str()] = img;
-                std::cout << image.name.c_str() << '\n';
-            }
-            else {
-                // we failed to load, so lets give the slot a default white texture to not
-                // completely break loading
-                tmpImages.emplace_back(defaultObjects.getImageError());
-                std::cout << "glTF failed to load texture " << image.name << '\n';
+            if (node.second->parent.lock() == nullptr) {
+                topNodes.emplace_back(node.second);
             }
         }
     }
 
-    std::shared_ptr<Image> Scene::loadImage(fastgltf::Asset& asset, fastgltf::Image& image) {
-        std::shared_ptr<Image> newImage;
-        VkImageUsageFlags imageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    void Scene::update() {
+        for (auto& g : topNodes) {
+            updateWorldMatrix(*g, transform.mat4());
+        }
+    }
 
+    void Scene::updateWorldMatrix(GameObject& g, const glm::mat4 &worldMatrix) { // TODO don't update for static objects after the first time (maybe have a second set function)
+        g.worldMatrix = worldMatrix * g.transform.mat4();
+        for (auto& c : g.children) {
+            updateWorldMatrix(*c, g.worldMatrix);
+        }
+    }
+
+    std::shared_ptr<Image> Scene::loadImage(const std::string &folder, fastgltf::Asset& asset, fastgltf::Image& image) {
+        std::shared_ptr<Image> newImage;
         int width, height, nrChannels;
 
         std::visit(
@@ -326,31 +364,19 @@ std::string recoverPathToFile(const std::string& pathStr) {
 
                     const std::string path(filePath.uri.path().begin(),
                         filePath.uri.path().end()); // Thanks C++.
-                    unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+                    unsigned char* data = stbi_load((folder + path).c_str(), &width, &height, &nrChannels, 4);
                     if (data) {
-                        VkExtent3D imagesize;
-                        imagesize.width = width;
-                        imagesize.height = height;
-                        imagesize.depth = 1;
-
-                        newImage = std::make_shared<Image>(device, imagesize, VK_FORMAT_R8G8B8A8_UNORM, imageFlags, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
-
+                        newImage = extractImage(data, width, height, nrChannels);
                         stbi_image_free(data);
                     }
                 },
                 [&](fastgltf::sources::Array& vector) {
-                        const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data());
+                    const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data());
 
-                        unsigned char* data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()),
-                        &width, &height, &nrChannels, 4);
+                    unsigned char* data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()),
+                    &width, &height, &nrChannels, 4);
                     if (data) {
-                        VkExtent3D imagesize;
-                        imagesize.width = width;
-                        imagesize.height = height;
-                        imagesize.depth = 1;
-
-                        newImage = std::make_shared<Image>(device, imagesize, VK_FORMAT_R8G8B8A8_UNORM, imageFlags, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
-
+                        newImage = extractImage(data, width, height, nrChannels);
                         stbi_image_free(data);
                     }
                 },
@@ -365,16 +391,10 @@ std::string recoverPathToFile(const std::string& pathStr) {
 
                             unsigned char* data = stbi_load_from_memory(imgBytes,
                                 static_cast<int>(bufferView.byteLength),
-                                &width, &height, &nrChannels, 0);
+                                &width, &height, &nrChannels, 4);
 
                             if (data) {
-                                VkExtent3D imagesize;
-                                imagesize.width = width;
-                                imagesize.height = height;
-                                imagesize.depth = 1;
-
-                                newImage = std::make_shared<Image>(device, imagesize, VK_FORMAT_R8G8B8A8_UNORM, imageFlags, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
-
+                                newImage = extractImage(data, width, height, nrChannels);
                                 stbi_image_free(data);
                             }
                         }},
@@ -391,6 +411,37 @@ std::string recoverPathToFile(const std::string& pathStr) {
             return newImage;
         } else {
             return {};
+        }
+    }
+
+    std::shared_ptr<Image> Scene::extractImage(unsigned char* data, int width, int height, int channels) {
+        VkImageUsageFlags imageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        VkExtent3D imagesize;
+        imagesize.width = width;
+        imagesize.height = height;
+        imagesize.depth = 1;
+
+        VkFormat format = extractFormat(channels);
+        return std::make_shared<Image>(device, imagesize, format, imageFlags, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
+    }
+
+    VkFormat Scene::extractFormat(int channels) {
+        return VK_FORMAT_R8G8B8A8_UNORM;
+
+        switch (channels) {
+            case 1:
+                return VK_FORMAT_R8_UNORM;
+                break;
+            case 2:
+                return VK_FORMAT_R8G8_UNORM;
+                break;
+            case 3:
+                return VK_FORMAT_R8G8B8_UNORM;
+                break;
+            case 4:
+            default:
+                return VK_FORMAT_R8G8B8A8_UNORM;
+                break;
         }
     }
 

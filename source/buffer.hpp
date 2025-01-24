@@ -3,6 +3,8 @@
 #include "device.hpp"
 #include "vk_helper.hpp"
 
+#include <cassert>
+
 namespace mari {
         // Holds data for a scratch buffer used as a temporary storage during acceleration structure builds
         // TODO make scratch buffers a funcionality of buffer class
@@ -52,59 +54,64 @@ namespace mari {
             }
         }
     };
-     
-class Buffer {
-    public:
-        Buffer(
-            Device& device,
-            VkDeviceSize instanceSize,
-            uint32_t instanceCount,
-            VkBufferUsageFlags usageFlags,
-            VkMemoryPropertyFlags memoryPropertyFlags,
-            VkDeviceSize minOffsetAlignment = 1);
-        ~Buffer();
-        
-        Buffer(const Buffer&) = delete;
-        Buffer& operator=(const Buffer&) = delete;
-        
-        VkResult                map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-        void                    unmap();
-        
-        void                    writeToBuffer(void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-        VkResult                flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-        VkDescriptorBufferInfo  descriptorInfo(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-        VkResult                invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-        
-        void                    writeToIndex(void* data, int index);
-        VkResult                flushIndex(int index);
-        VkDescriptorBufferInfo  descriptorInfoForIndex(int index);
-        VkResult                invalidateIndex(int index);
-        void*                   getMappedMemory();
-        
-        VkBuffer                handle()                    const { return buffer; }
-        VkDeviceMemory          deviceMemory()              const { return memory; }
-        uint32_t                getInstanceCount()          const { return instanceCount; }
-        VkDeviceSize            getInstanceSize()           const { return instanceSize; }
-        VkDeviceSize            getAlignmentSize()          const { return instanceSize; }
-        VkBufferUsageFlags      getUsageFlags()             const { return usageFlags; }
-        VkMemoryPropertyFlags   getMemoryPropertyFlags()    const { return memoryPropertyFlags; }
-        VkDeviceSize            getBufferSize()             const { return bufferSize; }
-    
-        uint64_t                deviceAddress(); // TODO always get buffer device address in creation and store it in a variable
 
-    private:
-        static VkDeviceSize     getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment);
-        
-        Device&                 device;
-        void*                   mapped = nullptr;
-        VkBuffer                buffer = VK_NULL_HANDLE;
-        VkDeviceMemory          memory = VK_NULL_HANDLE;
-        
-        VkDeviceSize            bufferSize;
-        uint32_t                instanceCount;
-        VkDeviceSize            instanceSize;
-        VkDeviceSize            alignmentSize;
-        VkBufferUsageFlags      usageFlags;
-        VkMemoryPropertyFlags   memoryPropertyFlags;
+    class Buffer {
+        public:
+            Buffer(
+                Device& device,
+                VkDeviceSize instanceSize,
+                uint32_t instanceCount,
+                VkBufferUsageFlags usageFlags,
+                VkMemoryPropertyFlags memoryPropertyFlags,
+                VkDeviceSize minOffsetAlignment = 1);
+            ~Buffer();
+            
+            Buffer(const Buffer&) = delete;
+            Buffer& operator=(const Buffer&) = delete;
+            
+            VkResult                map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+            void                    unmap();
+            
+            void                    writeToBuffer(void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+            VkResult                flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+            VkDescriptorBufferInfo  descriptorInfo(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+            VkResult                invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+            
+            void                    writeToIndex(void* data, int index);
+            VkResult                flushIndex(int index);
+            VkDescriptorBufferInfo  descriptorInfoForIndex(int index);
+            VkResult                invalidateIndex(int index);
+            void*                   getMappedMemory();
+            
+            VkBuffer                handle()                    const { return buffer; }
+            VkDeviceMemory          deviceMemory()              const { return memory; }
+            uint64_t                deviceAddress()             const { 
+                assert(usageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT && "Buffer needs VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT flag"); 
+                return address; 
+            }
+            uint32_t                getInstanceCount()          const { return instanceCount; }
+            VkDeviceSize            getInstanceSize()           const { return instanceSize; }
+            VkDeviceSize            getAlignmentSize()          const { return instanceSize; }
+            VkBufferUsageFlags      getUsageFlags()             const { return usageFlags; }
+            VkMemoryPropertyFlags   getMemoryPropertyFlags()    const { return memoryPropertyFlags; }
+            VkDeviceSize            getBufferSize()             const { return bufferSize; }
+
+        private:
+            static VkDeviceSize     getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment);
+            uint64_t                getBufferDeviceAddress();
+
+            
+            Device&                 device;
+            void*                   mapped = nullptr;
+            VkBuffer                buffer = VK_NULL_HANDLE;
+            VkDeviceMemory          memory = VK_NULL_HANDLE;
+            uint64_t                address;
+            
+            VkDeviceSize            bufferSize;
+            uint32_t                instanceCount;
+            VkDeviceSize            instanceSize;
+            VkDeviceSize            alignmentSize;
+            VkBufferUsageFlags      usageFlags;
+            VkMemoryPropertyFlags   memoryPropertyFlags;
     };
 }

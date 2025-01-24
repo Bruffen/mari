@@ -9,7 +9,6 @@
 #include "vk_helper.hpp"
  
 // std
-#include <cassert>
 #include <cstring>
  
 namespace mari {
@@ -25,10 +24,14 @@ namespace mari {
             instanceSize{instanceSize},
             instanceCount{instanceCount},
             usageFlags{usageFlags},
-            memoryPropertyFlags{memoryPropertyFlags} {
+            memoryPropertyFlags{memoryPropertyFlags} 
+    {
         alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
         bufferSize = alignmentSize * instanceCount;
         device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);
+        if (usageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+            address = getBufferDeviceAddress();
+        }
     }
  
     Buffer::~Buffer() {
@@ -208,7 +211,7 @@ namespace mari {
         return instanceSize;
     }
 
-    uint64_t Buffer::deviceAddress() {
+    uint64_t Buffer::getBufferDeviceAddress() {
         assert(buffer && "Buffer is null while trying to get its device address.");
 
         VkBufferDeviceAddressInfoKHR bufferDeviceAddressInfo{};

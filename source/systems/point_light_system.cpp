@@ -65,7 +65,7 @@ namespace mari {
     void PointLightSystem::update(FrameInfo &frameInfo, RasterizationUbo &ubo) {
         auto rotateLight = glm::rotate(
             glm::mat4(1.0f),
-            frameInfo.frameTime,
+            frameInfo.deltaTime,
             {0.0f, -1.0f, 0.0f}
         );
 
@@ -78,11 +78,11 @@ namespace mari {
 
 
             // Update light position
-            obj.transform.translation = glm::vec3(rotateLight * glm::vec4(obj.transform.translation, 1.0f));
-            obj.transform.translation.y = -1.7f + 1.5f * std::sin(frameInfo.elapsedTime + lightIndex * 3.0f);
+            obj.transform.position = glm::vec3(rotateLight * glm::vec4(obj.transform.position, 1.0f));
+            obj.transform.position.y = -1.7f + 1.5f * std::sin(frameInfo.elapsedTime + lightIndex * 3.0f);
 
             // Copy light to ubo
-            ubo.pointLights[lightIndex].position = glm::vec4(obj.transform.translation, 1.0f);
+            ubo.pointLights[lightIndex].position = glm::vec4(obj.transform.position, 1.0f);
             ubo.pointLights[lightIndex].color = glm::vec4(obj.color, obj.pointLight->lightIntensity);
 
             lightIndex++;
@@ -111,7 +111,7 @@ namespace mari {
             if (obj.pointLight == nullptr) continue;
 
             PointLightPushConstants push{};
-            push.position = glm::vec4(obj.transform.translation, 1.0f);
+            push.position = glm::vec4(obj.transform.position, 1.0f);
             push.color = glm::vec4(obj.color, obj.pointLight->lightIntensity);
             push.radius = obj.transform.scale.x;
 

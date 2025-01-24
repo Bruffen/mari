@@ -7,7 +7,7 @@ set(NAME mari)
 
 message(STATUS "using ${CMAKE_GENERATOR}")
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
-    if (NOT MINGW_PATH) 
+    if (NOT MINGW_PATH)
       message(FATAL_ERROR "MINGW_PATH not set in .env.cmake")
     endif()
     set(USE_MINGW "True")
@@ -76,12 +76,21 @@ if (NOT DEFINED STB_PATH)
     message(FATAL_ERROR "Could not find stb!")
 endif()
 
+# Get Dear ImGui source files plus what we need for GLFW and Vulkan 
+file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp ${IMGUI_PATH}/backends/imgui_impl_glfw.cpp ${IMGUI_PATH}/backends/imgui_impl_vulkan.cpp)
+
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
  
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES})
  
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
- 
+
+set(OPTIONS "/Zi") 
+set(OPTIONS "/DEBUG")
+set(OPTIONS "/openmp")
+#TODO set "/O2" in release mode
+target_compile_options(${PROJECT_NAME} PUBLIC "${OPTIONS}")
+
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
 
@@ -105,6 +114,8 @@ if (WIN32)
         ${GLM_PATH}
         ${FASTGLTF_INCLUDE_DIRS}
         ${STB_PATH}
+        ${IMGUI_PATH}
+        ${IMGUI_PATH}/backends
     )
 
     target_link_directories(${PROJECT_NAME} PUBLIC
@@ -113,19 +124,12 @@ if (WIN32)
     )
  
     target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf)
-elseif (UNIX)
-    message(STATUS "CREATING BUILD FOR UNIX")
-    target_include_directories(${PROJECT_NAME} PUBLIC
-        ${PROJECT_SOURCE_DIR}/source
-        ${TINYOBJ_PATH}
-    )
-    target_link_libraries(${PROJECT_NAME} glfw ${Vulkan_LIBRARIES})
 endif()
  
  
 ############## Build SHADERS #######################
  
-# Find all vertex and fragment sources within shaders directory
+# Find all sources within shaders directory
 # taken from VBlancos vulkan tutorial
 # https://github.com/vblanco20-1/vulkan-guide/blob/all-chapters/CMakeLists.txt
 find_program(GLSL_VALIDATOR glslangValidator HINTS 

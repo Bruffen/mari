@@ -1,14 +1,19 @@
 #pragma once
 
 #include "image.hpp"
+#include "default_objects.hpp"
 
 #include <memory>
 #include <stdexcept>
 #include <iostream>
+#include <vulkan/utility/vk_format_utils.h>
 
 namespace mari {
     Image::Image(Device &device, VkExtent3D size, VkFormat format, VkImageUsageFlags flags, VkImageLayout layout, void *data)
-     : device{device}, size{size}, format{format}, flags{flags}, layout{layout} {
+     : device{device}, size{size}, format{format}, flags{flags}, layout{layout}, sampler{sampler} {
+        auto formatInfo = vkuGetFormatInfo(format);
+        channels = formatInfo.component_count;
+        texelBytes = formatInfo.block_size;
         createImage();
         createImageView();
 
@@ -18,9 +23,9 @@ namespace mari {
     }
     
     Image::Image(Device &device, VkExtent3D size, VkFormat format, VkImageUsageFlags flags, VkImageLayout layout)
-    : Image(device, size, format, flags, layout, nullptr) {
+     : Image(device, size, format, flags, layout, nullptr) {
     }
-
+    
     Image::~Image() {
         cleanup();
     }
@@ -74,10 +79,10 @@ namespace mari {
     }
 
     VkDescriptorImageInfo Image::descriptorInfo() {
-        VkDescriptorImageInfo imageDescriptor{};
-        imageDescriptor.imageView                   = view;
-        imageDescriptor.imageLayout                 = VK_IMAGE_LAYOUT_GENERAL;
-        return imageDescriptor;
+        descriptor.imageView   = view;
+        descriptor.imageLayout = layout;
+        descriptor.sampler     = sampler ? sampler : DefaultObjects::getSamplerNearest(); // TODO not every image needs a sampler
+        return descriptor;
     }
 
     void Image::resize(uint32_t width, uint32_t height) {
@@ -90,7 +95,7 @@ namespace mari {
     }
 
     void Image::writeFromData(void *data) {
-        size_t data_size = size.width * size.height * size.depth * 4; // TODO right now it's fixed to 4 bytes format, look up format for more informed data size
+        size_t data_size = size.width * size.height * size.depth * texelBytes;
         Buffer stagingBuffer = Buffer(
             device, 
             data_size, 

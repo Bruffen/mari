@@ -12,7 +12,9 @@ namespace mari {
     uint32_t binding,
     VkDescriptorType descriptorType,
     VkShaderStageFlags stageFlags,
-    uint32_t count) {
+    uint32_t count,
+    VkDescriptorBindingFlags flags
+    ) {
         assert(bindings.count(binding) == 0 && "Binding already in use");
         VkDescriptorSetLayoutBinding layoutBinding{};
         layoutBinding.binding = binding;
@@ -20,17 +22,23 @@ namespace mari {
         layoutBinding.descriptorCount = count;
         layoutBinding.stageFlags = stageFlags;
         bindings[binding] = layoutBinding;
+        bindingFlags.push_back(flags);
+
         return *this;
     }
  
     std::unique_ptr<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const {
-        return std::make_unique<DescriptorSetLayout>(device, bindings);
+        VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
+        bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+        bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+        bindingFlagsInfo.pBindingFlags = bindingFlags.data();
+        return std::make_unique<DescriptorSetLayout>(device, bindings, bindingFlagsInfo);
     }
  
     // *************** Descriptor Set Layout *********************
  
     DescriptorSetLayout::DescriptorSetLayout(
-    Device &device, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings)
+    Device &device, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags)
     : device{device}, bindings{bindings} {
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings{};
         for (auto kv : bindings) {
@@ -41,6 +49,7 @@ namespace mari {
         descriptorSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         descriptorSetLayoutInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
         descriptorSetLayoutInfo.pBindings = setLayoutBindings.data();
+        descriptorSetLayoutInfo.pNext = &bindingFlags;
  
         if (vkCreateDescriptorSetLayout(
                 device.handle(),
@@ -97,13 +106,23 @@ namespace mari {
         vkDestroyDescriptorPool(device.handle(), descriptorPool, nullptr);
     }
  
-    bool DescriptorPool::allocateDescriptor(
-    const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet &descriptor) const {
+    bool DescriptorPool::allocateDescriptors(
+    const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet &descriptor, const uint32_t descriptorCount) const {
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = descriptorPool;
         allocInfo.pSetLayouts = &descriptorSetLayout;
         allocInfo.descriptorSetCount = 1;
+
+        VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountAllocInfo{};
+        if (descriptorCount > 1) {
+            uint32_t variableDescCounts[] = { descriptorCount };
+            variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
+            variableDescriptorCountAllocInfo.descriptorSetCount = 1;
+            variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
+            
+            allocInfo.pNext = &variableDescriptorCountAllocInfo;
+        }
     
         // Might want to create a "DescriptorPoolManager" class that handles this case, and builds
         // a new pool whenever an old pool fills up. But this is beyond our current scope
@@ -142,11 +161,11 @@ namespace mari {
             "Binding single descriptor info, but binding expects multiple");
     
         VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.descriptorType = bindingDescription.descriptorType;
-        write.dstBinding = binding;
-        write.pBufferInfo = bufferInfo;
-        write.descriptorCount = 1;
+        write.sType             = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.descriptorType    = bindingDescription.descriptorType;
+        write.dstBinding        = binding;
+        write.pBufferInfo       = bufferInfo;
+        write.descriptorCount   = 1;
         
         writes.push_back(write);
         return *this;
@@ -159,15 +178,36 @@ namespace mari {
         
         assert(
             bindingDescription.descriptorCount == 1 &&
-            "Binding single descriptor info, but binding expects multiple"
+            "Binding single descriptor info, but binding expects multiple. Use writeImages() instead."
         );
         
         VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.descriptorType = bindingDescription.descriptorType;
-        write.dstBinding = binding;
-        write.pImageInfo = imageInfo;
-        write.descriptorCount = 1;
+        write.sType             = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.descriptorType    = bindingDescription.descriptorType;
+        write.dstBinding        = binding;
+        write.pImageInfo        = imageInfo;
+        write.descriptorCount   = 1;
+        
+        writes.push_back(write);
+        return *this;
+    }
+
+        DescriptorWriter &DescriptorWriter::writeImages(uint32_t binding, std::vector<VkDescriptorImageInfo> *imageInfos) {
+        assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
+        
+        auto &bindingDescription = setLayout.bindings[binding];
+
+        assert(
+            bindingDescription.descriptorCount == static_cast<uint32_t>(imageInfos->size()) &&
+            "Binding single descriptor info, but binding expects multiple. Use writeImages() instead."
+        );
+        
+        VkWriteDescriptorSet write{};
+        write.sType             = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.descriptorType    = bindingDescription.descriptorType;
+        write.descriptorCount   = bindingDescription.descriptorCount;
+        write.dstBinding        = binding;
+        write.pImageInfo        = imageInfos->data();
         
         writes.push_back(write);
         return *this;
@@ -196,7 +236,15 @@ namespace mari {
 
  
     bool DescriptorWriter::build(VkDescriptorSet &set) {
-        bool success = pool.allocateDescriptor(setLayout.handle(), set);
+        uint32_t maxDescriptorCount = 1;
+        for (auto &write : writes) {
+            if (write.descriptorCount > maxDescriptorCount) {
+                maxDescriptorCount = write.descriptorCount;
+            }
+        }
+
+
+        bool success = pool.allocateDescriptors(setLayout.handle(), set, maxDescriptorCount);
         if (!success) {
             return false;
         }
@@ -208,7 +256,7 @@ namespace mari {
         for (auto &write : writes) {
             write.dstSet = set;
         }
-        vkUpdateDescriptorSets(pool.device.handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+        vkUpdateDescriptorSets(pool.device.handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, VK_NULL_HANDLE);
     }
 }
  

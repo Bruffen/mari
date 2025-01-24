@@ -19,16 +19,19 @@ namespace mari {
                         uint32_t binding,
                         VkDescriptorType descriptorType,
                         VkShaderStageFlags stageFlags,
-                        uint32_t count = 1);
+                        uint32_t count = 1,
+                        VkDescriptorBindingFlags flags = 0);
+
                     std::unique_ptr<DescriptorSetLayout> build() const;
                     
                 private:
                     Device &device;
                     std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings{};
+                    std::vector<VkDescriptorBindingFlags> bindingFlags{};
             };
     
             DescriptorSetLayout(
-                Device &device, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings);
+                Device &device, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags);
             ~DescriptorSetLayout();
             DescriptorSetLayout(const DescriptorSetLayout &) = delete;
             DescriptorSetLayout &operator=(const DescriptorSetLayout &) = delete;
@@ -70,11 +73,10 @@ namespace mari {
             DescriptorPool(const DescriptorPool &) = delete;
             DescriptorPool &operator=(const DescriptorPool &) = delete;
             
-            bool allocateDescriptor(
-                const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet &descriptor) const;
-            
+            VkDescriptorPool handle() { return descriptorPool; }
+
+            bool allocateDescriptors(const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet &descriptor, const uint32_t descriptorCount) const;
             void freeDescriptors(std::vector<VkDescriptorSet> &descriptors) const;
-            
             void resetPool();
  
         private:
@@ -90,6 +92,7 @@ namespace mari {
     
             DescriptorWriter &writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo);
             DescriptorWriter &writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo);
+            DescriptorWriter &writeImages(uint32_t binding, std::vector<VkDescriptorImageInfo> *imageInfos);
             DescriptorWriter &writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *accelerationStructureDescriptor);
             
             bool build(VkDescriptorSet &set);

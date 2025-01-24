@@ -1,5 +1,7 @@
 #pragma once
 
+#include "transform.hpp"
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -14,6 +16,8 @@ namespace mari {
             static constexpr float MIN_FOV = glm::radians(1.0f); 
 
             Camera();
+
+            void update(Transform &transform);
 
             void setOrthographicProjection(float left, float right, float top, float bottom, float near, float far);
             void setPerspectiveProjection(float fovy, float aspect, float near, float far);
@@ -32,7 +36,7 @@ namespace mari {
             static void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 
         private:
-            float fov{glm::radians(50.0f)};
+            float fov{glm::radians(60.0f)};
             float zoomSpeed{0.05f};
             glm::mat4 projectionMatrix{1.0f};
             glm::mat4 viewMatrix{1.0f};

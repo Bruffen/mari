@@ -2,7 +2,7 @@
 
 #include "device.hpp"
 #include "pipeline.hpp"
-#include "game_object.hpp"
+#include "scene/scene.hpp"
 #include "frame_info.hpp"
 #include "image.hpp"
 
@@ -24,17 +24,18 @@ namespace mari {
 
     class RayTracingSystem {
         public:
-            RayTracingSystem(Device &device, Window &window, GameObject::Map &gameObjects, VkDescriptorSetLayout descriptorSetLayout);
+            RayTracingSystem(Device &device, Window &window, const Scene &scene, VkDescriptorSetLayout descriptorSetLayout);
             ~RayTracingSystem();
 
             void                                    render(FrameInfo &frameInfo, Swapchain &swapchain);
-            // TODO get around having tlas and accumImage be public
+            // TODO get around having these be public
             AccelerationStructure                   tlas;
             std::unique_ptr<Image>                  accumImage;
+            std::unique_ptr<Buffer>                 geometryAddressesBuffer;
         private:
-            void                                    buildScene(const GameObject::Map &scene);
-            void                                    buildBLAS(const Mesh &mesh, const TransformComponent &transform);
-            void                                    buildTLAS();
+            void                                    buildScene(const Scene &scene);
+            void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix);
+            void                                    buildTLAS(VkTransformMatrixKHR transformMatrix);
             void                                    createPipelineLayout(VkDescriptorSetLayout descriptorSetLayout);
             void                                    createPipeline();
             void                                    createImages(uint32_t width, uint32_t height);
@@ -45,5 +46,7 @@ namespace mari {
             VkPipelineLayout                        pipelineLayout;
 
             std::unique_ptr<Image>                  presentImage;
+
+            std::vector<GeometryAdresses>           geometryAddresses;
     };
 }

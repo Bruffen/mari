@@ -1,7 +1,8 @@
 #pragma once
 
-#include "camera.hpp"
+#include "components/camera.hpp"
 #include "game_object.hpp"
+#include "gui.hpp"
 #include "window.hpp"
 
 namespace mari {
@@ -29,15 +30,21 @@ namespace mari {
                 double lastPositionY;
             };
 
+            KeyboardController(Gui& gui);
+
             void moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
             void rotateCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
+            bool changeCamera(GLFWwindow *window);
             void handleInput(GLFWwindow *window, bool &isRayTracingOn);
 
             const KeyMappings keys;
             Mouse mouse{};
-            float moveSpeed{3.0f};
+            Gui&  gui;
+            float moveSpeed{1.0f};
+            float currentSpeed{moveSpeed};
             float lookSpeed{0.25f};
             bool  changePipelinePressed = false;// TODO
+            bool  changeCameraPressed = false;// TODO
     };
     
 }

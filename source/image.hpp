@@ -13,11 +13,12 @@ namespace mari {
             Image(Device &device, VkExtent3D size, VkFormat format, VkImageUsageFlags flags, VkImageLayout layout);
             ~Image();
 
-            VkDescriptorImageInfo   descriptorInfo();
             void                    resize(uint32_t width, uint32_t height);
             void                    writeFromData(void *data);
             void                    writeFromBuffer(Buffer &buffer);
+            VkDescriptorImageInfo   descriptorInfo();
 
+            std::string             name = "";
             VkExtent3D              size;
             VkDeviceMemory          memory;
             VkImage                 handle = VK_NULL_HANDLE;
@@ -25,6 +26,8 @@ namespace mari {
             VkImageLayout           layout;
             VkFormat                format;
             VkImageUsageFlags       flags;
+            VkDescriptorSet         descriptorGui; // TODO can the same one be used for both?
+            VkSampler               sampler;
 
         private:
             void                    createImage();
@@ -32,5 +35,8 @@ namespace mari {
             void                    cleanup();
 
             Device                  &device;
+            uint32_t                channels;
+            uint32_t                texelBytes;
+            VkDescriptorImageInfo   descriptor;
     };
 }

@@ -41,56 +41,56 @@ namespace mari {
         VkSurfaceKHR                surface()                     { return surface_; }
         VkQueue                     graphicsQueue()               { return graphicsQueue_; }
         VkQueue                     presentQueue()                { return presentQueue_; }
+        VkInstance                  getInstance()                 { return instance; }
         VkCommandPool               getCommandPool()              { return commandPool; }
         VkPhysicalDevice            getPhysicalDevice()           { return physicalDevice; }
         SwapchainSupportDetails     getSwapchainSupport()         { return querySwapchainSupport(physicalDevice); }
 
-        QueueFamilyIndices          findPhysicalQueueFamilies()   { return findQueueFamilies(physicalDevice); }
+        QueueFamilyIndices          findPhysicalQueueFamilies()   { return findQueueFamilies(physicalDevice); } // TODO do this once and save it as a member variable
         uint32_t                    findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
         VkFormat                    findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
-        void createBuffer( /* TODO should this be in device? */
-            VkDeviceSize size,
-            VkBufferUsageFlags usage,
-            VkMemoryPropertyFlags properties,
-            VkBuffer &buffer,
-            VkDeviceMemory &bufferMemory);
+        VkCommandBuffer             beginSingleTimeCommands();
+        void                        endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-        VkCommandBuffer beginSingleTimeCommands();
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        /* TODO should this be in device? */
+        void                        createBuffer(
+                                        VkDeviceSize size, 
+                                        VkBufferUsageFlags usage, 
+                                        VkMemoryPropertyFlags properties, 
+                                        VkBuffer &buffer, 
+                                        VkDeviceMemory &bufferMemory);
 
-        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-        void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D extent, uint32_t layerCount, VkImageLayout oldLayout);
-
-        void createImageWithInfo(
-            const VkImageCreateInfo &imageInfo,
-            VkMemoryPropertyFlags properties,
-            VkImage &image,
-            VkDeviceMemory &imageMemory);
+        void                        createImageWithInfo(
+                                        const VkImageCreateInfo &imageInfo,
+                                        VkMemoryPropertyFlags properties,
+                                        VkImage &image,
+                                        VkDeviceMemory &imageMemory);
+        void                        copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void                        copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D extent, uint32_t layerCount, VkImageLayout oldLayout);
 
         VkPhysicalDeviceProperties properties;
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR propertiesRT{
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
 
-
     private:
-        void createInstance();
-        void setupDebugMessenger();
-        void createSurface();
-        void pickPhysicalDevice();
-        void createLogicalDevice();
-        void createCommandPool();
+        void                        createInstance();
+        void                        setupDebugMessenger();
+        void                        createSurface();
+        void                        pickPhysicalDevice();
+        void                        createLogicalDevice();
+        void                        createCommandPool();
 
-        bool isDeviceSuitable(VkPhysicalDevice device);
-        std::vector<const char *> getRequiredExtensions();
-        bool checkValidationLayerSupport();
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-        void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
-        void hasGflwRequiredInstanceExtensions();
-        bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-        SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device);
+        bool                        isDeviceSuitable(VkPhysicalDevice device);
+        std::vector<const char *>   getRequiredExtensions();
+        bool                        checkValidationLayerSupport();
+        QueueFamilyIndices          findQueueFamilies(VkPhysicalDevice device);
+        void                        populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
+        void                        hasGflwRequiredInstanceExtensions();
+        bool                        checkDeviceExtensionSupport(VkPhysicalDevice device);
+        SwapchainSupportDetails     querySwapchainSupport(VkPhysicalDevice device);
 
-        void addRayTracingExtensions();
+        void                        addRayTracingExtensions();
 
         VkInstance                  instance;
         VkDebugUtilsMessengerEXT    debugMessenger;

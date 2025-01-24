@@ -51,6 +51,7 @@ namespace mari {
         pickPhysicalDevice();
         createLogicalDevice();
         createCommandPool();
+        getRayTracingFunctionPointers(device_);
     }
 
     Device::~Device() {
@@ -158,6 +159,7 @@ namespace mari {
 
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
+        deviceFeatures.shaderInt64 = VK_TRUE;
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -170,26 +172,34 @@ namespace mari {
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
         /* Ray tracing features */
-        VkPhysicalDeviceBufferDeviceAddressFeaturesKHR featuresBDA{};
+        VkPhysicalDeviceBufferDeviceAddressFeatures featuresBDA{};
         featuresBDA.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
         featuresBDA.bufferDeviceAddress = VK_TRUE;
 
-        VkPhysicalDeviceRayTracingPipelineFeaturesKHR featureRT{};
-        featureRT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-        featureRT.rayTracingPipeline = VK_TRUE;
-        featureRT.pNext = &featuresBDA;
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR featuresRT{};
+        featuresRT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+        featuresRT.rayTracingPipeline = VK_TRUE;
+        featuresRT.pNext = &featuresBDA;
 
-        VkPhysicalDeviceAccelerationStructureFeaturesKHR featureAS{};
-        featureAS.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-        featureAS.accelerationStructure = VK_TRUE;
-        featureAS.pNext = &featureRT;
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR featuresAS{};
+        featuresAS.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+        featuresAS.accelerationStructure = VK_TRUE;
+        featuresAS.pNext = &featuresRT;
 
-        VkPhysicalDeviceRayTracingValidationFeaturesNV featureRTV{};
-        featureRTV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV;
-        featureRTV.rayTracingValidation = VK_TRUE;
-        featureRTV.pNext = &featureAS;
+        VkPhysicalDeviceDescriptorIndexingFeatures featuresDI{};
+        featuresDI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+        featuresDI.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+        featuresDI.runtimeDescriptorArray = VK_TRUE;
+        featuresDI.descriptorBindingVariableDescriptorCount = VK_TRUE;
+        featuresDI.pNext = &featuresAS;
 
-        createInfo.pNext = &featureRTV;
+        VkPhysicalDeviceRayTracingValidationFeaturesNV featuresRTV{};
+        featuresRTV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV;
+        featuresRTV.rayTracingValidation = VK_TRUE;
+        featuresRTV.pNext = &featuresDI;
+
+
+        createInfo.pNext = &featuresRTV;
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
 

@@ -14,9 +14,8 @@ namespace mari {
     
     struct MaterialResources {
         std::shared_ptr<Image>  colorImage;
-        VkSampler               colorSampler;
+        int32_t                 colorImageIndex;
         std::shared_ptr<Image>  metallicRoughnessImage;
-        VkSampler               metallicRoughnessSampler;
         std::unique_ptr<Buffer> dataBuffer;
         uint32_t                dataBufferOffset;
     };
@@ -24,11 +23,18 @@ namespace mari {
     struct Material {
         MaterialConstants constants;
         MaterialResources resources;
+        std::string name = "";
     };
 
-    struct Primitive {
-        uint32_t startIndex;
+    struct SubMesh {
+        uint32_t start;
         uint32_t count;
         std::shared_ptr<Material> material;
+    };
+
+    struct GeometryAdresses {
+        uint64_t vertexBufferDeviceAddress;
+        uint64_t indexBufferDeviceAddress;
+        int32_t  textureIndex;
     };
 }

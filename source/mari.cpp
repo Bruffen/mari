@@ -3,7 +3,7 @@
 #include "mari.hpp"
 
 #include "buffer.hpp"
-#include "camera.hpp"
+#include "components/camera.hpp"
 #include "keyboard_controller.hpp"
 #include "systems/simple_render_system.hpp"
 #include "systems/point_light_system.hpp"
@@ -18,10 +18,17 @@
 #include <chrono>
 #include <cassert>
 #include <stdexcept>
+#include <iostream>
 
 namespace mari {
 
+
     Mari::Mari() {
+        DefaultObjects::initialize(device);
+        gui = std::make_unique<Gui>(device, window, renderer);
+        loadGameObjects();
+        gui->set(scene);
+
         globalPool = DescriptorPool::Builder(device)
             .setMaxSets(Swapchain::MAX_FRAMES_IN_FLIGHT * 2)
             // Rasterization
@@ -30,10 +37,14 @@ namespace mari {
             .addPoolSize(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, Swapchain::MAX_FRAMES_IN_FLIGHT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, Swapchain::MAX_FRAMES_IN_FLIGHT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(scene->images.size()))
 
             .build();
+    }
 
-        loadGameObjects();
+    Mari::~Mari() {
+        DefaultObjects::cleanup(device);
     }
 
     void Mari::run() { 
@@ -65,10 +76,14 @@ namespace mari {
             .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS)
             .build();
 
+        const uint32_t imageCount = static_cast<uint32_t>(scene->images.size());
         std::unique_ptr<mari::DescriptorSetLayout> rayTracingSetLayout = DescriptorSetLayout::Builder(device)
             .addBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
+            .addBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
+                        imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT)
             .build();
 
         std::vector<VkDescriptorSet> rasterizationDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
@@ -80,8 +95,13 @@ namespace mari {
 
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout->handle()};
         PointLightSystem pointLightSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout->handle()};
-        RayTracingSystem rayTracingSystem{device, window, gameObjects, rayTracingSetLayout->handle()};
-        Camera camera{};
+        RayTracingSystem rayTracingSystem{device, window, *scene, rayTracingSetLayout->handle()};
+        std::shared_ptr<Camera> freeCamera = std::make_shared<Camera>();
+
+        std::vector<VkDescriptorImageInfo> textureDescriptors{};
+        for (auto &image : scene->images) {
+            textureDescriptors.push_back(image->descriptorInfo());
+        }
 
         std::vector<VkDescriptorSet> rayTracingDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < rayTracingDescriptorSets.size(); i++) {
@@ -89,6 +109,8 @@ namespace mari {
                 .writeAccelerationStructure(0, &rayTracingSystem.tlas.descriptor())
                 .writeImage(                1, &rayTracingSystem.accumImage->descriptorInfo())
                 .writeBuffer(               2, &rayTracingUboBuffers[i]->descriptorInfo())
+                .writeBuffer(               3, &rayTracingSystem.geometryAddressesBuffer->descriptorInfo())
+                .writeImages(               4, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
 
@@ -97,41 +119,52 @@ namespace mari {
         //glfwSetScrollCallback(window.getGLFWwindow(), camera.scrollCallback);
         glfwSetWindowUserPointer(window.getGLFWwindow(), &window);
 
-        auto cameraObject = GameObject::createGameObject();
-        cameraObject.transform.translation.y = -0.5f;
-        cameraObject.transform.translation.z = -2.5f;
-        KeyboardController cameraController{};
+        std::shared_ptr<GameObject> cameraObject = std::make_shared<GameObject>();
+        cameraObject->name = "Free Camera";
+        cameraObject->camera = freeCamera;
+        cameraObject->transform.position.y = -0.5f;
+        cameraObject->transform.position.z = -2.5f;
+        scene->topNodes.emplace_back(cameraObject);
+        KeyboardController controller{*gui};
 
         auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = startTime;
 
         bool isRayTracingOn = true;
 
+        std::shared_ptr<GameObject> currentCamera = cameraObject;
+
         while (!window.shouldClose()) {
             glfwPollEvents();
 
             auto newTime = std::chrono::high_resolution_clock::now();
-            float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
+            float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
             float elapsedTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - startTime).count();
             currentTime = newTime;
 
-            cameraController.rotateCamera(window.getGLFWwindow(), frameTime, cameraObject);
-            cameraController.moveCamera(window.getGLFWwindow(), frameTime, cameraObject);
-            cameraController.handleInput(window.getGLFWwindow(), isRayTracingOn);
-            camera.setViewYXZ(cameraObject.transform.translation, cameraObject.transform.rotation);
+            controller.rotateCamera(window.getGLFWwindow(), deltaTime, *currentCamera);
+            controller.handleInput(window.getGLFWwindow(), isRayTracingOn);
+            if (controller.changeCamera(window.getGLFWwindow())) {
+                currentCamera = scene->cameras[0]; // TODO
+            }
+            controller.moveCamera(window.getGLFWwindow(), deltaTime, *currentCamera);
+
+            freeCamera->setViewYXZ(currentCamera->transform.position, currentCamera->transform.rotation);
+
+            currentCamera->update(); // TODO call every gameobject's update
 
             float aspect = renderer.getAspectRatio();
             //camera.setOrthographicProjection(-aspect, aspect, -1, 1, 0.1f, 1000.0f);
-            camera.setPerspectiveProjection(aspect, 0.1f, 1000.0f);
+            freeCamera->setPerspectiveProjection(aspect, 0.1f, 1000.0f);
             
             if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
                 FrameInfo frameInfo {
                     frameIndex,
-                    frameTime,
+                    deltaTime,
                     elapsedTime,
                     commandBuffer,
-                    camera,
+                    *currentCamera->camera,
                     isRayTracingOn ? rayTracingDescriptorSets[frameIndex] : rasterizationDescriptorSets[frameIndex],
                     gameObjects
                 };
@@ -139,8 +172,8 @@ namespace mari {
                 if (isRayTracingOn) {
                     // update
                     RayTracingUbo ubo{};
-                    ubo.viewInverse = camera.getInverseView();
-                    ubo.projInverse = camera.getInverseProjection();
+                    ubo.viewInverse = currentCamera->camera->getInverseView();
+                    ubo.projInverse = currentCamera->camera->getInverseProjection();
                     rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                     rayTracingUboBuffers[frameIndex]->flush();
 
@@ -150,9 +183,9 @@ namespace mari {
                 else {
                     // update
                     RasterizationUbo ubo{};
-                    ubo.projection = camera.getProjection();
-                    ubo.view = camera.getView();
-                    ubo.inverseView = camera.getInverseView();
+                    ubo.projection  = currentCamera->camera->getProjection();
+                    ubo.view        = currentCamera->camera->getView();
+                    ubo.inverseView = currentCamera->camera->getInverseView();
                     pointLightSystem.update(frameInfo, ubo);
                     rasterizationUboBuffers[frameIndex]->writeToBuffer(&ubo);
                     rasterizationUboBuffers[frameIndex]->flush();
@@ -163,6 +196,13 @@ namespace mari {
                     pointLightSystem.render(frameInfo);
                     renderer.endSwapchainRenderPass(commandBuffer);
                 }
+
+                // GUI
+                gui->prepare(frameInfo);
+                renderer.beginSwapchainRenderPass(commandBuffer);
+                gui->render(commandBuffer);
+                renderer.endSwapchainRenderPass(commandBuffer);
+                
                 renderer.endFrame();
 
                 if (window.wasWindowResized()) { // TODO make this cleaner
@@ -220,7 +260,7 @@ namespace mari {
         floor.transform.rotation = glm::vec3{0.0f};
         floor.transform.scale = glm::vec3{3.0f};
         gameObjects.emplace(floor.getId(), std::move(floor));
-*/
+*//*
         std::vector<glm::vec3> lightColors {
             {1.f, .1f, .1f},
             {.1f, .1f, 1.f},
@@ -241,18 +281,13 @@ namespace mari {
             pointLight.transform.translation = glm::vec3(rotateLight * glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f));
             gameObjects.emplace(pointLight.getId(), std::move(pointLight));
         }
-
-        auto gameObject = GameObject::createGameObject();
-        //scene = std::make_shared<Scene>(device, defaultObjects, "../../../../_Models/gltf/bistro_exterior.glb");
-        //scene = std::make_shared<Scene>(device, defaultObjects, "../../../../_Models/gltf/the-white-room/the-white-room.gltf");
-        scene = std::make_shared<Scene>(device, defaultObjects, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
-        gameObject.transform.translation = {0.0f, -0.01f, 0.0f};
-        gameObject.transform.rotation = {glm::radians(-90.0f), 0.0f, glm::radians(0.0f)};
-        gameObject.transform.scale = glm::vec3{3.0f};
-        gameObject.mesh.reserve(scene->meshes.size());
-        for (auto mesh : scene->meshes) {
-            gameObject.mesh.emplace_back(mesh.second);
-        }
-        gameObjects.emplace(gameObject.getId(), std::move(gameObject));
+*/
+        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
+        //scene->transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(90.0f)};
+        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/living_room.glb");
+        scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
+        //scene->transform.position = {0.0f, -0.01f, 0.0f};
+        scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+        scene->update();
     }
 }

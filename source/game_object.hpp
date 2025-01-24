@@ -1,6 +1,8 @@
 #pragma once
 
-#include "mesh.hpp"
+#include "components/camera.hpp"
+#include "components/mesh.hpp"
+#include "components/transform.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -8,83 +10,45 @@
 #include <unordered_map>
 
 namespace mari {
-
-    struct TransformComponent {
-        glm::vec3 translation{};
-        glm::vec3 scale{1.0f, 1.0f, 1.0f};
-        glm::vec3 rotation{};
-
-        glm::mat4  mat4();
-        glm::mat3  normalMatrix();
-        VkTransformMatrixKHR matKHR() const;
-
-        glm::mat3 matrixRotation() {
-            glm::vec3 forward{0.0f, 0.0f, 1.0f};
-            const float c3 = glm::cos(rotation.z);
-            const float s3 = glm::sin(rotation.z);
-            const float c2 = glm::cos(rotation.x);
-            const float s2 = glm::sin(rotation.x);
-            const float c1 = glm::cos(rotation.y);
-            const float s1 = glm::sin(rotation.y);
-
-            return glm::mat3{
-                {
-                    (c1 * c3 + s1 * s2 * s3),
-                    (c2 * s3),
-                    (c1 * s2 * s3 - c3 * s1)
-                },
-                {
-                    (c3 * s1 * s2 - c1 * s3),
-                    (c2 * c3),
-                    (c1 * c3 * s2 + s1 * s3)
-                },
-                {
-                    (c2 * s1),
-                    (-s2),
-                    (c1 * c2)
-                }
-            };
-        }
-
-        glm::vec3 forward() { return matrixRotation() * glm::vec3{0.0f, 0.0f, 1.0f}; }
-        glm::vec3 right()   { return matrixRotation() * glm::vec3{1.0f, 0.0f, 0.0f}; }
-        glm::vec3 up()      { return matrixRotation() * glm::vec3{0.0f, 1.0f, 0.0f}; }
-    };
-
-    struct PointLightComponent {
+    struct PointLightComponent { // TODO
         float lightIntensity = 1.0f;
     };
 
     // TODO https://austinmorlan.com/posts/entity_component_system/
     class GameObject {
         public:
-            using id_t = unsigned int;
-            using Map = std::unordered_map<id_t, GameObject>;
+            using Map = std::unordered_map<uint32_t, GameObject>;
 
-            static GameObject createGameObject() {
-                static id_t currentId = 0;
-                return GameObject{currentId++};
-            }
+            GameObject();
+            //GameObject(const GameObject &) = delete;
+            //GameObject &operator=(const GameObject &) = delete;
+            //GameObject(GameObject &&) = default;
+            //GameObject &operator=(GameObject &&) = default;
 
-            static GameObject makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
+            void update();
+            void render();
 
-            GameObject(const GameObject &) = delete;
-            GameObject &operator=(const GameObject &) = delete;
-            GameObject(GameObject &&) = default;
-            GameObject &operator=(GameObject &&) = default;
+            const uint32_t                              getId() { return id; }
+            static GameObject                           makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
 
-            const id_t getId() { return id; }
-
-            glm::vec3 color{};
-            TransformComponent transform{};
-            float fovy{50.0f};
+            std::string                                 name        = "";
+            glm::vec3                                   color       {};         // TODO move to light component
+            glm::mat4                                   worldMatrix {};         // world values
+            Transform                                   transform   {};         // local values
+            bool                                        isStatic    {true};
+            float                                       fovy        {50.0f};
 
             // Optional pointer components
-            std::vector<std::shared_ptr<Mesh>> mesh{}; // TODO go back to a mesh por gameobject and create gameobject per node in scene
-            std::unique_ptr<PointLightComponent> pointLight = nullptr;
+            std::weak_ptr<GameObject>                   parent;
+            std::vector<std::shared_ptr<GameObject>>    children;
+            std::shared_ptr<Mesh>                       mesh;
+            std::shared_ptr<Camera>                     camera;
+            // TODO skin component
+            // TODO light component
+            std::unique_ptr<PointLightComponent>        pointLight  = nullptr;
 
         private:
-            GameObject(id_t objId) : id{objId} {}
-            id_t id;
+            GameObject(uint32_t id) : id{id} {}
+            uint32_t id;
     };
 }

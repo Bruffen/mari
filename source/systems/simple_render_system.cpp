@@ -71,15 +71,14 @@ namespace mari {
             nullptr
         );
 
-        for (auto& kv : frameInfo.gameObjects) {
+        for (auto& kv : frameInfo.gameObjects) { // TODO needs scene mesh objects now
             auto& obj = kv.second;
-            //if (obj.mesh == nullptr) continue;
-            if (obj.mesh.size() == 0) continue;
+            if (obj.mesh == nullptr) continue;
 
             SimplePushConstantData push{};
             auto modelMatrix = obj.transform.mat4();
             push.modelMatrix = modelMatrix;
-            push.normalMatrix = obj.transform.normalMatrix();
+            push.normalMatrix = obj.transform.matrixNormal();
 
             vkCmdPushConstants(
                 frameInfo.commandBuffer,
@@ -90,10 +89,8 @@ namespace mari {
                 &push
             );
 
-            for (auto &mesh : obj.mesh) {
-                mesh->bind(frameInfo.commandBuffer);
-                mesh->draw(frameInfo.commandBuffer);
-            }
+            obj.mesh->bind(frameInfo.commandBuffer);
+            obj.mesh->draw(frameInfo.commandBuffer);
         }
     }
 }
