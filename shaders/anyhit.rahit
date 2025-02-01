@@ -1,0 +1,45 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "raycommon.glsl"
+#include "hitcommon.glsl"
+#include "random.glsl"
+
+layout(location = 0) rayPayloadInEXT Payload prd;
+hitAttributeEXT vec2 attribs;
+
+layout(binding = 3, set = 0) buffer BlasData { uint64_t addresses[]; } blasData;
+layout(binding = 4, set = 0) uniform sampler2D textures[];
+
+layout(buffer_reference, scalar) buffer Meshes   { Mesh m[];   };
+layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; };
+layout(buffer_reference, scalar) buffer Indices  { uint i[];   };
+
+void main() {
+    uint64_t meshDeviceAddress = blasData.addresses[gl_InstanceID];
+
+    Meshes meshes = Meshes(meshDeviceAddress);
+    Mesh mesh = meshes.m[gl_GeometryIndexEXT];
+
+    if (mesh.textureIndex < 0) { // TODO get material color alpha
+        return;
+    }
+
+    Indices indices   = Indices(mesh.indexBufferDeviceAddress);
+    Vertices vertices = Vertices(mesh.vertexBufferDeviceAddress);
+
+    vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
+    vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
+    vec2 uv2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].uv;
+    vec3 barycentricCoords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+
+    vec2 uv  = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
+    float alpha = texture(textures[nonuniformEXT(mesh.textureIndex)], uv).a;
+
+    if(rnd(prd.seed) > alpha) {
+        ignoreIntersectionEXT;
+    }
+}

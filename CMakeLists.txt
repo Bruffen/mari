@@ -148,8 +148,10 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.vert"
     "${PROJECT_SOURCE_DIR}/shaders/*.rgen"
     "${PROJECT_SOURCE_DIR}/shaders/*.rchit"
+    "${PROJECT_SOURCE_DIR}/shaders/*.rahit"
     "${PROJECT_SOURCE_DIR}/shaders/*.rmiss"
 )
+# TODO if a common.glsl file is changed, recompile everything
  
 foreach(GLSL ${GLSL_SOURCE_FILES})
     get_filename_component(FILE_NAME ${GLSL} NAME)

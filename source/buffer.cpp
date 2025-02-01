@@ -95,6 +95,35 @@ namespace mari {
             memcpy(memOffset, data, size);
         }
     }
+
+    /**
+     * Copies the specified data to a buffer only in device memory. 
+     * A staging buffer in host memory is used as a intermediary to perform the copy.
+     * 
+     * @param data Pointer to the data to copy
+     */
+    void Buffer::stageToBuffer(void *data) {
+        assert(usageFlags & VK_BUFFER_USAGE_TRANSFER_DST_BIT && 
+            "Device buffer needs usage flag VK_BUFFER_USAGE_TRANSFER_DST_BIT to be copied to from host memory.");
+        assert(usageFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT || usageFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT && 
+            "Buffer is visible from host. Use writeToBuffer() instead.");
+        assert(memoryPropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT &&
+            "Buffer is not in device memory. Needs VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT in memory property flags.");
+
+        VkDeviceSize bufferSize = instanceSize * instanceCount;
+        
+        Buffer stagingBuffer{
+            device,
+            instanceSize,
+            instanceCount,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        };
+
+        stagingBuffer.map();
+        stagingBuffer.writeToBuffer(data);
+        device.copyBuffer(stagingBuffer.handle(), this->handle(), bufferSize);
+    }
     
     /**
      * Flush a memory range of the buffer to make it visible to the device

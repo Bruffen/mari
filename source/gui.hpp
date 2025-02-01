@@ -13,23 +13,27 @@ namespace mari {
             Gui(Device &device, Window &window, Renderer &renderer);
             ~Gui();
 
-            ImGuiIO& getIO() { return imGui; }
+            ImGuiIO* getIO() { return io; }
 
             void set(std::shared_ptr<Scene> scene);
             void prepare(FrameInfo &frameInfo);
             void render(VkCommandBuffer commandBuffer);
+
+            bool inputChanged = false;
         private:
             static void checkVkResult(VkResult err);
-            void imGuiObject(const GameObject &g);
-            void imGuiTransform(const Transform &transform);
+            void imGuiFramerate(float duration);
+            void imGuiObject(GameObject &g);
+            void imGuiTransform(Transform &transform);
             void imGuiMesh(const Mesh &mesh);
             void imGuiSubMesh(const SubMesh &submesh);
             void imGuiMaterial(const Material &material);
             void imGuiImage(const Image &image);
+            void imGuiCamera(Camera &camera);
 
             Device  &device;
             Window  &window;
-            ImGuiIO imGui;
+            ImGuiIO *io;
             std::shared_ptr<Scene> scene;
 
             VkDescriptorPool descriptorPool;

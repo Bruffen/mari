@@ -7,22 +7,29 @@
 
 namespace mari {
     struct MaterialConstants {
-        glm::vec4 color;
-        float     metallic;
-        float     roughness; 
+        glm::vec4               albedo;
+        float                   metallic;
+        float                   roughness;
+        float                   ior;
+        glm::vec4               emission;   // rgb for color, a for strength
     };
-    
+
     struct MaterialResources {
-        std::shared_ptr<Image>  colorImage;
-        int32_t                 colorImageIndex;
+        std::shared_ptr<Image>  albedoImage;
         std::shared_ptr<Image>  metallicRoughnessImage;
-        std::unique_ptr<Buffer> dataBuffer;
-        uint32_t                dataBufferOffset;
     };
-    
+
+    struct TextureIndices {
+        int32_t                 albedo      = -1;
+        int32_t                 normal      = -1;
+        int32_t                 occlusion   = -1;
+        int32_t                 emission    = -1;
+    };
+
     struct Material {
         MaterialConstants constants;
         MaterialResources resources;
+        TextureIndices    indices;
         std::string name = "";
     };
 
@@ -32,7 +39,7 @@ namespace mari {
         std::shared_ptr<Material> material;
     };
 
-    struct GeometryAdresses {
+    struct SubMeshAdresses {
         uint64_t vertexBufferDeviceAddress;
         uint64_t indexBufferDeviceAddress;
         int32_t  textureIndex;

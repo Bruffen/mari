@@ -27,5 +27,6 @@ namespace mari {
             static std::shared_ptr<Image> imageWhite;
             static std::shared_ptr<Image> imageBlack;
             static std::shared_ptr<Image> imageError;
+            // TODO default material
     };
 }

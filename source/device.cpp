@@ -338,7 +338,7 @@ namespace mari {
             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 
-            // Required for VK_KHR_ray_tracing_pipeline     // TODO Re check if actually required
+            // Required for VK_KHR_ray_tracing_pipeline
             VK_KHR_SPIRV_1_4_EXTENSION_NAME,
 
             // Required by VK_KHR_spirv_1_4
@@ -467,16 +467,18 @@ namespace mari {
         VkMemoryRequirements memRequirements;
         vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
 
-        // Set flag for exposing device address for the buffer
-        VkMemoryAllocateFlagsInfo flagsInfo{};
-        flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
-        flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-        allocInfo.pNext = &flagsInfo;
+
+        // Set flag for exposing device address for the buffer
+        if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+            VkMemoryAllocateFlagsInfo flagsInfo{};
+            flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+            flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+            allocInfo.pNext = &flagsInfo;
+        }
 
         if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate buffer memory!");
@@ -560,7 +562,6 @@ namespace mari {
         endSingleTimeCommands(commandBuffer);
     }
 
-    // TODO is this still needed
     void Device::createImageWithInfo(
         const VkImageCreateInfo &imageInfo,
         VkMemoryPropertyFlags properties,

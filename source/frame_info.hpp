@@ -27,6 +27,7 @@ namespace mari {
     struct RayTracingUbo {
         glm::mat4 viewInverse;
         glm::mat4 projInverse;
+        int frameCount;
     };
 
     struct FrameInfo {

@@ -65,114 +65,7 @@ namespace mari {
         return shaderStage;
     }
 
-    void Pipeline::createGraphicsPipeline(const std::string &vertFilepath, const std::string &fragFilepath, const PipelineConfigInfo &configInfo) {
-        assert(configInfo.pipelineLayout != VK_NULL_HANDLE && "Cannot create graphics pipeline: No pipelineLayout provided in configInfo");
-        assert(configInfo.renderPass     != VK_NULL_HANDLE && "Cannot create graphics pipeline: No renderPass provided in configInfo");
-
-        pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-
-        VkPipelineShaderStageCreateInfo shaderStages[] = {
-            loadShader(vertFilepath, VK_SHADER_STAGE_VERTEX_BIT),
-            loadShader(fragFilepath, VK_SHADER_STAGE_FRAGMENT_BIT)
-        };
-
-        auto &bindingDescriptions = configInfo.bindingDescriptions;
-        auto &attributeDescriptions = configInfo.attributeDescriptions;
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-        vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
-        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-        VkGraphicsPipelineCreateInfo pipelineInfo{};
-        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipelineInfo.stageCount = 2;
-        pipelineInfo.pStages = shaderStages;
-        pipelineInfo.pVertexInputState = &vertexInputInfo;
-        pipelineInfo.pInputAssemblyState = &configInfo.inputAssemblyInfo;
-        pipelineInfo.pViewportState = &configInfo.viewportInfo;
-        pipelineInfo.pRasterizationState = &configInfo.rasterizationInfo;
-        pipelineInfo.pMultisampleState = &configInfo.multisampleInfo;
-        pipelineInfo.pColorBlendState = &configInfo.colorBlendInfo;
-        pipelineInfo.pDepthStencilState = &configInfo.depthStencilInfo;
-        pipelineInfo.pDynamicState = &configInfo.dynamicStateInfo;
-
-        pipelineInfo.layout = configInfo.pipelineLayout;
-        pipelineInfo.renderPass = configInfo.renderPass;
-        pipelineInfo.subpass = configInfo.subpass;
-
-        pipelineInfo.basePipelineIndex = -1;
-        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-        if (vkCreateGraphicsPipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &handle) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create graphics pipeline");
-        }
-    }
-
-    void Pipeline::createRayTracingPipeline(VkPipelineLayout &pipelineLayout) {
-        assert(pipelineLayout != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
-
-        pipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
-
-        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-        // TODO this function should be generic, therefore shader information should be passed here from ray_tracing_system
-        {
-            shaderStages.push_back(loadShader("../../shaders/raygen.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR));
-            VkRayTracingShaderGroupCreateInfoKHR raygenGroupCreateInfo{};
-            raygenGroupCreateInfo.sType                     = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-            raygenGroupCreateInfo.type                      = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-            raygenGroupCreateInfo.generalShader             = static_cast<uint32_t>(shaderStages.size() - 1);
-            raygenGroupCreateInfo.closestHitShader          = VK_SHADER_UNUSED_KHR;
-            raygenGroupCreateInfo.anyHitShader              = VK_SHADER_UNUSED_KHR;
-            raygenGroupCreateInfo.intersectionShader        = VK_SHADER_UNUSED_KHR;
-            shaderGroups.push_back(raygenGroupCreateInfo);
-        }
-
-        {
-            shaderStages.push_back(loadShader("../../shaders/miss.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
-            VkRayTracingShaderGroupCreateInfoKHR missGroupCreateInfo{};
-            missGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-            missGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-            missGroupCreateInfo.generalShader               = static_cast<uint32_t>(shaderStages.size() - 1);
-            missGroupCreateInfo.closestHitShader            = VK_SHADER_UNUSED_KHR;
-            missGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
-            missGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
-            shaderGroups.push_back(missGroupCreateInfo);
-        }
-
-        {
-            shaderStages.push_back(loadShader("../../shaders/closesthit.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
-            VkRayTracingShaderGroupCreateInfoKHR chitGroupCreateInfo{};
-            chitGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-            chitGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-            chitGroupCreateInfo.generalShader               = VK_SHADER_UNUSED_KHR;
-            chitGroupCreateInfo.closestHitShader            = static_cast<uint32_t>(shaderStages.size() - 1);
-            chitGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
-            chitGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
-            shaderGroups.push_back(chitGroupCreateInfo);
-        }
-
-        VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
-        rayTracingPipelineCreateInfo.sType                  = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-        rayTracingPipelineCreateInfo.stageCount             = static_cast<uint32_t>(shaderStages.size());
-        rayTracingPipelineCreateInfo.pStages                = shaderStages.data();
-        rayTracingPipelineCreateInfo.groupCount             = static_cast<uint32_t>(shaderGroups.size());
-        rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
-        rayTracingPipelineCreateInfo.layout                 = pipelineLayout;
-        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = device.propertiesRT.maxRayRecursionDepth;
-        std::cout << "Maximum recursion depth of: " << rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth << std::endl;
-        if (vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &handle)) {
-            throw std::runtime_error("Failed to create ray tracing pipeline");
-        }
-
-        createShaderBindingTables();
-    }
-
-    void Pipeline::bind(VkCommandBuffer commandBuffer) {
-        vkCmdBindPipeline(commandBuffer, pipelineBindPoint, handle);
-    }
-
+    
     void Pipeline::defaultPipelineConfigInfo(PipelineConfigInfo &configInfo) {
         configInfo.inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         configInfo.inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -259,6 +152,118 @@ namespace mari {
         configInfo.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
 
+    void Pipeline::createGraphicsPipeline(const std::string &vertFilepath, const std::string &fragFilepath, const PipelineConfigInfo &configInfo) {
+        assert(configInfo.pipelineLayout != VK_NULL_HANDLE && "Cannot create graphics pipeline: No pipelineLayout provided in configInfo");
+        assert(configInfo.renderPass     != VK_NULL_HANDLE && "Cannot create graphics pipeline: No renderPass provided in configInfo");
+
+        pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = {
+            loadShader(vertFilepath, VK_SHADER_STAGE_VERTEX_BIT),
+            loadShader(fragFilepath, VK_SHADER_STAGE_FRAGMENT_BIT)
+        };
+
+        auto &bindingDescriptions = configInfo.bindingDescriptions;
+        auto &attributeDescriptions = configInfo.attributeDescriptions;
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &configInfo.inputAssemblyInfo;
+        pipelineInfo.pViewportState = &configInfo.viewportInfo;
+        pipelineInfo.pRasterizationState = &configInfo.rasterizationInfo;
+        pipelineInfo.pMultisampleState = &configInfo.multisampleInfo;
+        pipelineInfo.pColorBlendState = &configInfo.colorBlendInfo;
+        pipelineInfo.pDepthStencilState = &configInfo.depthStencilInfo;
+        pipelineInfo.pDynamicState = &configInfo.dynamicStateInfo;
+
+        pipelineInfo.layout = configInfo.pipelineLayout;
+        pipelineInfo.renderPass = configInfo.renderPass;
+        pipelineInfo.subpass = configInfo.subpass;
+
+        pipelineInfo.basePipelineIndex = -1;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+        if (vkCreateGraphicsPipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &handle) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create graphics pipeline");
+        }
+    }
+
+    void Pipeline::createRayTracingPipeline(VkPipelineLayout &pipelineLayout) {
+        assert(pipelineLayout != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
+
+        pipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        // TODO this function should be generic, therefore shader information should be passed here from ray_tracing_system
+        {
+            shaderStages.push_back(loadShader("../../shaders/raygen.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR));
+            VkRayTracingShaderGroupCreateInfoKHR raygenGroupCreateInfo{};
+            raygenGroupCreateInfo.sType                     = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            raygenGroupCreateInfo.type                      = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+            raygenGroupCreateInfo.generalShader             = static_cast<uint32_t>(shaderStages.size() - 1);
+            raygenGroupCreateInfo.closestHitShader          = VK_SHADER_UNUSED_KHR;
+            raygenGroupCreateInfo.anyHitShader              = VK_SHADER_UNUSED_KHR;
+            raygenGroupCreateInfo.intersectionShader        = VK_SHADER_UNUSED_KHR;
+            shaderGroups.push_back(raygenGroupCreateInfo);
+        }
+
+        {
+            shaderStages.push_back(loadShader("../../shaders/miss.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
+            VkRayTracingShaderGroupCreateInfoKHR missGroupCreateInfo{};
+            missGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            missGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+            missGroupCreateInfo.generalShader               = static_cast<uint32_t>(shaderStages.size() - 1);
+            missGroupCreateInfo.closestHitShader            = VK_SHADER_UNUSED_KHR;
+            missGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
+            missGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
+            shaderGroups.push_back(missGroupCreateInfo);
+        }
+
+        {
+            shaderStages.push_back(loadShader("../../shaders/closesthit.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
+            VkRayTracingShaderGroupCreateInfoKHR hitGroupCreateInfo{};
+            hitGroupCreateInfo.sType                        = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            hitGroupCreateInfo.type                         = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+            hitGroupCreateInfo.generalShader                = VK_SHADER_UNUSED_KHR;
+            hitGroupCreateInfo.closestHitShader             = static_cast<uint32_t>(shaderStages.size() - 1);
+            hitGroupCreateInfo.intersectionShader           = VK_SHADER_UNUSED_KHR;
+            shaderStages.push_back(loadShader("../../shaders/anyhit.rahit.spv", VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
+            hitGroupCreateInfo.anyHitShader                 = static_cast<uint32_t>(shaderStages.size() - 1);
+            shaderGroups.push_back(hitGroupCreateInfo);
+        }
+
+        VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
+        rayTracingPipelineCreateInfo.sType                  = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+        rayTracingPipelineCreateInfo.stageCount             = static_cast<uint32_t>(shaderStages.size());
+        rayTracingPipelineCreateInfo.pStages                = shaderStages.data();
+        rayTracingPipelineCreateInfo.groupCount             = static_cast<uint32_t>(shaderGroups.size());
+        rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
+        rayTracingPipelineCreateInfo.layout                 = pipelineLayout;
+
+        if (device.propertiesRT.maxRayRecursionDepth <= 1)  {
+            throw std::runtime_error("Device only supports maximum ray recursion depth of 1 or less."); // TODO check if shadow rays count as depth 1 or more
+        }
+        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = 2;
+        if (vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &handle)) {
+            throw std::runtime_error("Failed to create ray tracing pipeline");
+        }
+
+        createShaderBindingTables();
+    }
+
+    void Pipeline::bind(VkCommandBuffer commandBuffer) {
+        vkCmdBindPipeline(commandBuffer, pipelineBindPoint, handle);
+    }
+
     inline uint32_t alignedSize(uint32_t value, uint32_t alignment) {
         return (value + alignment - 1) & ~(alignment - 1);
     }
@@ -281,12 +286,9 @@ namespace mari {
             throw std::runtime_error("Failed to get ray tracing shader group handles");
         }
 
-        uint8_t *data = static_cast<uint8_t *>(raygenSBT->getMappedMemory());
-        memcpy(data, shaderHandleStorage.data(), handleSize);
-        data = static_cast<uint8_t *>(missSBT->getMappedMemory());
-        memcpy(data, shaderHandleStorage.data() + handleSizeAligned, handleSize);
-        data = static_cast<uint8_t *>(hitSBT->getMappedMemory());
-        memcpy(data, shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
+        memcpy(raygenSBT->getMappedMemory(), shaderHandleStorage.data() + handleSizeAligned * 0, handleSize);
+        memcpy(missSBT->getMappedMemory()  , shaderHandleStorage.data() + handleSizeAligned * 1, handleSize);
+        memcpy(hitSBT->getMappedMemory()   , shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
 
         raygenSBT->unmap();
         missSBT->unmap();

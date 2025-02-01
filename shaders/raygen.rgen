@@ -2,19 +2,25 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "raycommon.glsl"
+#include "random.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
-layout(binding = 1, set = 0, rgba8) uniform image2D image;
+layout(binding = 1, set = 0, rgba16) uniform image2D image;
 layout(binding = 2, set = 0) uniform CameraProperties {
     mat4 viewInverse;
     mat4 projInverse;
+    int frameCount;
 } cam;
 
-layout(location = 0) rayPayloadEXT payload prd;
+layout(location = 0) rayPayloadEXT Payload prd;
 
-void main() 
-{
-    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+void main() {
+    prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, cam.frameCount);
+	float r1 = rnd(prd.seed);
+    float r2 = rnd(prd.seed);
+
+    const vec2 pixelJitter = vec2(r1, r2);
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + pixelJitter;
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
     vec2 d = inUV * 2.0 - 1.0;
 
@@ -27,7 +33,14 @@ void main()
 
     prd.color = vec3(0.0);
 
-    traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin.xyz, tmin, direction.xyz, tmax, 0);
+    traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin.xyz, tmin, direction.xyz, tmax, 0);
 
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(prd.color, 1.0));
+    vec4 imageColor = vec4(0.0);
+    if (cam.frameCount > 0) {
+        imageColor = imageLoad(image, ivec2(gl_LaunchIDEXT.xy));
+    }
+
+    float avg = 1.0 / (cam.frameCount + 1.0);
+    vec4 averageColor = (vec4(prd.color, 1.0) + imageColor * cam.frameCount) * avg;
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), averageColor);
 }

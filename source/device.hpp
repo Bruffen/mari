@@ -53,7 +53,6 @@ namespace mari {
         VkCommandBuffer             beginSingleTimeCommands();
         void                        endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-        /* TODO should this be in device? */
         void                        createBuffer(
                                         VkDeviceSize size, 
                                         VkBufferUsageFlags usage, 
@@ -103,7 +102,7 @@ namespace mari {
         VkQueue                     graphicsQueue_;
         VkQueue                     presentQueue_;
 
-        const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+        const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"/*, "VK_NV_ray_tracing_validation", "VK_LAYER_LUNARG_api_dump"*/};
         std::vector<const char *> deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME
         };

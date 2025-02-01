@@ -10,11 +10,11 @@ namespace mari {
     Gui::Gui(Device &device, Window &window, Renderer &renderer) : device{device}, window{window} {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
-        imGui = ImGui::GetIO();
-        imGui.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        imGui.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-        imGui.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-        imGui.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        io = &ImGui::GetIO();
+        io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        //io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         ImGui::StyleColorsDark();
 
         std::vector<VkDescriptorPoolSize> poolSizes = {{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }};
@@ -81,16 +81,22 @@ namespace mari {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
         {
             ImGui::Begin("Mari");
-            ImGui::Text("Frame duration: %.3f ms (%.1f FPS)", frameInfo.deltaTime * 1000.0f, 1.0f / frameInfo.deltaTime);
+
+            imGuiFramerate(frameInfo.deltaTime);
 
             if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None)) {
                 bool a = true;
                 bool *a_ptr = &a;
                 if (ImGui::BeginTabItem("Scene")) {
-                    for (const std::shared_ptr<GameObject> &g : scene->topNodes) {
-                        imGuiObject(*g);
+                    if (ImGui::TreeNode("Scene")) {
+                        imGuiTransform(scene->transform);
+                        for (std::shared_ptr<GameObject> &g : scene->topNodes) {
+                            imGuiObject(*g);
+                        }
+                        ImGui::TreePop();
                     }
                     ImGui::EndTabItem();
                 }
@@ -119,12 +125,37 @@ namespace mari {
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     }
 
+    void Gui::imGuiFramerate(float duration) {
+        const  int     size = 50;
+        static float   values[size] = {};
+        static int     values_offset = 0;
+        static double  refresh_time = 0.0;
+        if (refresh_time == 0.0)
+            refresh_time = ImGui::GetTime();
+        while (refresh_time < ImGui::GetTime()) { // Create data at fixed 60 Hz rate for the demo
+            values[values_offset] = duration * 1000.0f;
+            values_offset = (values_offset + 1) % size;
+            refresh_time += 1.0f / 60.0f;
+        }
 
-    void Gui::imGuiObject(const GameObject &g) {
+        float average = 0.0f;
+        for (float v : values) {
+            average += v;
+        }
+        average /= static_cast<float>(size);
+
+        ImGui::Text("Frame duration: %.3f ms (%.1f FPS)", average, 1000.0f / average);
+        ImGui::PlotLines("##frameplot", values, IM_ARRAYSIZE(values), values_offset, 0, 0.0f);
+    }
+
+    void Gui::imGuiObject(GameObject &g) {
         if (ImGui::TreeNode(g.name.c_str(), g.name.c_str())) {
             imGuiTransform(g.transform);
             if (g.mesh) {
                 imGuiMesh(*g.mesh);
+            }
+            if (g.camera) {
+                imGuiCamera(*g.camera);
             }
             for (const std::shared_ptr<GameObject> &child : g.children) {
                 imGuiObject(*child);
@@ -133,10 +164,30 @@ namespace mari {
         }
     }
 
-    void Gui::imGuiTransform(const Transform &transform) {
-        ImGui::Text("Position: x: %.2f, y: %.2f, z: %.2f", transform.position.x, transform.position.y, transform.position.z);
-        ImGui::Text("Rotation: x: %.2f°, y: %.2f°, z: %.2f°", glm::degrees(transform.rotation.x), glm::degrees(transform.rotation.y), glm::degrees(transform.rotation.z));
-        ImGui::Text("Scale:    x: %.2f, y: %.2f, z: %.2f", transform.scale.x, transform.scale.y, transform.scale.z);
+    void Gui::imGuiTransform(Transform &transform) {
+        // TODO if (static) {} else {
+        glm::vec3 p = transform.position;
+        glm::vec3 r = transform.rotation;
+        glm::vec3 s = transform.scale;
+        glm::vec3 rd = glm::degrees(transform.rotation);
+
+        ImGui::Text("Position:");
+        ImGui::SameLine();
+        ImGui::DragFloat3("##pos", &transform.position.x, 0.005f);
+
+        ImGui::Text("Rotation:");
+        ImGui::SameLine();
+        ImGui::DragFloat3("##rot", &rd.x, 0.1f, 0.0f, 360.0f, "%.1f", ImGuiSliderFlags_WrapAround); // TODO degrees
+
+        ImGui::Text("Scale:   ");
+        ImGui::SameLine();
+        ImGui::DragFloat3("##sca", &transform.scale.x, 0.005f);
+
+        transform.rotation = glm::radians(rd);
+
+        if (p != transform.position || r != transform.rotation || s != transform.scale) {
+            inputChanged = true;
+        }
     }
 
     void Gui::imGuiMesh(const Mesh &mesh) {
@@ -159,7 +210,7 @@ namespace mari {
         }
     }
 
-    void Gui::imGuiSubMesh(const SubMesh &submesh) {
+    void Gui::imGuiSubMesh(const SubMesh &submesh) { // TODO dropdown list of materials
         //bool a = true;
         //bool *a_ptr = &a;
         //if (ImGui::CollapsingHeader(submesh.material->name.c_str(), a_ptr)) {
@@ -169,10 +220,10 @@ namespace mari {
 
     void Gui::imGuiMaterial(const Material &material) {
         if (ImGui::TreeNode(material.name.c_str(), ("Material: " + material.name).c_str())) {
-            ImGui::Text("Color: R: %.2f, G: %.2f, B: %.2f, A: %.2f", material.constants.color.r, material.constants.color.g, material.constants.color.b, material.constants.color.a);
+            ImGui::Text("Color: R: %.2f, G: %.2f, B: %.2f, A: %.2f", material.constants.albedo.r, material.constants.albedo.g, material.constants.albedo.b, material.constants.albedo.a);
             ImGui::Text("Metallic: %.3f", material.constants.metallic);
             ImGui::Text("Roughness: %.3f", material.constants.roughness);
-            imGuiImage(*material.resources.colorImage);
+            imGuiImage(*material.resources.albedoImage);
             imGuiImage(*material.resources.metallicRoughnessImage);
             ImGui::TreePop();
         }
@@ -185,5 +236,22 @@ namespace mari {
         ImGui::Text("%ix%i", image.size.width, image.size.height);
         float ratio = 128.0f / glm::max(image.size.height, image.size.width);
         ImGui::Image((ImTextureID)image.descriptorGui, ImVec2(static_cast<float>(image.size.width) * ratio, static_cast<float>(image.size.height) * ratio));    
+    }
+
+    void Gui::imGuiCamera(Camera &camera) {
+        if (ImGui::TreeNode("##cam", "Camera")) {
+            float fov = camera.fov;
+            float fovDegrees = glm::degrees(fov);
+
+            ImGui::Text("Field of View:");
+            ImGui::SameLine();
+            ImGui::DragFloat("##fov", &fovDegrees, 0.1f, glm::degrees(Camera::MIN_FOV), glm::degrees(Camera::MAX_FOV), "%.1f", ImGuiSliderFlags_ClampOnInput);
+
+            camera.fov = glm::radians(fovDegrees);
+            if (fov != camera.fov) {
+                inputChanged = true;
+            }
+            ImGui::TreePop();
+        }
     }
 }

@@ -23,7 +23,7 @@ namespace mari {
         vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerLinear);
 
         uint32_t white   = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
-        uint32_t black   = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
+        uint32_t black   = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
         uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
         const uint32_t size = 16;
         std::array<uint32_t, size * size > pixels; //for 16x16 checkerboard texture

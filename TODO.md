@@ -17,8 +17,5 @@
 
 ## imGui
 
-- Docking not working
-- Imgui input and camera drag can't happen simultaneously
-
 # Research
 - Ray tracing Shader Execution Reordering (SER) VK_RAY_TRACING_INVOCATION_REORDER_MODE_REORDER_NV / GL_NV_shader_invocation_reorder

@@ -12,6 +12,7 @@ namespace mari {
 
     void Camera::update(Transform &transform) {
         setViewYXZ(transform.position, transform.rotation);
+        setPerspectiveProjection(aspectRatio, 0.01f, 1000.0f);
     }
 
     void Camera::setOrthographicProjection(float left, float right, float top, float bottom, float near, float far) {

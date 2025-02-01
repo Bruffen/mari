@@ -32,10 +32,15 @@ namespace mari {
 
             KeyboardController(Gui& gui);
 
+            void update(GLFWwindow *window, float deltatime, GameObject &gameObject);
+            bool changeCamera(GLFWwindow *window);
+            bool checkFrameAccumulationReset();
+            bool isRayTracingOn() { return isRaytracing; }
+
+        private:
             void moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
             void rotateCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
-            bool changeCamera(GLFWwindow *window);
-            void handleInput(GLFWwindow *window, bool &isRayTracingOn);
+            void handleInput(GLFWwindow *window);
 
             const KeyMappings keys;
             Mouse mouse{};
@@ -45,6 +50,8 @@ namespace mari {
             float lookSpeed{0.25f};
             bool  changePipelinePressed = false;// TODO
             bool  changeCameraPressed = false;// TODO
+            bool  resetFrame = false;
+            bool  isRaytracing = true;
     };
     
 }

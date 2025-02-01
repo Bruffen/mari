@@ -3,7 +3,7 @@
 
 #include "raycommon.glsl"
 
-layout(location = 0) rayPayloadInEXT payload prd;
+layout(location = 0) rayPayloadInEXT Payload prd;
 
 void main()
 {

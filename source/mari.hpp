@@ -26,7 +26,7 @@ namespace mari {
 
             void run();
         private:
-            void loadGameObjects();
+            void loadScene();
 
             Window          window{WIDTH, HEIGHT, "Mari"};
             Device          device{window};
