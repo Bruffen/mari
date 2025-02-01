@@ -57,7 +57,7 @@ namespace mari {
         accelerationStructureCreateInfo.sType  = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
         accelerationStructureCreateInfo.buffer = buffer->handle();
         accelerationStructureCreateInfo.size   = accelerationStructureBuildSizesInfo.accelerationStructureSize;
-        accelerationStructureCreateInfo.type   = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+        accelerationStructureCreateInfo.type   = type;
         if (vkCreateAccelerationStructureKHR(device.handle(), &accelerationStructureCreateInfo, nullptr, &handle)) {
             throw std::runtime_error("Could not create acceleration structure");
         };
