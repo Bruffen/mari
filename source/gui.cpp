@@ -45,14 +45,28 @@ namespace mari {
         ImGui_ImplVulkan_Init(&initInfo);
 
         std::shared_ptr<Image> s = DefaultObjects::getImageWhite();
-        DefaultObjects::getImageWhite()->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), DefaultObjects::getImageWhite()->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        DefaultObjects::getImageBlack()->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), DefaultObjects::getImageBlack()->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        DefaultObjects::getImageError()->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), DefaultObjects::getImageError()->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        DefaultObjects::getImageWhite()->descriptorGui = ImGui_ImplVulkan_AddTexture(
+            DefaultObjects::getSamplerNearest(), 
+            DefaultObjects::getImageWhite()->view, 
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+        DefaultObjects::getImageBlack()->descriptorGui = ImGui_ImplVulkan_AddTexture(
+            DefaultObjects::getSamplerNearest(), 
+            DefaultObjects::getImageBlack()->view, 
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+        DefaultObjects::getImageError()->descriptorGui = ImGui_ImplVulkan_AddTexture(
+            DefaultObjects::getSamplerNearest(), 
+            DefaultObjects::getImageError()->view, 
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
     }
 
     Gui::~Gui() {
-        for (auto &image : scene->images) {
-            ImGui_ImplVulkan_RemoveTexture(image->descriptorGui);
+        if (scene) {
+            for (auto &image : scene->images) {
+                ImGui_ImplVulkan_RemoveTexture(image->descriptorGui); // TODO will give errors if the same texture shows up more than once in scene->images
+            }
         }
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -73,6 +87,17 @@ namespace mari {
         for (auto &image : this->scene->images) {
             image->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), image->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
+
+        for (auto &[k, n] : scene->nodes) {
+            if (n->mesh) {
+                if(n->mesh->hasIndexBuffer) {
+                    triangleCount += n->mesh->indexCount / 3;
+                }
+                else {
+                    triangleCount += n->mesh->vertexCount / 3;
+                }
+            }
+        }
     }
 
     void Gui::prepare(FrameInfo &frameInfo) {
@@ -81,11 +106,12 @@ namespace mari {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        ImGui::ShowDemoWindow();
+        //ImGui::ShowDemoWindow();
         {
             ImGui::Begin("Mari");
 
             imGuiFramerate(frameInfo.deltaTime);
+            ImGui::Text("Triangle count: %i", triangleCount);
 
             if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None)) {
                 bool a = true;
@@ -199,7 +225,7 @@ namespace mari {
             ImGui::Text("%i triangles", mesh.hasIndexBuffer ? mesh.indexCount / 3 : mesh.vertexCount / 3);
 
             std::vector<std::string> materials;
-            for (const SubMesh &s : mesh.submeshes) {
+            for (const PrimMesh &s : mesh.primMeshes) {
                 // avoid showing the same material multiple times
                 if (std::find(materials.begin(), materials.end(), s.material->name) == materials.end()) {
                     materials.push_back(s.material->name);
@@ -210,7 +236,7 @@ namespace mari {
         }
     }
 
-    void Gui::imGuiSubMesh(const SubMesh &submesh) { // TODO dropdown list of materials
+    void Gui::imGuiSubMesh(const PrimMesh &submesh) { // TODO dropdown list of materials
         //bool a = true;
         //bool *a_ptr = &a;
         //if (ImGui::CollapsingHeader(submesh.material->name.c_str(), a_ptr)) {
@@ -220,9 +246,9 @@ namespace mari {
 
     void Gui::imGuiMaterial(const Material &material) {
         if (ImGui::TreeNode(material.name.c_str(), ("Material: " + material.name).c_str())) {
-            ImGui::Text("Color: R: %.2f, G: %.2f, B: %.2f, A: %.2f", material.constants.albedo.r, material.constants.albedo.g, material.constants.albedo.b, material.constants.albedo.a);
-            ImGui::Text("Metallic: %.3f", material.constants.metallic);
-            ImGui::Text("Roughness: %.3f", material.constants.roughness);
+            ImGui::Text("Color: R: %.2f, G: %.2f, B: %.2f, A: %.2f", material.data.constants.albedo.r, material.data.constants.albedo.g, material.data.constants.albedo.b, material.data.constants.albedo.a);
+            ImGui::Text("Metallic: %.3f", material.data.constants.metallic);
+            ImGui::Text("Roughness: %.3f", material.data.constants.roughness);
             imGuiImage(*material.resources.albedoImage);
             imGuiImage(*material.resources.metallicRoughnessImage);
             ImGui::TreePop();

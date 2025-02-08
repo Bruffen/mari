@@ -21,8 +21,6 @@
 #include <iostream>
 
 namespace mari {
-
-
     Mari::Mari() {
         DefaultObjects::initialize(device);
         gui = std::make_unique<Gui>(device, window, renderer);
@@ -109,7 +107,7 @@ namespace mari {
                 .writeAccelerationStructure(0, &rayTracingSystem.tlas->descriptor())
                 .writeImage(                1, &rayTracingSystem.accumImage->descriptorInfo())
                 .writeBuffer(               2, &rayTracingUboBuffers[i]->descriptorInfo())
-                .writeBuffer(               3, &rayTracingSystem.blasDataBuffer->descriptorInfo())
+                .writeBuffer(               3, &rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
                 .writeImages(               4, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
@@ -141,7 +139,7 @@ namespace mari {
             currentTime = newTime;
 
             if (controller.changeCamera(window.getGLFWwindow())) {
-                currentCamera = scene->cameras[0]; // TODO
+                currentCamera = scene->cameraObjects[0]; // TODO
             }
 
             // If window is resized and aspect ratio is different
@@ -195,6 +193,7 @@ namespace mari {
                 }
 
                 // GUI
+                
                 gui->prepare(frameInfo);
                 renderer.beginSwapchainRenderPass(commandBuffer);
                 gui->render(commandBuffer);
@@ -224,16 +223,39 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
-        //scene->transform.rotation = {0.0f, glm::radians(180.0f), glm::radians(90.0f)};
-        scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/living_room.glb");
-        //scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
-        //scene->transform.position = {0.0f, -0.01f, 0.0f};
-        scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+        //scene = std::make_shared<Scene>(device, "../../models/FlightHelmet/glTF/FlightHelmet.gltf");
+        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_interior.glb");
+        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/living_room.glb");
+        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf");
+
+        switch (0) {
+            case 0:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
+                scene->transform.position = {0.0f, -0.01f, 0.0f};
+                scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+                break;
+            case 1:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/ABeautifulGame/glTF/ABeautifulGame.glTF"); // TODO this scene uses instancing
+                scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+                break;
+            case 2:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/mylivingroom.glb");
+                scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+                break;
+            case 3:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box.glb");
+                scene->transform.position = {0.0f, 0.0f, 0.0f};
+                scene->transform.rotation = glm::vec3(glm::radians(-90.0f), glm::radians(0.0f), 0.0f);
+                scene->transform.scale = {0.2f, 0.2, 0.2f};
+                break;
+            case 4:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
+                scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+                break;
+        }
         scene->update();
         
-/*
-        std::vector<glm::vec3> lightColors {
+        /*std::vector<glm::vec3> lightColors {
             {1.f, .1f, .1f},
             {.1f, .1f, 1.f},
             {.1f, 1.f, .1f},
@@ -252,8 +274,6 @@ namespace mari {
             );
             pointLight.transform.translation = glm::vec3(rotateLight * glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f));
             gameObjects.emplace(pointLight.getId(), std::move(pointLight));
-        }
-*/
-
+        }*/
     }
 }

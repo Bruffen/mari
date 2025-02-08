@@ -49,10 +49,10 @@ namespace mari {
         if (!gui.getIO()->WantCaptureMouse && mouse.cameraDragDown) {
             glm::vec2 movement{static_cast<float>(x - mouse.lastPositionX), static_cast<float>(y - mouse.lastPositionY)};
             if (glm::dot(movement, movement) > glm::epsilon<float>()) {
-                gameObject.transform.rotation.x -= movement.y * lookSpeed * deltatime;
-                gameObject.transform.rotation.y += movement.x * lookSpeed * deltatime;
+                gameObject.transform.rotation.x -= movement.y * lookSpeed;
+                gameObject.transform.rotation.y += movement.x * lookSpeed;
 
-                gameObject.transform.rotation.x = glm::clamp(gameObject.transform.rotation.x, -1.5f, 1.5f);
+                //gameObject.transform.rotation.x = glm::clamp(gameObject.transform.rotation.x, -1.5f, 1.5f);
                 gameObject.transform.rotation.y = glm::mod(gameObject.transform.rotation.y, glm::two_pi<float>());       
                 resetFrame = true;     
             }

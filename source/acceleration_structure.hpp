@@ -15,6 +15,7 @@ namespace mari {
             uint64_t                                        deviceAddress;
             std::unique_ptr<Buffer>                         buffer;
             uint32_t                                        geometryCount = 0;
+            VkTransformMatrixKHR                            transformMatrix{1.0};
 
             void                                            build(const VkAccelerationStructureGeometryKHR *pGeometries, 
                                                                   const uint32_t geometryCount, 
@@ -22,7 +23,7 @@ namespace mari {
                                                                   VkAccelerationStructureBuildRangeInfoKHR** ppBuildRangeInfos);
             VkWriteDescriptorSetAccelerationStructureKHR    descriptor();
         private:
-            Device& device;
-            VkAccelerationStructureTypeKHR type;
+            Device&                                         device;
+            VkAccelerationStructureTypeKHR                  type;
     };
 }

@@ -26,7 +26,7 @@ namespace mari {
             void imGuiObject(GameObject &g);
             void imGuiTransform(Transform &transform);
             void imGuiMesh(const Mesh &mesh);
-            void imGuiSubMesh(const SubMesh &submesh);
+            void imGuiSubMesh(const PrimMesh &submesh);
             void imGuiMaterial(const Material &material);
             void imGuiImage(const Image &image);
             void imGuiCamera(Camera &camera);
@@ -35,6 +35,8 @@ namespace mari {
             Window  &window;
             ImGuiIO *io;
             std::shared_ptr<Scene> scene;
+
+            uint32_t triangleCount = 0;
 
             VkDescriptorPool descriptorPool;
     };

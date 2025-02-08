@@ -9,9 +9,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-#include <array>
-#include <cassert>
 #include <stdexcept>
+
+
+
+#include <iostream>
+#include <glm/glm.hpp>
 
 namespace mari {
     RayTracingSystem::RayTracingSystem(Device &device, Window &window, const Scene &scene, VkDescriptorSetLayout descriptorSetLayout) : device{device} {
@@ -23,104 +26,84 @@ namespace mari {
 
     RayTracingSystem::~RayTracingSystem() {
         vkDestroyPipelineLayout(device.handle(), pipelineLayout, nullptr);
-        /*vkDestroyAccelerationStructureKHR(device.handle(), tlas.handle, nullptr);
-        for (auto &blas : blases) {
-            vkDestroyAccelerationStructureKHR(device.handle(), blas.handle, nullptr);
-        }*/
     }
 
     void RayTracingSystem::createImages(uint32_t width, uint32_t height) {
-        accumImage   = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
-        presentImage = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        accumImage   = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
     }
 
     void RayTracingSystem::buildScene(const Scene &scene) {
         // TODO reuse the same blas if the object's geometry is the same
         for (auto const &[id, object] : scene.nodes) {
             if (object->mesh) {
-                buildBLAS(*object->mesh, Transform::mat4ToKHR(object->worldMatrix));
+                VkTransformMatrixKHR transformMatrix = vkhelper::glmToVkMatrix(object->worldMatrix);
+                buildBLAS(*object->mesh, transformMatrix, scene.materialDataBuffer->deviceAddress());
             }
         }
         
-        VkDeviceSize geometryAddressesBufferSize = sizeof(SubMeshAdresses) * geometryAddresses.size();
+        VkDeviceSize primMeshesAdressesBufferSize = sizeof(PrimMeshInfo) * primMeshesInfos.size();
 
-        geometryAddressesBuffer = std::make_unique<Buffer>(
+        primMeshesInfosBuffer = std::make_unique<Buffer>(
             device,
-            geometryAddressesBufferSize,
+            primMeshesAdressesBufferSize,
             1,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
-        geometryAddressesBuffer->stageToBuffer((void*) geometryAddresses.data());
+        primMeshesInfosBuffer->stageToBuffer((void*) primMeshesInfos.data());
 
-        std::vector<uint64_t> blasData{};
-        blasData.reserve(blases.size());
+        std::vector<uint64_t> pPrimMeshesAdresses{};
+        pPrimMeshesAdresses.reserve(blases.size());
 
-        uint64_t start = geometryAddressesBuffer->deviceAddress();
+        uint64_t start = primMeshesInfosBuffer->deviceAddress();
         for (auto& blas : blases) {
-            blasData.push_back(start);
-            start += sizeof(SubMeshAdresses) * blas->geometryCount;
+            pPrimMeshesAdresses.push_back(start);
+            start += sizeof(PrimMeshInfo) * blas->geometryCount;
         }
 
-        VkDeviceSize blasDataBufferSize = sizeof(uint64_t) * blasData.size();
+        VkDeviceSize pPrimMeshesAdressesBufferSize = sizeof(uint64_t) * pPrimMeshesAdresses.size();
 
-        blasDataBuffer = std::make_unique<Buffer>(
+        pPrimMeshesInfosBuffer = std::make_unique<Buffer>(
             device,
-            blasDataBufferSize,
+            pPrimMeshesAdressesBufferSize,
             1,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
-        blasDataBuffer->stageToBuffer((void*) blasData.data());
+        pPrimMeshesInfosBuffer->stageToBuffer((void*) pPrimMeshesAdresses.data());
 
-        //buildTLAS(scene.transform.matKHR());
-        buildTLAS({
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f
-        });
+        buildTLAS();
     }
 
-    void RayTracingSystem::buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix) {
+    void RayTracingSystem::buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress) {
         auto blas = std::make_unique<AccelerationStructure>(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
-
-        Buffer transformBuffer{
-            device,
-            sizeof(transformMatrix),
-            1,
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT
-            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        };
-        transformBuffer.stageToBuffer((void*) &transformMatrix);
+        blas->transformMatrix = transformMatrix;
 
         std::vector<uint32_t> triangleCounts{};
         std::vector<VkAccelerationStructureGeometryKHR> geometries{};
         std::vector<VkAccelerationStructureBuildRangeInfoKHR> buildRangeInfos{};
         std::vector<VkAccelerationStructureBuildRangeInfoKHR *> pBuildRangeInfos{};
 
-        triangleCounts.reserve(mesh.submeshes.size());
-        geometries.reserve(mesh.submeshes.size());
-        buildRangeInfos.reserve(mesh.submeshes.size());
-        pBuildRangeInfos.reserve(mesh.submeshes.size());
+        triangleCounts.reserve(mesh.primMeshes.size());
+        geometries.reserve(mesh.primMeshes.size());
+        buildRangeInfos.reserve(mesh.primMeshes.size());
+        pBuildRangeInfos.reserve(mesh.primMeshes.size());
 
-        // Create geometries per submesh so we can index materials by gl_GeometryIndexEXT
-        for (const SubMesh &submesh : mesh.submeshes) {
+        // Create geometries per primMesh so we can index materials by gl_GeometryIndexEXT
+        for (const PrimMesh &primMesh : mesh.primMeshes) {
             // Set device adresses for buffers
             VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
             VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
-            VkDeviceOrHostAddressConstKHR transformBufferDeviceAddress{};
             
-            vertexBufferDeviceAddress.deviceAddress     = mesh.vertexBuffer->deviceAddress();
-            indexBufferDeviceAddress.deviceAddress      = mesh.indexBuffer->deviceAddress() + submesh.start * sizeof(uint32_t);
-            transformBufferDeviceAddress.deviceAddress  = transformBuffer.deviceAddress();
+            vertexBufferDeviceAddress.deviceAddress = mesh.vertexBuffer->deviceAddress();
+            indexBufferDeviceAddress.deviceAddress  = mesh.indexBuffer->deviceAddress() + primMesh.start * sizeof(uint32_t);
 
             // Set geometry info
             VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
             accelerationStructureGeometry.sType                            = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-            //accelerationStructureGeometry.flags                            = VK_GEOMETRY_OPAQUE_BIT_KHR; // TODO set this flag for non transparent objects
+            accelerationStructureGeometry.flags                            = primMesh.material->transparent ? 0 : VK_GEOMETRY_OPAQUE_BIT_KHR;
             accelerationStructureGeometry.geometryType                     = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
             accelerationStructureGeometry.geometry.triangles.sType         = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
             accelerationStructureGeometry.geometry.triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
@@ -128,12 +111,10 @@ namespace mari {
             accelerationStructureGeometry.geometry.triangles.vertexStride  = sizeof(Mesh::Vertex);
             accelerationStructureGeometry.geometry.triangles.maxVertex     = mesh.vertexCount - 1;
             accelerationStructureGeometry.geometry.triangles.indexType     = VK_INDEX_TYPE_UINT32;
-            accelerationStructureGeometry.geometry.triangles.indexData     = indexBufferDeviceAddress;
-            accelerationStructureGeometry.geometry.triangles.transformData = transformBufferDeviceAddress;
-            
+            accelerationStructureGeometry.geometry.triangles.indexData     = indexBufferDeviceAddress;            
 
             // Set build size info
-            const uint32_t triangleCount = submesh.count / 3;
+            const uint32_t triangleCount = primMesh.count / 3;
             VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
             accelerationStructureBuildRangeInfo.primitiveCount  = triangleCount;
             accelerationStructureBuildRangeInfo.primitiveOffset = 0;
@@ -146,18 +127,18 @@ namespace mari {
             buildRangeInfos.push_back(accelerationStructureBuildRangeInfo);
             pBuildRangeInfos.push_back(&buildRangeInfos.back());                // only works if .reserve() was called properly
 
-            SubMeshAdresses submeshAddresses{};
-            submeshAddresses.vertexBufferDeviceAddress = vertexBufferDeviceAddress.deviceAddress;
-            submeshAddresses.indexBufferDeviceAddress  = indexBufferDeviceAddress.deviceAddress;
-            submeshAddresses.textureIndex = submesh.material->indices.albedo;
-            geometryAddresses.push_back(submeshAddresses);
+            PrimMeshInfo primMeshAddresses{};
+            primMeshAddresses.vertexBufferDeviceAddress = vertexBufferDeviceAddress.deviceAddress;
+            primMeshAddresses.indexBufferDeviceAddress  = indexBufferDeviceAddress.deviceAddress;
+            primMeshAddresses.materialBufferDeviceAddress = materialBufferDeviceAddress + primMesh.material->index * sizeof(MaterialData);
+            primMeshesInfos.push_back(primMeshAddresses);
         }
 
         blas->build(geometries.data(), static_cast<uint32_t>(geometries.size()), triangleCounts.data(), pBuildRangeInfos.data());
         blases.emplace_back(std::move(blas));
     }
 
-    void RayTracingSystem::buildTLAS(VkTransformMatrixKHR transformMatrix) {
+    void RayTracingSystem::buildTLAS() {
         tlas = std::make_unique<AccelerationStructure>(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
 
         std::vector<VkAccelerationStructureInstanceKHR> asInstances;
@@ -166,8 +147,8 @@ namespace mari {
         int i = 0;
         for (auto& blas : blases) {
             VkAccelerationStructureInstanceKHR accelerationStructureInstance{};
-            accelerationStructureInstance.transform = transformMatrix;
-            accelerationStructureInstance.instanceCustomIndex = i++;
+            accelerationStructureInstance.transform = blas->transformMatrix;
+            accelerationStructureInstance.instanceCustomIndex = 0;
             accelerationStructureInstance.mask = 0xFF;
             accelerationStructureInstance.instanceShaderBindingTableRecordOffset = 0;
             accelerationStructureInstance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
@@ -251,7 +232,7 @@ namespace mari {
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             subresourceRange
         );
-
+/*
         VkImageCopy imageCopy{};
         imageCopy.srcSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         imageCopy.srcOffset         = {0, 0, 0};
@@ -262,6 +243,31 @@ namespace mari {
         vkCmdCopyImage(
             frameInfo.commandBuffer, accumImage->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             swapchain.getImage(frameInfo.frameIndex), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy
+        );
+*/
+        VkImageSubresourceLayers subresourceLayers{};
+        subresourceLayers.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresourceLayers.baseArrayLayer    = 0;
+        subresourceLayers.layerCount        = 1;
+        subresourceLayers.mipLevel          = 0;
+
+        VkImageBlit imageBlit{};
+        imageBlit.srcSubresource = subresourceLayers;
+        imageBlit.dstSubresource = subresourceLayers;
+        imageBlit.srcOffsets[0] = {0, 0, 0}; 
+        imageBlit.srcOffsets[1] = {static_cast<int32_t>(width), static_cast<int32_t>(height), 1}; 
+        imageBlit.dstOffsets[0] = {0, 0, 0}; 
+        imageBlit.dstOffsets[1] = {static_cast<int32_t>(width), static_cast<int32_t>(height), 1};
+
+        vkCmdBlitImage(
+            frameInfo.commandBuffer, 
+            accumImage->handle, 
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            swapchain.getImage(frameInfo.frameIndex),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &imageBlit,
+            VK_FILTER_NEAREST
         );
 
         vkhelper::transitionImageLayout(

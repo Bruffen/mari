@@ -11,25 +11,29 @@
 layout(location = 0) rayPayloadInEXT Payload prd;
 hitAttributeEXT vec2 attribs;
 
-layout(binding = 3, set = 0) buffer BlasData { uint64_t addresses[]; } blasData;
+layout(binding = 3, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
 layout(binding = 4, set = 0) uniform sampler2D textures[];
 
-layout(buffer_reference, scalar) buffer Meshes   { Mesh m[];   };
-layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; };
-layout(buffer_reference, scalar) buffer Indices  { uint i[];   };
+layout(buffer_reference, scalar) buffer PrimMeshInfos { PrimMeshInfo p[];   };
+layout(buffer_reference, scalar) buffer Vertices      { Vertex v[];         };
+layout(buffer_reference, scalar) buffer Indices       { uint i[];           };
+layout(buffer_reference, scalar) buffer Materials     { MaterialData m[];   };
 
 void main() {
-    uint64_t meshDeviceAddress = blasData.addresses[gl_InstanceID];
+    uint64_t meshDeviceAddress = pPrimMeshInfos.addresses[gl_InstanceID];
 
-    Meshes meshes = Meshes(meshDeviceAddress);
-    Mesh mesh = meshes.m[gl_GeometryIndexEXT];
+    PrimMeshInfos primMeshInfos = PrimMeshInfos(meshDeviceAddress);
+    PrimMeshInfo primMeshInfo = primMeshInfos.p[gl_GeometryIndexEXT];
 
-    if (mesh.textureIndex < 0) { // TODO get material color alpha
+    Materials materials = Materials(primMeshInfo.materialBufferDeviceAddress);
+    MaterialData material = materials.m[0];
+
+    if (material.indices.albedo < 0) { // TODO get material color alpha
         return;
     }
 
-    Indices indices   = Indices(mesh.indexBufferDeviceAddress);
-    Vertices vertices = Vertices(mesh.vertexBufferDeviceAddress);
+    Indices indices   = Indices(primMeshInfo.indexBufferDeviceAddress);
+    Vertices vertices = Vertices(primMeshInfo.vertexBufferDeviceAddress);
 
     vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
     vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
@@ -37,7 +41,7 @@ void main() {
     vec3 barycentricCoords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
     vec2 uv  = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
-    float alpha = texture(textures[nonuniformEXT(mesh.textureIndex)], uv).a;
+    float alpha = texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
 
     if(rnd(prd.seed) > alpha) {
         ignoreIntersectionEXT;

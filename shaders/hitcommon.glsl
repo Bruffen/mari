@@ -1,9 +1,9 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-struct Mesh {
+struct PrimMeshInfo {
     uint64_t vertexBufferDeviceAddress;
     uint64_t indexBufferDeviceAddress;
-    int      textureIndex;
+    uint64_t materialBufferDeviceAddress;
 };
 
 struct Vertex {
@@ -14,17 +14,35 @@ struct Vertex {
     float pad1;
     vec2 uv;
     vec2 pad2;
+}; 
+
+struct MaterialConstants {
+    vec4  albedo;
+    float metallic;
+    float roughness;
+    float ior;
+    float pad0;
+    vec4  emission;   // rgb for color, a for strength
 };
 
-struct Material {
-    int textureIndex;
+struct TextureIndices {
+    int albedo;
+    int normal;
+    int occlusion;
+    int emission;
+};
+
+struct MaterialData {
+    MaterialConstants constants;
+    TextureIndices    indices;
 };
 
 struct Triangle {
     Vertex vertices[3];
     vec4 color;
-    vec3 position;
-    vec3 normal;
+    vec3 hit;
+    vec3 normalS;       // Surface normal from vertex normal and normal map
+    vec3 normalG;       // Geometric normal indicating where triangle is facing
     vec2 uv;
-    Material material;
+    MaterialData material;
 };

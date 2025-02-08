@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
 
 namespace mari {
     extern PFN_vkGetBufferDeviceAddressKHR                vkGetBufferDeviceAddressKHR;
@@ -17,6 +18,7 @@ namespace mari {
     void                                                  getRayTracingFunctionPointers(VkDevice device);
 
     namespace vkhelper {
+        VkTransformMatrixKHR    glmToVkMatrix(const glm::mat4& matrix);
 
         VkAccessFlags           getAccessFlags(VkImageLayout layout);
         VkPipelineStageFlags    getPipelineStageFlags(VkImageLayout layout);

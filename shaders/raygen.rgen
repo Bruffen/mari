@@ -5,7 +5,7 @@
 #include "random.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
-layout(binding = 1, set = 0, rgba16) uniform image2D image;
+layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 layout(binding = 2, set = 0) uniform CameraProperties {
     mat4 viewInverse;
     mat4 projInverse;
@@ -31,9 +31,15 @@ void main() {
     float tmin = 0.001;
     float tmax = 10000.0;
 
-    prd.color = vec3(0.0);
+    prd.radiance    = vec3(0.0);
+    prd.throughput  = vec3(1.0);
+    prd.origin      = origin.xyz;
+    prd.direction   = direction.xyz;
+    prd.done        = 0;
 
-    traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin.xyz, tmin, direction.xyz, tmax, 0);
+    for (int depth = 0; prd.done == 0 && depth < 5; depth++) {
+        traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
+    }
 
     vec4 imageColor = vec4(0.0);
     if (cam.frameCount > 0) {
@@ -41,6 +47,6 @@ void main() {
     }
 
     float avg = 1.0 / (cam.frameCount + 1.0);
-    vec4 averageColor = (vec4(prd.color, 1.0) + imageColor * cam.frameCount) * avg;
+    vec4 averageColor = (vec4(prd.radiance, 1.0) + imageColor * cam.frameCount) * avg;
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), averageColor);
 }

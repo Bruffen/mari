@@ -67,7 +67,7 @@ namespace mari {
             /**/
 
             std::string                 name = "";
-            std::vector<SubMesh>        submeshes;
+            std::vector<PrimMesh>       primMeshes;
         private:
 
 

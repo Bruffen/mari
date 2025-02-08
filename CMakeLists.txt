@@ -87,7 +87,8 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 set(OPTIONS "/Zi") 
 set(OPTIONS "/DEBUG")
-set(OPTIONS "/openmp")
+set(OPTIONS "/W3") 
+#set(OPTIONS "/openmp")
 #TODO set "/O2" in release mode
 target_compile_options(${PROJECT_NAME} PUBLIC "${OPTIONS}")
 
@@ -151,15 +152,20 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.rahit"
     "${PROJECT_SOURCE_DIR}/shaders/*.rmiss"
 )
-# TODO if a common.glsl file is changed, recompile everything
+
+# TODO currently if a common.glsl file is changed everything is recompiled
+# Ideally only those who include it should be recompiled
+file(GLOB_RECURSE GLSL_COMMON_FILES
+    "${PROJECT_SOURCE_DIR}/shaders/*.glsl"
+)
  
 foreach(GLSL ${GLSL_SOURCE_FILES})
     get_filename_component(FILE_NAME ${GLSL} NAME)
     set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/${FILE_NAME}.spv")
     add_custom_command(
         OUTPUT ${SPIRV}
-        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}  --target-env vulkan1.3 
-        DEPENDS ${GLSL})
+        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}  --target-env vulkan1.3 -gVS # TODO -gVS is debug only
+        DEPENDS ${GLSL} ${GLSL_COMMON_FILES})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)
  

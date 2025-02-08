@@ -11,7 +11,7 @@ namespace mari {
         float                   metallic;
         float                   roughness;
         float                   ior;
-        glm::vec4               emission;   // rgb for color, a for strength
+        alignas(16) glm::vec4   emission;   // rgb for color, a for strength
     };
 
     struct MaterialResources {
@@ -25,23 +25,29 @@ namespace mari {
         int32_t                 occlusion   = -1;
         int32_t                 emission    = -1;
     };
-
-    struct Material {
+    
+    struct MaterialData {
         MaterialConstants constants;
-        MaterialResources resources;
         TextureIndices    indices;
-        std::string name = "";
     };
 
-    struct SubMesh {
+    struct Material {
+        std::string name = "";
+        int32_t index;
+        MaterialData data;
+        MaterialResources resources;
+        bool transparent = false;
+    };
+
+    struct PrimMesh {
         uint32_t start;
         uint32_t count;
         std::shared_ptr<Material> material;
     };
 
-    struct SubMeshAdresses {
+    struct PrimMeshInfo {
         uint64_t vertexBufferDeviceAddress;
         uint64_t indexBufferDeviceAddress;
-        int32_t  textureIndex;
+        uint64_t materialBufferDeviceAddress;
     };
 }

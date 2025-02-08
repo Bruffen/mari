@@ -40,6 +40,13 @@ namespace mari {
     }
 
     namespace vkhelper {
+        VkTransformMatrixKHR glmToVkMatrix(const glm::mat4& matrix) {
+            VkTransformMatrixKHR transformMatrix{};
+            glm::mat4 m = glm::transpose(matrix);
+            memcpy(&transformMatrix, (void*)&m, sizeof(VkTransformMatrixKHR));
+            return transformMatrix;
+        }
+
         // Taken from vk_common.cpp in Vulkan Samples https://github.com/KhronosGroup/Vulkan-Samples
         VkAccessFlags getAccessFlags(VkImageLayout layout)
         {

@@ -16,12 +16,12 @@ namespace mari {
             // TODO get around having these be public
             std::unique_ptr<AccelerationStructure>  tlas;
             std::unique_ptr<Image>                  accumImage;
-            std::unique_ptr<Buffer>                 geometryAddressesBuffer;
-            std::unique_ptr<Buffer>                 blasDataBuffer;
+            std::unique_ptr<Buffer>                 primMeshesInfosBuffer;
+            std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
         private:
             void                                    buildScene(const Scene &scene);
-            void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix);
-            void                                    buildTLAS(VkTransformMatrixKHR transformMatrix);
+            void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress);
+            void                                    buildTLAS();
             void                                    createPipelineLayout(VkDescriptorSetLayout descriptorSetLayout);
             void                                    createPipeline();
             void                                    createImages(uint32_t width, uint32_t height);
@@ -30,9 +30,6 @@ namespace mari {
             std::vector<std::unique_ptr<AccelerationStructure>> blases;
             std::unique_ptr<Pipeline>               pipeline; 
             VkPipelineLayout                        pipelineLayout;
-
-            std::unique_ptr<Image>                  presentImage;
-
-            std::vector<SubMeshAdresses>            geometryAddresses;
+            std::vector<PrimMeshInfo>               primMeshesInfos;
     };
 }

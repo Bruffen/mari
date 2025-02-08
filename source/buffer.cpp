@@ -109,8 +109,6 @@ namespace mari {
             "Buffer is visible from host. Use writeToBuffer() instead.");
         assert(memoryPropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT &&
             "Buffer is not in device memory. Needs VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT in memory property flags.");
-
-        VkDeviceSize bufferSize = instanceSize * instanceCount;
         
         Buffer stagingBuffer{
             device,

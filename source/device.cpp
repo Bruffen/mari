@@ -198,6 +198,12 @@ namespace mari {
         featuresRTV.rayTracingValidation = VK_TRUE;
         featuresRTV.pNext = &featuresDI;
 
+        if (enableShaderRelaxed) {
+            VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR featuresSREI{};
+            featuresSREI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR;
+            featuresSREI.shaderRelaxedExtendedInstruction = VK_TRUE;
+            featuresBDA.pNext = &featuresSREI;
+        }
 
         createInfo.pNext = &featuresRTV;
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -301,7 +307,10 @@ namespace mari {
         if (enableValidationLayers) {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
-
+        //if (enableShaderRelaxed) { // TODO doesn't work here but works in header directly?
+        //    extensions.push_back(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME);
+        //}
+            
         return extensions;
     }
 
@@ -348,7 +357,7 @@ namespace mari {
             VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME       
         };
         
-        deviceExtensions.insert(deviceExtensions.begin(), rtExtensions.begin(), rtExtensions.end());
+        deviceExtensions.insert(deviceExtensions.end(), rtExtensions.begin(), rtExtensions.end());
     }
 
     bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device) {

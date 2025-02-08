@@ -44,7 +44,10 @@ namespace mari {
             fastgltf::Options::LoadExternalBuffers |
             fastgltf::Options::DecomposeNodeMatrices;
 
-        fastgltf::Parser parser {};
+        constexpr auto parserOptions =
+            fastgltf::Extensions::KHR_materials_emissive_strength;
+
+        fastgltf::Parser parser{parserOptions};
         fastgltf::Expected<fastgltf::GltfDataBuffer> data = fastgltf::GltfDataBuffer::FromPath(path);
         if (data.error() != fastgltf::Error::None) {
             throw std::invalid_argument("Error: Could not load the glTF file.");
@@ -59,41 +62,15 @@ namespace mari {
 
         // TODO increase descriptor pool size
 
-        // Temporary arrays for all the objects to use while creating the GLTF data
         std::vector<std::shared_ptr<GameObject>> tmpNodes;
         std::vector<uint32_t>                    tmpImageIds;
-        std::vector<std::shared_ptr<Camera>>     tmpCameras;
 
         loadSamplers(gltf.samplers);
         loadImages(gltf.images, gltf, folder); // TODO improve passing asset gltf
         loadMaterials(gltf.materials, gltf.textures);
         loadMeshes(gltf);
-
-        // load cameras
-        for (auto& camera : gltf.cameras) {
-            std::shared_ptr<Camera> newCamera = std::make_unique<Camera>();
-            tmpCameras.emplace_back(newCamera);
-            std::visit(fastgltf::visitor {
-                [&](fastgltf::Camera::Perspective& perspective) {
-                    newCamera->setPerspectiveProjection(
-                        perspective.yfov, 
-                        perspective.aspectRatio.value_or(16.0f/9.0f), 
-                        perspective.znear, 
-                        perspective.zfar.value_or(1000.0f)
-                    );
-                },
-                [&](fastgltf::Camera::Orthographic& orthographic) {
-                    newCamera->setOrthographicProjection(
-                        -orthographic.xmag * 0.5f, 
-                         orthographic.xmag * 0.5f, 
-                         orthographic.ymag * 0.5f, 
-                        -orthographic.ymag * 0.5f,
-                        orthographic.znear,
-                        orthographic.zfar
-                    );
-                },
-            }, camera.camera);
-        }
+        loadCameras(gltf.cameras);
+        // TODO there's a gltf.scenes
 
         // load all nodes and their meshes
         for (fastgltf::Node& node : gltf.nodes) {
@@ -104,16 +81,18 @@ namespace mari {
                 newNode->mesh = meshes[*node.meshIndex];
             }
             if (node.cameraIndex.has_value()) {
-                newNode->camera = tmpCameras[*node.cameraIndex];
-                cameras.emplace_back(newNode);
+                newNode->camera = cameras[*node.cameraIndex];
+                cameraObjects.emplace_back(newNode);
             }
 
             tmpNodes.emplace_back(newNode);
             nodes[newNode->name] = newNode;
 
-            std::visit(fastgltf::visitor { [&](fastgltf::math::fmat4x4 matrix) {
-                                            //memcpy(&newNode->, matrix.data(), sizeof(matrix));
-                                },
+            std::visit(fastgltf::visitor { 
+                [&](fastgltf::math::fmat4x4 matrix) {
+                    memcpy(&newNode->worldMatrix, matrix.data(), sizeof(matrix));
+                    assert(true && "TODO Currently this world matrix value will be overwritten");
+                },
                 [&](fastgltf::TRS transform) {
                     glm::vec3 tl(transform.translation[0], transform.translation[1], transform.translation[2]);
                     glm::quat rot(transform.rotation[3], transform.rotation[0], transform.rotation[1], transform.rotation[2]);
@@ -130,6 +109,7 @@ namespace mari {
         // run loop again to setup transform hierarchy
         for (int i = 0; i < gltf.nodes.size(); i++) {
             fastgltf::Node& node = gltf.nodes[i];
+
             std::shared_ptr<GameObject>& sceneNode = tmpNodes[i];
 
             for (auto& c : node.children) {
@@ -159,6 +139,33 @@ namespace mari {
         }
     }
 
+    void Scene::loadCameras(const std::vector<fastgltf::Camera> &gltfCameras) {
+        for (auto& camera : gltfCameras) {
+            std::shared_ptr<Camera> newCamera = std::make_unique<Camera>();
+            cameras.emplace_back(newCamera);
+            std::visit(fastgltf::visitor {
+                [&](const fastgltf::Camera::Perspective& perspective) {
+                    newCamera->setPerspectiveProjection(
+                        perspective.yfov, 
+                        perspective.aspectRatio.value_or(16.0f/9.0f), // TODO aspect ratio will be overwritten by window's
+                        perspective.znear, 
+                        perspective.zfar.value_or(1000.0f)
+                    );
+                },
+                [&](const fastgltf::Camera::Orthographic& orthographic) {
+                    newCamera->setOrthographicProjection(
+                        -orthographic.xmag * 0.5f, 
+                         orthographic.xmag * 0.5f, 
+                         orthographic.ymag * 0.5f, 
+                        -orthographic.ymag * 0.5f,
+                        orthographic.znear,
+                        orthographic.zfar
+                    );
+                },
+            }, camera.camera);
+        }
+    }   
+
     void Scene::loadMeshes(const fastgltf::Asset &gltf) {
 
         std::vector<uint32_t> indices;
@@ -173,7 +180,7 @@ namespace mari {
             vertices.clear();
 
             for (const fastgltf::Primitive &p : mesh.primitives) {
-                SubMesh newPrimitive;
+                PrimMesh newPrimitive;
                 newPrimitive.start = static_cast<uint32_t>(indices.size());
                 newPrimitive.count = static_cast<uint32_t>(gltf.accessors[p.indicesAccessor.value()].count);
 
@@ -237,11 +244,13 @@ namespace mari {
 
                 if (p.materialIndex.has_value()) {
                     newPrimitive.material = materials[p.materialIndex.value()];
+                    newPrimitive.material->index = static_cast<int32_t>(p.materialIndex.value());
                 } else {
                     newPrimitive.material = materials[0];
+                    newPrimitive.material->index = 0;
                 }
 
-                newMesh->submeshes.push_back(newPrimitive);
+                newMesh->primMeshes.push_back(newPrimitive);
             }
 
             newMesh->createVertexBuffers(vertices);
@@ -254,39 +263,58 @@ namespace mari {
     void Scene::loadMaterials(const std::vector<fastgltf::Material> &gltfMaterials, const std::vector<fastgltf::Texture> &gltfTextures) {
         for (const fastgltf::Material& gltfMat : gltfMaterials) {
             std::shared_ptr<Material> m = std::make_shared<Material>();
-            m->name                 = gltfMat.name.c_str();
-            m->constants.albedo.x   = gltfMat.pbrData.baseColorFactor[0];
-            m->constants.albedo.y   = gltfMat.pbrData.baseColorFactor[1];
-            m->constants.albedo.z   = gltfMat.pbrData.baseColorFactor[2];
-            m->constants.albedo.w   = gltfMat.pbrData.baseColorFactor[3];
-            m->constants.metallic   = gltfMat.pbrData.metallicFactor;
-            m->constants.roughness  = gltfMat.pbrData.roughnessFactor;
-            m->constants.emission   = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
-
-            /*
-            if (gltfMat.alphaMode == fastgltf::AlphaMode::Blend) {
-                // TODO material transparency for pipeline pass
+            m->name                     = gltfMat.name.c_str();
+            m->data.constants.albedo.x  = gltfMat.pbrData.baseColorFactor[0];
+            m->data.constants.albedo.y  = gltfMat.pbrData.baseColorFactor[1];
+            m->data.constants.albedo.z  = gltfMat.pbrData.baseColorFactor[2];
+            m->data.constants.albedo.w  = gltfMat.pbrData.baseColorFactor[3];
+            m->data.constants.metallic  = gltfMat.pbrData.metallicFactor;
+            m->data.constants.roughness = gltfMat.pbrData.roughnessFactor;
+            m->data.constants.emission  = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
+            
+            if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque) {
+                m->transparent = true;
             }
-            */
 
             // default the material textures
-            m->resources.albedoImage                     = DefaultObjects::getImageWhite();
+            m->resources.albedoImage                     = DefaultObjects::getImageError();
             m->resources.albedoImage->sampler            = DefaultObjects::getSamplerLinear();
             m->resources.metallicRoughnessImage          = DefaultObjects::getImageWhite();
             m->resources.metallicRoughnessImage->sampler = DefaultObjects::getSamplerLinear();
 
             // grab textures from gltf file
             if (gltfMat.pbrData.baseColorTexture.has_value()) {
-                size_t img      = gltfTextures[gltfMat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
-                size_t sampler  = gltfTextures[gltfMat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
-
-                m->resources.albedoImage = images[img];
-                m->resources.albedoImage->sampler = samplers[sampler];
-                m->indices.albedo = static_cast<int32_t>(img);
+                const fastgltf::Texture& texture = gltfTextures[gltfMat.pbrData.baseColorTexture.value().textureIndex];
+                if (texture.imageIndex.has_value()) {
+                    size_t img = texture.imageIndex.value();
+                    m->resources.albedoImage = images[img];
+                    m->data.indices.albedo = static_cast<int32_t>(img);
+                }
+                if (texture.samplerIndex.has_value()) {
+                    m->resources.albedoImage->sampler = samplers[texture.samplerIndex.value()];
+                }
             }
 
             materials.emplace_back(m);
         }
+
+        std::vector<MaterialData> materialDatas;
+        materialDatas.reserve(materials.size());
+        
+        for (const auto& mat : materials) {
+            materialDatas.push_back(mat->data);
+        }
+        
+        VkDeviceSize materialBufferSize = sizeof(MaterialData) * materials.size();
+        materialDataBuffer = std::make_unique<Buffer>(            
+            device,
+            sizeof(MaterialData),
+            static_cast<uint32_t>(materials.size()),
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+        materialDataBuffer->stageToBuffer((void*) materialDatas.data());
     }
 
     void Scene::loadImages(std::vector<fastgltf::Image> &gltfImages, fastgltf::Asset& asset, const std::string& folderPath) {

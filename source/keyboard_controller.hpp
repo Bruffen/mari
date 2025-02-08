@@ -47,7 +47,7 @@ namespace mari {
             Gui&  gui;
             float moveSpeed{1.0f};
             float currentSpeed{moveSpeed};
-            float lookSpeed{0.25f};
+            float lookSpeed{0.002f};
             bool  changePipelinePressed = false;// TODO
             bool  changeCameraPressed = false;// TODO
             bool  resetFrame = false;
