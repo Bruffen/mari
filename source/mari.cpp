@@ -137,6 +137,7 @@ namespace mari {
             float deltaTime   = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
             float elapsedTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - startTime).count();
             currentTime = newTime;
+            frameCounter++;
 
             if (controller.changeCamera(window.getGLFWwindow())) {
                 currentCamera = scene->cameraObjects[0]; // TODO
@@ -153,6 +154,7 @@ namespace mari {
                 int frameIndex = renderer.getFrameIndex();
                 FrameInfo frameInfo {
                     frameIndex,
+                    frameCounter,
                     deltaTime,
                     elapsedTime,
                     commandBuffer,
@@ -168,7 +170,6 @@ namespace mari {
                     ubo.projInverse = currentCamera->camera->getInverseProjection();
                     frameCounter    = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
                     ubo.frameCount  = frameCounter;
-                    frameCounter++;
                     rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                     rayTracingUboBuffers[frameIndex]->flush();
 
@@ -252,7 +253,10 @@ namespace mari {
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
                 break;
-        }
+            case 5:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
+                break;
+    }
         scene->update();
         
         /*std::vector<glm::vec3> lightColors {

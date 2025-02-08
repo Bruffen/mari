@@ -111,6 +111,7 @@ namespace mari {
             ImGui::Begin("Mari");
 
             imGuiFramerate(frameInfo.deltaTime);
+            ImGui::Text("Samples: %i", frameInfo.frameCounter);
             ImGui::Text("Triangle count: %i", triangleCount);
 
             if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None)) {
@@ -246,12 +247,23 @@ namespace mari {
 
     void Gui::imGuiMaterial(const Material &material) {
         if (ImGui::TreeNode(material.name.c_str(), ("Material: " + material.name).c_str())) {
-            ImGui::Text("Color: R: %.2f, G: %.2f, B: %.2f, A: %.2f", material.data.constants.albedo.r, material.data.constants.albedo.g, material.data.constants.albedo.b, material.data.constants.albedo.a);
-            ImGui::Text("Metallic: %.3f", material.data.constants.metallic);
-            ImGui::Text("Roughness: %.3f", material.data.constants.roughness);
+            ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
+
+            glm::vec4 a = material.data.constants.albedo;
+            float m = material.data.constants.metallic;
+            float r = material.data.constants.roughness;
+
+            ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
+            ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
+            ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
+
             imGuiImage(*material.resources.albedoImage);
             imGuiImage(*material.resources.metallicRoughnessImage);
             ImGui::TreePop();
+
+            if (a != material.data.constants.albedo || m != material.data.constants.metallic || r != material.data.constants.roughness) {
+                inputChanged = true;
+            }
         }
     }
 

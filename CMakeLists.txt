@@ -56,13 +56,7 @@ endif()
 
 include_directories(include)
  
-# If TINYOBJ_PATH not specified in .env.cmake, try fetching from git repo
-if (NOT TINYOBJ_PATH)
-    message(STATUS "TINYOBJ_PATH not specified in .env.cmake, using include/tinyobjloader")
-    set(TINYOBJ_PATH include/tinyobjloader)
-endif()
-
-# 2. Set GLFW_PATH in .env.cmake to target specific glfw
+# 3. Set FASTGLTF_PATH in .env.cmake
 if (DEFINED FASTGLTF_PATH)
     message(STATUS "Using fastgltf path specified in .env")
     set(FASTGLTF_INCLUDE_DIRS "${FASTGLTF_PATH}/include")
@@ -110,7 +104,6 @@ if (WIN32)
     target_include_directories(${PROJECT_NAME} PUBLIC
         ${PROJECT_SOURCE_DIR}/source
         ${Vulkan_INCLUDE_DIRS}
-        ${TINYOBJ_PATH}
         ${GLFW_INCLUDE_DIRS}
         ${GLM_PATH}
         ${FASTGLTF_INCLUDE_DIRS}

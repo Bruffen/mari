@@ -32,6 +32,7 @@ namespace mari {
 
     struct FrameInfo {
         int frameIndex;
+        int frameCounter;
         float deltaTime;
         float elapsedTime;
         VkCommandBuffer commandBuffer;
