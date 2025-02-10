@@ -51,9 +51,19 @@ Triangle unpackTriangle(uint index) {
 void main() {
     Triangle tri = unpackTriangle(gl_PrimitiveID);
 
-    vec3 color = tri.material.constants.albedo.rgb;
+    vec3  color     = tri.material.constants.albedo.rgb;
+    float metallic  = tri.material.constants.metallic;
+    float roughness = tri.material.constants.roughness;
+    vec3  emission  = tri.material.constants.emission.rgb * tri.material.constants.emission.a;
+
     if (tri.material.indices.albedo > -1) {
-        color = texture(textures[nonuniformEXT(tri.material.indices.albedo)], tri.uv).rgb;
+        color *= texture(textures[nonuniformEXT(tri.material.indices.albedo)], tri.uv).rgb;
+    }
+
+    if (tri.material.indices.metallicRoughness > -1) {
+        vec2 rm = texture(textures[nonuniformEXT(tri.material.indices.metallicRoughness)], tri.uv).gb;
+        roughness *= rm.x;
+        metallic  *= rm.y;
     }
 
     const vec3 worldPosition = vec3(gl_ObjectToWorldEXT * vec4(tri.hit, 1.0));      // Transforming the position to world space
@@ -69,9 +79,8 @@ void main() {
 
     // TODO check with geometric normal that new direction doesn't go inside object
 
-    const vec4 emission = tri.material.constants.emission;
 
     const float d = dot(prd.direction, worldNormalS);
-    prd.radiance += prd.throughput * emission.rgb * emission.a;
+    prd.radiance += prd.throughput * emission;
     prd.throughput *= color * d;
 }

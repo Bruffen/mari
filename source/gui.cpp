@@ -249,20 +249,23 @@ namespace mari {
         if (ImGui::TreeNode(material.name.c_str(), ("Material: " + material.name).c_str())) {
             ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
-            glm::vec4 a = material.data.constants.albedo;
-            float m = material.data.constants.metallic;
-            float r = material.data.constants.roughness;
+            MaterialConstants mc = material.data.constants;
 
             ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
+            imGuiImage(*material.textures.albedo);
             ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
             ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
+            imGuiImage(*material.textures.metallicRoughness);
+            ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
-            imGuiImage(*material.resources.albedoImage);
-            imGuiImage(*material.resources.metallicRoughnessImage);
             ImGui::TreePop();
 
-            if (a != material.data.constants.albedo || m != material.data.constants.metallic || r != material.data.constants.roughness) {
+            if (mc.albedo != material.data.constants.albedo || 
+                mc.metallic != material.data.constants.metallic || 
+                mc.roughness != material.data.constants.roughness ||
+                mc.emission != material.data.constants.emission) {
                 inputChanged = true;
+                scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
             }
         }
     }

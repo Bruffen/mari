@@ -10,10 +10,11 @@
 
 namespace mari {
     Image::Image(Device &device, VkExtent3D size, VkFormat format, VkImageUsageFlags flags, VkImageLayout layout, void *data)
-     : device{device}, size{size}, format{format}, flags{flags}, layout{layout}, sampler{sampler} {
+     : device{device}, size{size}, format{format}, flags{flags}, layout{layout} {
         auto formatInfo = vkuGetFormatInfo(format);
         channels = formatInfo.component_count;
         texelBytes = formatInfo.block_size;
+        sampler = DefaultObjects::getSamplerLinear();
         createImage();
         createImageView();
 
@@ -81,7 +82,7 @@ namespace mari {
     VkDescriptorImageInfo Image::descriptorInfo() {
         descriptor.imageView   = view;
         descriptor.imageLayout = layout;
-        descriptor.sampler     = sampler ? sampler : DefaultObjects::getSamplerNearest(); // TODO not every image needs a sampler
+        descriptor.sampler     = sampler;
         return descriptor;
     }
 

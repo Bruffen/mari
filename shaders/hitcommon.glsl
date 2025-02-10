@@ -27,9 +27,13 @@ struct MaterialConstants {
 
 struct TextureIndices {
     int albedo;
+    int metallicRoughness;
     int normal;
-    int occlusion;
-    int emission;
+    int emissive;
+    int anisotropy;
+    int thickness;
+    int iridescence;
+    int clearcoat;
 };
 
 struct MaterialData {

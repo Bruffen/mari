@@ -142,6 +142,26 @@ namespace mari {
         mappedRange.size = size;
         return vkFlushMappedMemoryRanges(device.handle(), 1, &mappedRange);
     }
+
+    /**
+     * Update a small memory range of the buffer in device memory
+     *
+     * @note Only necessary for device only memory
+     *
+     * @param offset Byte offset from beginning.
+     * @param size Size of the memory range to update. Must be less than or equal to 65536 bytes
+     * @param data Pointer to the data to copy.
+     */
+    void Buffer::update(VkDeviceSize offset, VkDeviceSize size, const void* data) {
+        assert(usageFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT && "Use memcpy for host visible buffers");
+        assert(size <= 65536 && "Buffer update size must be less than or equal to 65536 bytes");
+        assert(offset + size < bufferSize && "Buffer update goes outside of memory range");
+
+        VkCommandBuffer cmd = device.beginSingleTimeCommands();
+        vkCmdUpdateBuffer(cmd, buffer, offset, size, data);
+        device.endSingleTimeCommands(cmd);
+    }
+
     
     /**
      * Invalidate a memory range of the buffer to make it visible to the host

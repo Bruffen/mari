@@ -175,7 +175,6 @@ namespace mari {
             std::shared_ptr<Mesh> newMesh = std::make_shared<Mesh>(device);
             newMesh->name = mesh.name;
 
-            // clear the mesh arrays each mesh, we dont want to merge them by error
             indices.clear();
             vertices.clear();
 
@@ -184,7 +183,7 @@ namespace mari {
                 newPrimitive.start = static_cast<uint32_t>(indices.size());
                 newPrimitive.count = static_cast<uint32_t>(gltf.accessors[p.indicesAccessor.value()].count);
 
-                uint32_t initial_vtx = static_cast<uint32_t>(vertices.size());
+                uint32_t initialVertex = static_cast<uint32_t>(vertices.size());
 
                 // load indexes
                 {
@@ -192,7 +191,7 @@ namespace mari {
                     indices.reserve(indices.size() + indexaccessor.count);
                     
                     fastgltf::iterateAccessor<std::uint32_t>(gltf, indexaccessor, [&](std::uint32_t idx) {
-                        indices.push_back(idx + initial_vtx);
+                        indices.push_back(idx + initialVertex);
                     });
                 }
 
@@ -210,7 +209,7 @@ namespace mari {
                             newvtx.normal = { 1, 0, 0 };
                             newvtx.color = glm::vec4 { 1.f };
                             newvtx.uv = {0, 0};
-                            vertices[initial_vtx + index] = newvtx;
+                            vertices[initialVertex + index] = newvtx;
                         }
                     );
                 }
@@ -219,8 +218,8 @@ namespace mari {
                 auto normals = p.findAttribute("NORMAL");
                 if (normals != p.attributes.end()) {
                     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(gltf, gltf.accessors[(*normals).accessorIndex],
-                        [&](fastgltf::math::fvec3 v, size_t index) {
-                            vertices[initial_vtx + index].normal = {v.x(), v.y(), v.z()};
+                        [&](fastgltf::math::fvec3 n, size_t index) {
+                            vertices[initialVertex + index].normal = {n.x(), n.y(), n.z()};
                         });
                 }
 
@@ -228,8 +227,8 @@ namespace mari {
                 auto uv = p.findAttribute("TEXCOORD_0");
                 if (uv != p.attributes.end()) {
                     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(gltf, gltf.accessors[(*uv).accessorIndex],
-                        [&](fastgltf::math::fvec2 v, size_t index) {
-                            vertices[initial_vtx + index].uv = {v.x(), v.y()};
+                        [&](fastgltf::math::fvec2 uv, size_t index) {
+                            vertices[initialVertex + index].uv = {uv.x(), uv.y()};
                         });
                 }
 
@@ -237,8 +236,8 @@ namespace mari {
                 auto colors = p.findAttribute("COLOR_0");
                 if (colors != p.attributes.end()) {
                     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(gltf, gltf.accessors[(*colors).accessorIndex],
-                        [&](fastgltf::math::fvec4 v, size_t index) {
-                            vertices[initial_vtx + index].color =  {v.x(), v.y(), v.z(), v.w()};
+                        [&](fastgltf::math::fvec4 c, size_t index) {
+                            vertices[initialVertex + index].color =  {c.x(), c.y(), c.z(), c.w()};
                         });
                 }
 
@@ -264,34 +263,56 @@ namespace mari {
         for (const fastgltf::Material& gltfMat : gltfMaterials) {
             std::shared_ptr<Material> m = std::make_shared<Material>();
             m->name                     = gltfMat.name.c_str();
+            
+            if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque)  m->transparent = true;
+
+            // PBR data
             m->data.constants.albedo.x  = gltfMat.pbrData.baseColorFactor[0];
             m->data.constants.albedo.y  = gltfMat.pbrData.baseColorFactor[1];
             m->data.constants.albedo.z  = gltfMat.pbrData.baseColorFactor[2];
             m->data.constants.albedo.w  = gltfMat.pbrData.baseColorFactor[3];
             m->data.constants.metallic  = gltfMat.pbrData.metallicFactor;
             m->data.constants.roughness = gltfMat.pbrData.roughnessFactor;
-            m->data.constants.emission  = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
-            
-            if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque) {
-                m->transparent = true;
-            }
 
-            // default the material textures
-            m->resources.albedoImage                     = DefaultObjects::getImageError();
-            m->resources.albedoImage->sampler            = DefaultObjects::getSamplerLinear();
-            m->resources.metallicRoughnessImage          = DefaultObjects::getImageWhite();
-            m->resources.metallicRoughnessImage->sampler = DefaultObjects::getSamplerLinear();
-
-            // grab textures from gltf file
             if (gltfMat.pbrData.baseColorTexture.has_value()) {
                 const fastgltf::Texture& texture = gltfTextures[gltfMat.pbrData.baseColorTexture.value().textureIndex];
                 if (texture.imageIndex.has_value()) {
                     size_t img = texture.imageIndex.value();
-                    m->resources.albedoImage = images[img];
+                    m->textures.albedo = images[img];
                     m->data.indices.albedo = static_cast<int32_t>(img);
                 }
                 if (texture.samplerIndex.has_value()) {
-                    m->resources.albedoImage->sampler = samplers[texture.samplerIndex.value()];
+                    m->textures.albedo->sampler = samplers[texture.samplerIndex.value()];
+                }
+            }
+
+            if (gltfMat.pbrData.metallicRoughnessTexture.has_value()) {
+                const fastgltf::Texture& texture = gltfTextures[gltfMat.pbrData.metallicRoughnessTexture.value().textureIndex];
+                if (texture.imageIndex.has_value()) {
+                    size_t img = texture.imageIndex.value();
+                    m->textures.metallicRoughness = images[img];
+                    m->data.indices.metallicRoughness = static_cast<int32_t>(img);
+                }
+                if (texture.samplerIndex.has_value()) {
+                    m->textures.metallicRoughness->sampler = samplers[texture.samplerIndex.value()];
+                }
+            }
+
+            // Emission 
+            // TODO get texture
+            m->data.constants.emission = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
+
+            // Normal
+            // TODO Normal maps have a scale value
+            if (gltfMat.normalTexture.has_value()) { 
+                const fastgltf::Texture& texture = gltfTextures[gltfMat.normalTexture.value().textureIndex];
+                if (texture.imageIndex.has_value()) {
+                    size_t img = texture.imageIndex.value();
+                    m->textures.normal = images[img];
+                    m->data.indices.normal = static_cast<int32_t>(img);
+                }
+                if (texture.samplerIndex.has_value()) {
+                    m->textures.normal->sampler = samplers[texture.samplerIndex.value()];
                 }
             }
 
@@ -332,7 +353,6 @@ namespace mari {
 
             if (img) {
                 img->name = image.name.c_str();
-                img->sampler = DefaultObjects::getSamplerLinear(); // TODO get loaded sampler
                 images.emplace_back(img);
                 std::cout << img->name << std::endl;
             }
@@ -352,16 +372,14 @@ namespace mari {
             [](auto& arg) {},
             [&](fastgltf::sources::URI& filePath) {
                 assert(filePath.fileByteOffset == 0); // We don't support offsets with stbi.
-                assert(filePath.uri.isLocalPath()); // We're only capable of loading
-                                                    // local files.
+                assert(filePath.uri.isLocalPath());   // We're only capable of loading local files.
 
-                const std::string path(filePath.uri.path().begin(), filePath.uri.path().end()); // Thanks C++.
+                const std::string path(filePath.uri.path().begin(), filePath.uri.path().end());
                 data = stbi_load((folder + path).c_str(), &width, &height, &nrChannels, 4);
             },
             [&](fastgltf::sources::Array& vector) {
                 const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data());
-                data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()),
-                &width, &height, &nrChannels, 4);
+                data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()), &width, &height, &nrChannels, 4);
             },
             [&](fastgltf::sources::BufferView& view) {
                 auto& bufferView = asset.bufferViews[view.bufferViewIndex];
@@ -422,7 +440,6 @@ namespace mari {
     }
 
     void Scene::loadSamplers(const std::vector<fastgltf::Sampler> &gltfSamplers) {
-        // load samplers
         for (const fastgltf::Sampler& sampler : gltfSamplers) {
             VkSamplerCreateInfo samplerCreateInfo = {};
             samplerCreateInfo.sType         = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

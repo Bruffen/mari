@@ -27,6 +27,7 @@ namespace mari {
             void                    writeToBuffer(void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
             void                    stageToBuffer(void* data);
             VkResult                flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+            void                    update(VkDeviceSize offset, VkDeviceSize size, const void* data);
             VkDescriptorBufferInfo  descriptorInfo(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
             VkResult                invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
             

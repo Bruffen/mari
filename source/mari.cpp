@@ -229,7 +229,7 @@ namespace mari {
         //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/living_room.glb");
         //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf");
 
-        switch (0) {
+        switch (  0  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -256,7 +256,7 @@ namespace mari {
             case 5:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
                 break;
-    }
+        }
         scene->update();
         
         /*std::vector<glm::vec3> lightColors {
