@@ -105,7 +105,7 @@ namespace mari {
     void Buffer::stageToBuffer(void *data) {
         assert(usageFlags & VK_BUFFER_USAGE_TRANSFER_DST_BIT && 
             "Device buffer needs usage flag VK_BUFFER_USAGE_TRANSFER_DST_BIT to be copied to from host memory.");
-        assert(usageFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT || usageFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT && 
+        assert(!(memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) && 
             "Buffer is visible from host. Use writeToBuffer() instead.");
         assert(memoryPropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT &&
             "Buffer is not in device memory. Needs VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT in memory property flags.");
@@ -153,7 +153,7 @@ namespace mari {
      * @param data Pointer to the data to copy.
      */
     void Buffer::update(VkDeviceSize offset, VkDeviceSize size, const void* data) {
-        assert(usageFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT && "Use memcpy for host visible buffers");
+        assert(!(memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) && "Buffer is visible from host. Use writeToBuffer() instead.");
         assert(size <= 65536 && "Buffer update size must be less than or equal to 65536 bytes");
         assert(offset + size < bufferSize && "Buffer update goes outside of memory range");
 
