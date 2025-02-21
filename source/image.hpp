@@ -26,7 +26,7 @@ namespace mari {
             VkImageLayout           layout;
             VkFormat                format;
             VkImageUsageFlags       flags;
-            VkDescriptorSet         descriptorGui; // TODO can the same one be used for both?
+            VkDescriptorSet         descriptorGui; // TODO can the same one be used for both? Probably not, use a map instead in gui class
             VkSampler               sampler; // TODO not every image needs a sampler, maybe make a texture class that holds both an image and sampler
 
         private:

@@ -14,18 +14,17 @@
 namespace mari {
 
     Buffer::Buffer(
-            Device &device,
-            VkDeviceSize instanceSize,
-            uint32_t instanceCount,
-            VkBufferUsageFlags usageFlags,
-            VkMemoryPropertyFlags memoryPropertyFlags,
-            VkDeviceSize minOffsetAlignment)
+        Device &device,
+        VkDeviceSize instanceSize,
+        uint32_t instanceCount,
+        VkBufferUsageFlags usageFlags,
+        VkMemoryPropertyFlags memoryPropertyFlags,
+        VkDeviceSize minOffsetAlignment)
             : device{device},
             instanceSize{instanceSize},
             instanceCount{instanceCount},
             usageFlags{usageFlags},
-            memoryPropertyFlags{memoryPropertyFlags} 
-    {
+            memoryPropertyFlags{memoryPropertyFlags} {
         alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
         bufferSize = alignmentSize * instanceCount;
         device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);

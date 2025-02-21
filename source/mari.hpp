@@ -28,9 +28,10 @@ namespace mari {
         private:
             void loadScene();
 
-            Window          window{WIDTH, HEIGHT, "Mari"};
-            Device          device{window};
-            Renderer        renderer{window, device};
+            Window              window{WIDTH, HEIGHT, "Mari"};
+            Device              device{window};
+            Renderer            renderer{window, device};
+            RayTracingSystem    rayTracingSystem{device, window};
 
             std::shared_ptr<Scene> scene; // TODO
             GameObject::Map gameObjects;

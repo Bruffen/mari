@@ -4,13 +4,14 @@
 #include "frame_info.hpp"
 #include "scene/scene.hpp"
 #include "renderer.hpp"
+#include "systems/ray_tracing_system.hpp"
 
 #include <imgui.h>
 
 namespace mari {
     class Gui {
         public:
-            Gui(Device &device, Window &window, Renderer &renderer);
+            Gui(Device &device, Window &window, Renderer &renderer, RayTracingSystem &system);
             ~Gui();
 
             ImGuiIO* getIO() { return io; }
@@ -30,9 +31,11 @@ namespace mari {
             void imGuiMaterial(const Material &material);
             void imGuiImage(const Image &image);
             void imGuiCamera(Camera &camera);
+            void imGuiRender();
 
             Device  &device;
             Window  &window;
+            RayTracingSystem &system;
             ImGuiIO *io;
             std::shared_ptr<Scene> scene;
 

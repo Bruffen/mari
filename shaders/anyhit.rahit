@@ -11,13 +11,13 @@
 layout(location = 0) rayPayloadInEXT Payload prd;
 hitAttributeEXT vec2 attribs;
 
-layout(binding = 3, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
-layout(binding = 4, set = 0) uniform sampler2D textures[];
+layout(binding = 4, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
+layout(binding = 6, set = 0) uniform sampler2D textures[];
 
-layout(buffer_reference, scalar) buffer PrimMeshInfos { PrimMeshInfo p[];   };
-layout(buffer_reference, scalar) buffer Vertices      { Vertex v[];         };
-layout(buffer_reference, scalar) buffer Indices       { uint i[];           };
-layout(buffer_reference, scalar) buffer Materials     { MaterialData m[];   };
+layout(buffer_reference, scalar) buffer PrimMeshInfos { PrimMeshInfo p[]; };
+layout(buffer_reference, scalar) buffer Vertices      { Vertex v[];       };
+layout(buffer_reference, scalar) buffer Indices       { uint i[];         };
+layout(buffer_reference, scalar) buffer Materials     { MaterialData m[]; };
 
 void main() {
     uint64_t meshDeviceAddress = pPrimMeshInfos.addresses[gl_InstanceID];
@@ -43,7 +43,9 @@ void main() {
     vec2 uv  = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
     float alpha = texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
 
-    if(rnd(prd.seed) > alpha) {
-        ignoreIntersectionEXT;
-    }
+    //if (alpha < 0.9) {
+        if(rnd(prd.seed) > alpha) {
+            ignoreIntersectionEXT;
+        }
+    //}
 }

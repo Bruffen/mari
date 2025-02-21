@@ -11,13 +11,13 @@
 layout(location = 0) rayPayloadInEXT Payload prd;
 hitAttributeEXT vec2 attribs;
 
-layout(binding = 3, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
-layout(binding = 4, set = 0) uniform sampler2D textures[];
+layout(binding = 4, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
+layout(binding = 6, set = 0) uniform sampler2D textures[];
 
-layout(buffer_reference, scalar) buffer PrimMeshInfos { PrimMeshInfo p[];   };
-layout(buffer_reference, scalar) buffer Vertices      { Vertex v[];         };
-layout(buffer_reference, scalar) buffer Indices       { uint i[];           };
-layout(buffer_reference, scalar) buffer Materials     { MaterialData m[];   };
+layout(buffer_reference, scalar) buffer PrimMeshInfos { PrimMeshInfo p[]; };
+layout(buffer_reference, scalar) buffer Vertices      { Vertex v[];       };
+layout(buffer_reference, scalar) buffer Indices       { uint i[];         };
+layout(buffer_reference, scalar) buffer Materials     { MaterialData m[]; };
 
 Triangle unpackTriangle(uint index) {
     Triangle tri;

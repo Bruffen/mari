@@ -17,11 +17,8 @@
 #include <glm/glm.hpp>
 
 namespace mari {
-    RayTracingSystem::RayTracingSystem(Device &device, Window &window, const Scene &scene, VkDescriptorSetLayout descriptorSetLayout) : device{device} {
+    RayTracingSystem::RayTracingSystem(Device &device, Window &window) : device{device} {
         createImages(window.getExtent().width, window.getExtent().height);
-        buildScene(scene);
-        createPipelineLayout(descriptorSetLayout);
-        createPipeline();
     }
 
     RayTracingSystem::~RayTracingSystem() {
@@ -29,7 +26,8 @@ namespace mari {
     }
 
     void RayTracingSystem::createImages(uint32_t width, uint32_t height) {
-        accumImage   = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        accumImage   = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        presentImage = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
     }
 
     void RayTracingSystem::buildScene(const Scene &scene) {
@@ -189,7 +187,7 @@ namespace mari {
        tlas->build(&accelerationStructureGeometry, 1, &primitiveCount, pBuildRangeInfos.data());
     }
 
-    void RayTracingSystem::createPipelineLayout(VkDescriptorSetLayout descriptorSetLayout) {
+    void RayTracingSystem::buildPipeline(VkDescriptorSetLayout descriptorSetLayout) {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
         pipelineLayoutCreateInfo.sType                      = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutCreateInfo.setLayoutCount             = 1;
@@ -197,9 +195,7 @@ namespace mari {
         if (vkCreatePipelineLayout(device.handle(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout)) {
             throw std::runtime_error("Failed to create pipeline layout");
         }
-    }
 
-    void RayTracingSystem::createPipeline() {
         pipeline = std::make_unique<Pipeline>(device);
         pipeline->createRayTracingPipeline(pipelineLayout);
     }
@@ -223,7 +219,7 @@ namespace mari {
 
         vkhelper::transitionImageLayout(
             frameInfo.commandBuffer, 
-            accumImage->handle, 
+            presentImage->handle, 
             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             {},
@@ -241,7 +237,7 @@ namespace mari {
         imageCopy.extent            = {width, height, 1};
         
         vkCmdCopyImage(
-            frameInfo.commandBuffer, accumImage->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            frameInfo.commandBuffer, presentImage->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             swapchain.getImage(frameInfo.frameIndex), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy
         );
 */
@@ -261,7 +257,7 @@ namespace mari {
 
         vkCmdBlitImage(
             frameInfo.commandBuffer, 
-            accumImage->handle, 
+            presentImage->handle, 
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             swapchain.getImage(frameInfo.frameIndex),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -279,7 +275,7 @@ namespace mari {
 
         vkhelper::transitionImageLayout(
             frameInfo.commandBuffer, 
-            accumImage->handle, 
+            presentImage->handle, 
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
             VK_ACCESS_TRANSFER_READ_BIT,

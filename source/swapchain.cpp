@@ -15,10 +15,9 @@ namespace mari
         initialize();
     }
 
-        Swapchain::Swapchain(Device &deviceRef, VkExtent2D extent, std::shared_ptr<Swapchain> previous) 
-            : device{deviceRef}, windowExtent{extent}, oldSwapchain{previous} {
+    Swapchain::Swapchain(Device &deviceRef, VkExtent2D extent, std::shared_ptr<Swapchain> previous) 
+        : device{deviceRef}, windowExtent{extent}, oldSwapchain{previous} {
         initialize();
-
         // clean up old swap chain since it's no longer used
     }
 
@@ -32,35 +31,30 @@ namespace mari
     }
 
     Swapchain::~Swapchain() {
-        for (auto imageView : swapchainImageViews)
-        {
+        for (auto imageView : swapchainImageViews) {
             vkDestroyImageView(device.handle(), imageView, nullptr);
         }
         swapchainImageViews.clear();
 
-        if (swapchain != nullptr)
-        {
+        if (swapchain != nullptr) {
             vkDestroySwapchainKHR(device.handle(), swapchain, nullptr);
             swapchain = nullptr;
         }
 
-        for (int i = 0; i < depthImages.size(); i++)
-        {
+        for (int i = 0; i < depthImages.size(); i++) {
             vkDestroyImageView(device.handle(), depthImageViews[i], nullptr);
             vkDestroyImage(device.handle(), depthImages[i], nullptr);
             vkFreeMemory(device.handle(), depthImageMemorys[i], nullptr);
         }
 
-        for (auto framebuffer : swapchainFramebuffers)
-        {
+        for (auto framebuffer : swapchainFramebuffers) {
             vkDestroyFramebuffer(device.handle(), framebuffer, nullptr);
         }
 
         vkDestroyRenderPass(device.handle(), renderPass, nullptr);
 
         // cleanup synchronization objects
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-        {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(device.handle(), renderFinishedSemaphores[i], nullptr);
             vkDestroySemaphore(device.handle(), imageAvailableSemaphores[i], nullptr);
             vkDestroyFence(device.handle(), inFlightFences[i], nullptr);
@@ -87,8 +81,7 @@ namespace mari
     }
 
     VkResult Swapchain::submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex) {
-        if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE)
-        {
+        if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE) {
             vkWaitForFences(device.handle(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
         }
         imagesInFlight[*imageIndex] = inFlightFences[currentFrame];

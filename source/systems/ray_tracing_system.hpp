@@ -9,21 +9,26 @@
 namespace mari {
     class RayTracingSystem {
         public:
-            RayTracingSystem(Device &device, Window &window, const Scene &scene, VkDescriptorSetLayout descriptorSetLayout);
+            RayTracingSystem(Device &device, Window &window);
             ~RayTracingSystem();
 
             void                                    render(FrameInfo &frameInfo, Swapchain &swapchain);
+            void                                    buildScene(const Scene &scene);
+            void                                    buildPipeline(VkDescriptorSetLayout descriptorSetLayout);
+
             // TODO get around having these be public
             std::unique_ptr<AccelerationStructure>  tlas;
             std::unique_ptr<Image>                  accumImage;
+            std::unique_ptr<Image>                  presentImage;
             std::unique_ptr<Buffer>                 primMeshesInfosBuffer;
             std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
+            
+            int                                     maxDepth = 10;
+            float                                   exposure = 1.0f;
+            int                                     tonemapper = 0;
         private:
-            void                                    buildScene(const Scene &scene);
             void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress);
             void                                    buildTLAS();
-            void                                    createPipelineLayout(VkDescriptorSetLayout descriptorSetLayout);
-            void                                    createPipeline();
             void                                    createImages(uint32_t width, uint32_t height);
 
             Device                                  &device;

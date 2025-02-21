@@ -28,6 +28,9 @@ namespace mari {
         glm::mat4 viewInverse;
         glm::mat4 projInverse;
         int frameCount;
+        int maxDepth;
+        float exposure;
+        int tonemapper;
     };
 
     struct FrameInfo {

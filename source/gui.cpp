@@ -7,7 +7,7 @@
 #include <vulkan/vk_enum_string_helper.h> 
 
 namespace mari {
-    Gui::Gui(Device &device, Window &window, Renderer &renderer) : device{device}, window{window} {
+    Gui::Gui(Device &device, Window &window, Renderer &renderer, RayTracingSystem &system) : device{device}, window{window}, system{system} {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         io = &ImGui::GetIO();
@@ -67,6 +67,9 @@ namespace mari {
             for (auto &image : scene->images) {
                 ImGui_ImplVulkan_RemoveTexture(image->descriptorGui); // TODO will give errors if the same texture shows up more than once in scene->images
             }
+            for (auto &image : scene->environments) {
+                ImGui_ImplVulkan_RemoveTexture(image->descriptorGui);
+            }
         }
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -85,6 +88,9 @@ namespace mari {
     void Gui::set(std::shared_ptr<Scene> scene) {
         this->scene = scene;
         for (auto &image : this->scene->images) {
+            image->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), image->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        for (auto &image : this->scene->environments) {
             image->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), image->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
@@ -130,14 +136,18 @@ namespace mari {
                 if (ImGui::BeginTabItem("Textures")) {
                     for (auto &image : scene->images) {
                         if (ImGui::CollapsingHeader(image->name.c_str(), a_ptr)) {
-                            ImGui::Text("%s", string_VkFormat(image->format));
-                            ImGui::Text("%ix%i", image->size.width, image->size.height);
-                            float ratio = 240.0f / glm::max(image->size.height, image->size.width);
-                            ImGui::Image((ImTextureID)image->descriptorGui, ImVec2(static_cast<float>(image->size.width) * ratio, static_cast<float>(image->size.height) * ratio));
+                            imGuiImage(*image);
+                        }
+                    }
+                    for (auto &image : scene->environments) {
+                        if (ImGui::CollapsingHeader(image->name.c_str(), a_ptr)) {
+                            imGuiImage(*image);
                         }
                     }
                     ImGui::EndTabItem();
                 }
+                imGuiRender();
+
                 ImGui::EndTabBar();
             }
             ImGui::End();
@@ -293,6 +303,40 @@ namespace mari {
                 inputChanged = true;
             }
             ImGui::TreePop();
+        }
+    }
+
+    void Gui::imGuiRender() {
+        if (ImGui::BeginTabItem("Render")) {
+            int oldMaxDepth = system.maxDepth;
+
+            ImGui::SliderInt("##depth", &system.maxDepth, 1, 10, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            ImGui::DragFloat("##exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
+
+            const char* items[] = { "None", "ACES", "AgX" };
+    
+            // Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled from items[])
+            const char* value = items[system.tonemapper];
+    
+            if (ImGui::BeginCombo("Tonemapper", value, 0)) {
+                for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
+                    const bool is_selected = (system.tonemapper == n);
+                    if (ImGui::Selectable(items[n], is_selected)) {
+                        system.tonemapper = n;
+                    }
+    
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            if (oldMaxDepth != system.maxDepth) {
+                inputChanged = true;
+            } 
+            ImGui::EndTabItem();
         }
     }
 }

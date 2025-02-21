@@ -24,6 +24,7 @@ namespace mari {
             Transform transform;
 
             std::vector<std::shared_ptr<Image>>                          images;
+            std::vector<std::shared_ptr<Image>>                          environments;
             std::unordered_map<std::string, std::shared_ptr<GameObject>> nodes;
             std::vector<std::shared_ptr<GameObject>> topNodes;
             std::vector<std::shared_ptr<GameObject>> cameraObjects;

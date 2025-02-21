@@ -3,13 +3,18 @@
 
 #include "raycommon.glsl"
 #include "random.glsl"
+#include "tonemapping.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
-layout(binding = 2, set = 0) uniform CameraProperties {
+layout(binding = 2, set = 0, rgba32f) uniform image2D presentImage;
+layout(binding = 3, set = 0) uniform CameraProperties {
     mat4 viewInverse;
     mat4 projInverse;
     int frameCount;
+    int maxDepth;
+    float exposure;
+    int tonemapper;
 } cam;
 
 layout(location = 0) rayPayloadEXT Payload prd;
@@ -22,10 +27,10 @@ void main() {
     const vec2 pixelJitter = vec2(r1, r2);
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + pixelJitter;
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
-    vec2 d = inUV * 2.0 - 1.0;
+    vec2 s = inUV * 2.0 - 1.0;
 
     vec4 origin     = cam.viewInverse * vec4(0, 0, 0, 1);
-    vec4 target     = cam.projInverse * vec4(d.x, d.y, 1, 1);
+    vec4 target     = cam.projInverse * vec4(s.x, s.y, 1, 1);
     vec4 direction  = cam.viewInverse * vec4(normalize(target.xyz), 0);
 
     float tmin = 0.001;
@@ -37,7 +42,7 @@ void main() {
     prd.direction   = direction.xyz;
     prd.done        = 0;
 
-    for (int depth = 0; prd.done == 0 && depth < 5; depth++) {
+    for (int depth = 0; prd.done == 0 && depth < cam.maxDepth; depth++) {
         traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
     }
 
@@ -49,4 +54,19 @@ void main() {
     float avg = 1.0 / (cam.frameCount + 1.0);
     vec4 averageColor = (vec4(prd.radiance, 1.0) + imageColor * cam.frameCount) * avg;
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), averageColor);
+
+    // Apply tone mapping
+    vec3 tonemappedColor = averageColor.rgb;
+    switch (cam.tonemapper) {
+        case 1:
+            tonemappedColor = toneACES(tonemappedColor, cam.exposure);
+            break;
+        case 2:
+            tonemappedColor = toneAgX(tonemappedColor, cam.exposure);
+            break;
+        default:
+            tonemappedColor = pow(tonemappedColor * cam.exposure, vec3(1.0/2.2));
+            break;
+    }
+    imageStore(presentImage, ivec2(gl_LaunchIDEXT.xy), vec4(tonemappedColor, 1.0));
 }

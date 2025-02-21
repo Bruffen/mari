@@ -20,11 +20,40 @@
 #include <stdexcept>
 #include <iostream>
 
+
+
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#endif
+
 namespace mari {
     Mari::Mari() {
         DefaultObjects::initialize(device);
-        gui = std::make_unique<Gui>(device, window, renderer);
+
+        gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
         loadScene();
+        rayTracingSystem.buildScene(*scene);
+
+        int width, height, nrChannels;
+        float* data = nullptr;
+        //data = stbi_loadf("../../models/brown_photostudio_01_4k.hdr", &width, &height, &nrChannels, 4);
+        //data = stbi_loadf("../../models/solitude_interior_8k.hdr", &width, &height, &nrChannels, 4);
+        //data = stbi_loadf("../../models/meadow_8k.hdr", &width, &height, &nrChannels, 4);
+        data = stbi_loadf("../../models/qwantani_noon_8k.hdr", &width, &height, &nrChannels, 4);
+
+        std::shared_ptr<Image> environment = std::make_unique<Image>(
+            device, 
+            VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1}, 
+            VK_FORMAT_R32G32B32A32_SFLOAT, 
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            (void*) data
+        );
+        environment->name = "environment"; 
+        scene->environments.push_back(environment);
+        scene->environments.push_back(DefaultObjects::getImageWhite());
+        
         gui->set(scene);
 
         globalPool = DescriptorPool::Builder(device)
@@ -47,26 +76,11 @@ namespace mari {
 
     void Mari::run() { 
         std::vector<std::unique_ptr<Buffer>> rasterizationUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
-        for (int i = 0; i < rasterizationUboBuffers.size(); i++) {
-            rasterizationUboBuffers[i] = std::make_unique<Buffer>(
-                device,
-                sizeof(RasterizationUbo),
-                1,
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            );
-            rasterizationUboBuffers[i]->map();
-        }
-
         std::vector<std::unique_ptr<Buffer>> rayTracingUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
-        for (int i = 0; i < rayTracingUboBuffers.size(); i++) {
-            rayTracingUboBuffers[i] = std::make_unique<Buffer>(
-                device,
-                sizeof(RayTracingUbo),
-                1,
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            );
+        for (int i = 0; i < Swapchain::MAX_FRAMES_IN_FLIGHT; i++) {
+            rasterizationUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(RasterizationUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+            rasterizationUboBuffers[i]->map();
+            rayTracingUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(RayTracingUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             rayTracingUboBuffers[i]->map();
         }
 
@@ -78,9 +92,11 @@ namespace mari {
         std::unique_ptr<mari::DescriptorSetLayout> rayTracingSetLayout = DescriptorSetLayout::Builder(device)
             .addBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
-            .addBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
+            .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
+            .addBinding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_MISS_BIT_KHR)
+            .addBinding(6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
                         imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT)
             .build();
 
@@ -93,8 +109,10 @@ namespace mari {
 
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout->handle()};
         PointLightSystem pointLightSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout->handle()};
-        RayTracingSystem rayTracingSystem{device, window, *scene, rayTracingSetLayout->handle()};
+        
+        rayTracingSystem.buildPipeline(rayTracingSetLayout->handle());
         std::shared_ptr<Camera> freeCamera = std::make_shared<Camera>();
+
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -106,9 +124,11 @@ namespace mari {
             DescriptorWriter(*rayTracingSetLayout, *globalPool)
                 .writeAccelerationStructure(0, &rayTracingSystem.tlas->descriptor())
                 .writeImage(                1, &rayTracingSystem.accumImage->descriptorInfo())
-                .writeBuffer(               2, &rayTracingUboBuffers[i]->descriptorInfo())
-                .writeBuffer(               3, &rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
-                .writeImages(               4, &textureDescriptors)
+                .writeImage(                2, &rayTracingSystem.presentImage->descriptorInfo())
+                .writeBuffer(               3, &rayTracingUboBuffers[i]->descriptorInfo())
+                .writeBuffer(               4, &rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
+                .writeImage(                5, &scene->environments[0]->descriptorInfo())
+                .writeImages(               6, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
 
@@ -170,6 +190,9 @@ namespace mari {
                     ubo.projInverse = currentCamera->camera->getInverseProjection();
                     frameCounter    = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
                     ubo.frameCount  = frameCounter;
+                    ubo.maxDepth    = rayTracingSystem.maxDepth;
+                    ubo.exposure    = rayTracingSystem.exposure;
+                    ubo.tonemapper  = rayTracingSystem.tonemapper;
                     rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                     rayTracingUboBuffers[frameIndex]->flush();
 
@@ -210,10 +233,12 @@ namespace mari {
 
                     VkExtent2D e = window.getExtent();
                     rayTracingSystem.accumImage->resize(e.width, e.height);
+                    rayTracingSystem.presentImage->resize(e.width, e.height);
 
                     for (int i = 0; i < rayTracingDescriptorSets.size(); i++) {
                         DescriptorWriter::DescriptorWriter(*rayTracingSetLayout, *globalPool)
                             .writeImage(1, &rayTracingSystem.accumImage->descriptorInfo())
+                            .writeImage(2, &rayTracingSystem.presentImage->descriptorInfo())
                             .overwrite(rayTracingDescriptorSets[i]);
                     }
                 }
@@ -227,9 +252,8 @@ namespace mari {
         //scene = std::make_shared<Scene>(device, "../../models/FlightHelmet/glTF/FlightHelmet.gltf");
         //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_interior.glb");
         //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/living_room.glb");
-        //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf");
 
-        switch (  0  ) {
+        switch (  3  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -244,16 +268,20 @@ namespace mari {
                 scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
                 break;
             case 3:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf");
+                scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+                break;
+            case 4:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box.glb");
                 scene->transform.position = {0.0f, 0.0f, 0.0f};
                 scene->transform.rotation = glm::vec3(glm::radians(-90.0f), glm::radians(0.0f), 0.0f);
                 scene->transform.scale = {0.2f, 0.2, 0.2f};
                 break;
-            case 4:
+            case 5:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
                 break;
-            case 5:
+            case 6:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
                 break;
         }
