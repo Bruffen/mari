@@ -3,33 +3,33 @@
 #include "transform.hpp"
 
 namespace mari {
-    // Matrix corrsponds to Translate * Ry * Rx * Rz * Scale
-    // Rotations correspond to Tait-bryan angles of Y(1), X(2), Z(3)
+    // Matrix corrsponds to Translate * Ry * Rz * Rx * Scale
+    // Rotations correspond to Tait-bryan angles of Y(1), Z(2), X(3)
     // https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
     glm::mat4 Transform::mat4() const {
-        const float c3 = glm::cos(rotation.z);
-        const float s3 = glm::sin(rotation.z);
-        const float c2 = glm::cos(rotation.x);
-        const float s2 = glm::sin(rotation.x);
-        const float c1 = glm::cos(rotation.y);
-        const float s1 = glm::sin(rotation.y);
+        const float cy = glm::cos(rotation.x);
+        const float sy = glm::sin(rotation.x);
+        const float cb = glm::cos(rotation.z);
+        const float sb = glm::sin(rotation.z);
+        const float ca = glm::cos(rotation.y);
+        const float sa = glm::sin(rotation.y);
         return glm::mat4{
             {
-                scale.x * (c1 * c3 + s1 * s2 * s3),
-                scale.x * (c2 * s3),
-                scale.x * (c1 * s2 * s3 - c3 * s1),
+                scale.x * (ca * cb),
+                scale.x * (sb),
+                scale.x * (-cb * sa),
                 0.0f,
             },
             {
-                scale.y * (c3 * s1 * s2 - c1 * s3),
-                scale.y * (c2 * c3),
-                scale.y * (c1 * c3 * s2 + s1 * s3),
+                scale.y * (sa * sy - ca * cy * sb),
+                scale.y * (cb * cy),
+                scale.y * (ca * sy + cy * sa * sb),
                 0.0f,
             },
             {
-                scale.z * (c2 * s1),
-                scale.z * (-s2),
-                scale.z * (c1 * c2),
+                scale.z * (cy * sa + ca * sb * sy),
+                scale.z * (-cb * sy),
+                scale.z * (ca * cy - sa * sb * sy),
                 0.0f,
             },
             {
@@ -39,55 +39,55 @@ namespace mari {
     }
 
     glm::mat3 Transform::matrixNormal() const {
-        const float c3 = glm::cos(rotation.z);
-        const float s3 = glm::sin(rotation.z);
-        const float c2 = glm::cos(rotation.x);
-        const float s2 = glm::sin(rotation.x);
-        const float c1 = glm::cos(rotation.y);
-        const float s1 = glm::sin(rotation.y);
+        const float cy = glm::cos(rotation.x);
+        const float sy = glm::sin(rotation.x);
+        const float cb = glm::cos(rotation.z);
+        const float sb = glm::sin(rotation.z);
+        const float ca = glm::cos(rotation.y);
+        const float sa = glm::sin(rotation.y);
         const glm::vec3 invScale = 1.0f / scale;
         return glm::mat3{
             {
-                invScale.x * (c1 * c3 + s1 * s2 * s3),
-                invScale.x * (c2 * s3),
-                invScale.x * (c1 * s2 * s3 - c3 * s1),
+                invScale.x * (ca * cb),
+                invScale.x * (sb),
+                invScale.x * (-cb * sa),
             },
             {
-                invScale.y * (c3 * s1 * s2 - c1 * s3),
-                invScale.y * (c2 * c3),
-                invScale.y * (c1 * c3 * s2 + s1 * s3),
+                invScale.y * (sa * sy - ca * cy * sb),
+                invScale.y * (cb * cy),
+                invScale.y * (ca * sy + cy * sa * sb),
             },
             {
-                invScale.z * (c2 * s1),
-                invScale.z * (-s2),
-                invScale.z * (c1 * c2),
-            },
+                invScale.z * (cy * sa + ca * sb * sy),
+                invScale.z * (-cb * sy),
+                invScale.z * (ca * cy - sa * sb * sy),
+            }
         };
     }
 
     glm::mat3 Transform::matrixRotation() const {
-        const float c3 = glm::cos(rotation.z);
-        const float s3 = glm::sin(rotation.z);
-        const float c2 = glm::cos(rotation.x);
-        const float s2 = glm::sin(rotation.x);
-        const float c1 = glm::cos(rotation.y);
-        const float s1 = glm::sin(rotation.y);
+        const float cy = glm::cos(rotation.x);
+        const float sy = glm::sin(rotation.x);
+        const float cb = glm::cos(rotation.z);
+        const float sb = glm::sin(rotation.z);
+        const float ca = glm::cos(rotation.y);
+        const float sa = glm::sin(rotation.y);
 
         return glm::mat3{
             {
-                (c1 * c3 + s1 * s2 * s3),
-                (c2 * s3),
-                (c1 * s2 * s3 - c3 * s1)
+                (ca * cb),
+                (sb),
+                (-cb * sa),
             },
             {
-                (c3 * s1 * s2 - c1 * s3),
-                (c2 * c3),
-                (c1 * c3 * s2 + s1 * s3)
+                (sa * sy - ca * cy * sb),
+                (cb * cy),
+                (ca * sy + cy * sa * sb),
             },
             {
-                (c2 * s1),
-                (-s2),
-                (c1 * c2)
+                (cy * sa + ca * sb * sy),
+                (-cb * sy),
+                (ca * cy - sa * sb * sy),
             }
         };
     }
