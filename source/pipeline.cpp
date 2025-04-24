@@ -205,7 +205,7 @@ namespace mari {
         std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
         // TODO this function should be generic, therefore shader information should be passed here from ray_tracing_system
         {
-            shaderStages.push_back(loadShader("../../shaders/raygen.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR));
+            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR));
             VkRayTracingShaderGroupCreateInfoKHR raygenGroupCreateInfo{};
             raygenGroupCreateInfo.sType                     = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
             raygenGroupCreateInfo.type                      = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
@@ -217,7 +217,7 @@ namespace mari {
         }
 
         {
-            shaderStages.push_back(loadShader("../../shaders/miss.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
+            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
             VkRayTracingShaderGroupCreateInfoKHR missGroupCreateInfo{};
             missGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
             missGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
@@ -229,14 +229,14 @@ namespace mari {
         }
 
         {
-            shaderStages.push_back(loadShader("../../shaders/closesthit.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
+            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
             VkRayTracingShaderGroupCreateInfoKHR hitGroupCreateInfo{};
             hitGroupCreateInfo.sType                        = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
             hitGroupCreateInfo.type                         = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
             hitGroupCreateInfo.generalShader                = VK_SHADER_UNUSED_KHR;
             hitGroupCreateInfo.closestHitShader             = static_cast<uint32_t>(shaderStages.size() - 1);
             hitGroupCreateInfo.intersectionShader           = VK_SHADER_UNUSED_KHR;
-            shaderStages.push_back(loadShader("../../shaders/anyhit.rahit.spv", VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
+            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rahit.spv", VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
             hitGroupCreateInfo.anyHitShader                 = static_cast<uint32_t>(shaderStages.size() - 1);
             shaderGroups.push_back(hitGroupCreateInfo);
         }

@@ -20,13 +20,6 @@
 #include <stdexcept>
 #include <iostream>
 
-
-
-
-#ifndef STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#endif
-
 namespace mari {
     Mari::Mari() {
         DefaultObjects::initialize(device);
@@ -41,28 +34,6 @@ namespace mari {
         rayTracingSystem.buildScene(*scene);
         rayTracingSystem.tonemapper = 2;
 
-        int width, height, nrChannels;
-        float* data = nullptr;
-        //data = stbi_loadf("../../models/brown_photostudio_01_4k.hdr", &width, &height, &nrChannels, 4);
-        //data = stbi_loadf("../../models/solitude_interior_8k.hdr", &width, &height, &nrChannels, 4);
-        //data = stbi_loadf("../../models/meadow_8k.hdr", &width, &height, &nrChannels, 4);
-        data = stbi_loadf("../../models/qwantani_noon_8k.hdr", &width, &height, &nrChannels, 4);
-        //data = stbi_loadf("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", &width, &height, &nrChannels, 4);
-        // TODO check for image load fail
-
-        std::shared_ptr<Image> environment = std::make_unique<Image>(
-            device, 
-            VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1}, 
-            VK_FORMAT_R32G32B32A32_SFLOAT, 
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            (void*) data
-        );
-        environment->name = "environment"; 
-        scene->environments.push_back(environment);
-        //scene->environments.push_back(DefaultObjects::getImageWhite());
-        scene->environments.push_back(DefaultObjects::getImageBlack());
-        
         gui->set(scene);
 
         globalPool = DescriptorPool::Builder(device)
@@ -102,10 +73,9 @@ namespace mari {
             .addBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR) // TODO maybe separate environmentID for miss shader
             .addBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
-            .addBinding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_MISS_BIT_KHR)
-            .addBinding(6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
+            .addBinding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 
                         imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT)
             .build();
 
@@ -134,8 +104,7 @@ namespace mari {
                 .writeImage(                2, &rayTracingSystem.presentImage->descriptorInfo())
                 .writeBuffer(               3, &rayTracingUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               4, &rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
-                .writeImage(                5, &scene->environments[0]->descriptorInfo())
-                .writeImages(               6, &textureDescriptors)
+                .writeImages(               5, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
 
@@ -152,6 +121,8 @@ namespace mari {
         scene->topNodes.emplace_back(cameraObject);
         scene->cameraObjects.emplace_back(cameraObject);
         rayTracingSystem.currentCamera = cameraObject;
+
+        rayTracingSystem.environmentID = static_cast<int>(scene->images.size() - 1);
         
         KeyboardController controller{*gui};
         
@@ -197,9 +168,10 @@ namespace mari {
                     frameCounter        = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
                     ubo.frameCount      = frameCounter;
                     ubo.maxDepth        = rayTracingSystem.maxDepth;
-                    ubo.russianRoulette = rayTracingSystem.russianRoulette;
+                    ubo.russianRoulette = static_cast<int>(rayTracingSystem.russianRoulette);
                     ubo.exposure        = rayTracingSystem.exposure;
                     ubo.tonemapper      = rayTracingSystem.tonemapper;
+                    ubo.environmentID   = rayTracingSystem.environmentID;
                     rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                     rayTracingUboBuffers[frameIndex]->flush();
 
@@ -258,7 +230,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  7  ) {
+        switch (  0  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -278,9 +250,14 @@ namespace mari {
                 break;
             case 5:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/IntelSponza/intelsponza_curtains_ivy.glb");
+                scene->images.emplace_back(scene->loadImage(
+                    "../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", 
+                    VK_FORMAT_R32G32B32A32_SFLOAT,
+                    "kloppenheim"
+                ));
                 break;
             case 6:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/boxm.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
                 break;
             case 7:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
@@ -290,6 +267,12 @@ namespace mari {
                 break;
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+
+        scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
+        scene->images.emplace_back(scene->loadImage("../../models/solitude_interior_8k.hdr",    VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior"));
+        scene->images.emplace_back(scene->loadImage("../../models/meadow_8k.hdr",               VK_FORMAT_R32G32B32A32_SFLOAT, "meadow"));
+        scene->images.emplace_back(scene->loadImage("../../models/qwantani_noon_8k.hdr",        VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon"));
+
         scene->update();
     }
 }

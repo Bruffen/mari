@@ -54,7 +54,7 @@ namespace mari {
         pipelineConfig.renderPass = renderPass;
         pipelineConfig.pipelineLayout = pipelineLayout;
         pipeline = std::make_unique<Pipeline>(device);
-        pipeline->createGraphicsPipeline("../../shaders/simple.vert.spv", "../../shaders/simple.frag.spv", pipelineConfig);
+        pipeline->createGraphicsPipeline("../../shaders/spv/simple.vert.spv", "../../shaders/spv/simple.frag.spv", pipelineConfig);
     }
 
     void SimpleRenderSystem::render(FrameInfo &frameInfo) {

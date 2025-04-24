@@ -31,7 +31,8 @@ namespace mari {
         int maxDepth;
         float exposure;
         int tonemapper;
-        bool russianRoulette;
+        int russianRoulette;
+        int environmentID;
     };
 
     struct FrameInfo {

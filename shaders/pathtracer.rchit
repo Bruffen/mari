@@ -4,9 +4,9 @@
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_nonuniform_qualifier : require
 
-#include "random.glsl"
-#include "raycommon.glsl"
-#include "hitcommon.glsl"
+#include "common/random.glsl"
+#include "common/raycommon.glsl"
+#include "common/hitcommon.glsl"
 
 void main() {
     Triangle tri = unpackTriangle(gl_PrimitiveID);

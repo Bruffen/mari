@@ -67,9 +67,6 @@ namespace mari {
             for (auto &image : scene->images) {
                 ImGui_ImplVulkan_RemoveTexture(image->descriptorGui); // TODO will give errors if the same texture shows up more than once in scene->images
             }
-            for (auto &image : scene->environments) {
-                ImGui_ImplVulkan_RemoveTexture(image->descriptorGui);
-            }
         }
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -88,9 +85,6 @@ namespace mari {
     void Gui::set(std::shared_ptr<Scene> scene) {
         this->scene = scene;
         for (auto &image : this->scene->images) {
-            image->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), image->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        }
-        for (auto &image : this->scene->environments) {
             image->descriptorGui = ImGui_ImplVulkan_AddTexture(DefaultObjects::getSamplerNearest(), image->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
@@ -139,11 +133,6 @@ namespace mari {
                 // Textures tab
                 if (ImGui::BeginTabItem("Textures")) {
                     for (auto &image : scene->images) {
-                        if (ImGui::CollapsingHeader(image->name.c_str(), a_ptr)) {
-                            imGuiImage(*image);
-                        }
-                    }
-                    for (auto &image : scene->environments) {
                         if (ImGui::CollapsingHeader(image->name.c_str(), a_ptr)) {
                             imGuiImage(*image);
                         }
@@ -329,8 +318,6 @@ namespace mari {
             ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
 
             const char* tonemappers[] = { "None", "ACES", "AgX" };
-    
-            // Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled from items[])
             const char* selectedTonemapper = tonemappers[system.tonemapper];
     
             if (ImGui::BeginCombo("Tonemapper", selectedTonemapper, 0)) {
@@ -352,7 +339,7 @@ namespace mari {
                 cameraNames.push_back(&camera->name[0]);
             }
     
-            const char* selectedCamera = &system.currentCamera->name[0];
+            const char* selectedCamera = system.currentCamera->name.c_str();
             if (ImGui::BeginCombo("Camera", selectedCamera, 0)) {
                 for (int n = 0; n < cameraNames.size(); n++) {
                     const bool isSelected = (system.currentCamera->name == cameraNames[n]);
@@ -360,6 +347,32 @@ namespace mari {
                         for (const auto& camera : scene->cameraObjects) {
                             if (camera->name == cameraNames[n]) {
                                 system.currentCamera = camera;
+                                inputChanged = true;
+                                break;
+                            }
+                        }
+                    }
+    
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            std::vector<char*> environmentNames;
+            for (const auto& environment : scene->images) {
+                environmentNames.push_back(&environment->name[0]);
+            }
+
+            const char* selectedEnvironment = scene->images.at(system.environmentID)->name.c_str();
+            if (ImGui::BeginCombo("Environment", selectedEnvironment, 0)) {
+                for (int n = 0; n < scene->images.size(); n++) {
+                    const bool isSelected = (system.environmentID == n);
+                    if (ImGui::Selectable(environmentNames[n], isSelected)) {
+                        for (const auto& environment : scene->images) {
+                            if (environment->name == environmentNames[n]) {
+                                system.environmentID = n;
                                 inputChanged = true;
                                 break;
                             }

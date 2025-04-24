@@ -28,6 +28,7 @@ namespace mari {
             float                                   exposure = 1.0f;
             int                                     tonemapper = 0;
             std::shared_ptr<GameObject>             currentCamera; // TODO shouldn't be here
+            int                                     environmentID = 0;
         private:
             void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress);
             void                                    buildTLAS();

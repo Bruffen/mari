@@ -413,11 +413,12 @@ namespace mari {
                 assert(filePath.uri.isLocalPath());   // We're only capable of loading local files.
 
                 const std::string path(filePath.uri.path().begin(), filePath.uri.path().end());
-                data = stbi_load((folder + path).c_str(), &width, &height, &nrChannels, 4);
+                newImage = loadImage((folder + path).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
             },
             [&](fastgltf::sources::Array& vector) {
                 const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data());
                 data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()), &width, &height, &nrChannels, 4);
+                newImage = loadImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
             },
             [&](fastgltf::sources::BufferView& view) {
                 auto& bufferView = asset.bufferViews[view.bufferViewIndex];
@@ -428,37 +429,68 @@ namespace mari {
                     [&](fastgltf::sources::Array& vector) {
                         const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data()) + bufferView.byteOffset;
                         data = stbi_load_from_memory(imgBytes, static_cast<int>(bufferView.byteLength), &width, &height, &nrChannels, 4);
+                        newImage = loadImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
                     }},
                     buffer.data
                 );
             },}, image.data
         );
 
+        return newImage;
+    }
+
+    std::shared_ptr<Image> Scene::loadImage(void* data, VkFormat format, int width, int height) {
+        assert(data && "Null pointer to image data");
+        std::shared_ptr<Image> image;
+
         if (data) {
-            newImage = extractImage(data, width, height, nrChannels);
+            image = std::make_shared<Image>(
+                device, 
+                VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+                format, 
+                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+                data
+            );
             stbi_image_free(data);
         }
 
-        if (newImage && newImage->handle != VK_NULL_HANDLE) {
-            return newImage;
+        if (image && image->handle != VK_NULL_HANDLE) {
+            return image;
         } else {
             return {};
         }
     }
 
-    std::shared_ptr<Image> Scene::extractImage(unsigned char* data, int width, int height, int channels) {
-        VkImageUsageFlags imageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        VkExtent3D imagesize;
-        imagesize.width  = width;
-        imagesize.height = height;
-        imagesize.depth  = 1;
+    std::shared_ptr<Image> Scene::loadImage(const std::string &path, VkFormat format) {
+        assert(format == VK_FORMAT_R8G8B8A8_UNORM || format == VK_FORMAT_R32G32B32A32_SFLOAT && "Only R8G8B8A8_UNORM and R32G32B32A32_SFLOAT are implemented");
 
-        VkFormat format = extractFormat(channels);
-        return std::make_shared<Image>(device, imagesize, format, imageFlags, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
+        int width, height, nrChannels;
+        void* data = nullptr;
+
+        if (format == VK_FORMAT_R32G32B32A32_SFLOAT) {
+            data = stbi_loadf(path.c_str(), &width, &height, &nrChannels, 4);
+        }
+        else if (format == VK_FORMAT_R8G8B8A8_UNORM) {
+            data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+        }
+
+        if (data) {
+            return loadImage(data, format, width, height);
+        }
+        return {};
+    }
+
+    std::shared_ptr<Image> Scene::loadImage(const std::string &path, VkFormat format, const std::string &name) {
+        std::shared_ptr<Image> img = loadImage(path, format);
+        if (img) {
+            img->name = name;
+        }
+        return img;
     }
 
     VkFormat Scene::extractFormat(int channels) {
-        return VK_FORMAT_R8G8B8A8_UNORM;
+        return VK_FORMAT_R8G8B8A8_UNORM; // TODO
 
         switch (channels) {
             case 1:

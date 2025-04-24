@@ -1,9 +1,9 @@
 #version 460
-#extension GL_GOOGLE_include_directive : enable
+#extension GL_GOOGLE_include_directive : require
 
-#include "raycommon.glsl"
-#include "random.glsl"
-#include "tonemapping.glsl"
+#include "common/raycommon.glsl"
+#include "common/random.glsl"
+#include "common/tonemapping.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
@@ -15,7 +15,8 @@ layout(binding = 3, set = 0) uniform Properties {
     int maxDepth;
     float exposure;
     int tonemapper;
-    bool russianRoulette;
+    int russianRoulette;
+    int environmentID;
 } properties;
 
 layout(location = 0) rayPayloadEXT Payload prd;
@@ -53,7 +54,7 @@ void main() {
 
         traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
 
-        if (properties.russianRoulette && depth > 3) { // TODO implement a minimum rr depth variable
+        if (properties.russianRoulette == 1 && depth > 3) { // TODO implement a minimum rr depth variable
             float probability = (prd.throughput.r + prd.throughput.g + prd.throughput.b) / 3.0;
             
             if (random(prd.seed) > probability) {
