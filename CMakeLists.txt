@@ -73,9 +73,14 @@ endif()
 # Get Dear ImGui source files plus what we need for GLFW and Vulkan 
 file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp ${IMGUI_PATH}/backends/imgui_impl_glfw.cpp ${IMGUI_PATH}/backends/imgui_impl_vulkan.cpp)
 
+# Get MikkTSpace source files
+file (GLOB MIKKTSPACE_SOURCES ${MIKKTSPACE_PATH}/*.c)
+
+# Our project's source files
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
+
  
-add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES} ${MIKKTSPACE_SOURCES})
  
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 

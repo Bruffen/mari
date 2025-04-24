@@ -31,6 +31,7 @@ namespace mari {
         int maxDepth;
         float exposure;
         int tonemapper;
+        bool russianRoulette;
     };
 
     struct FrameInfo {
@@ -39,7 +40,7 @@ namespace mari {
         float deltaTime;
         float elapsedTime;
         VkCommandBuffer commandBuffer;
-        Camera &camera;
+        GameObject &cameraObject;
         VkDescriptorSet globalDescriptorSet;
         GameObject::Map &gameObjects; // TODO should point to scene now and go through game objects that way
     };

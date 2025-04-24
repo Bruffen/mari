@@ -63,7 +63,7 @@ namespace mari {
             pixels.data()
         );
         imageError->name = "default_error";
-        imageError->sampler = samplerLinear;
+        imageError->sampler = samplerNearest;
     }
 
     void DefaultObjects::cleanup(Device &device) {

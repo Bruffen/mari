@@ -33,7 +33,6 @@ namespace mari {
             KeyboardController(Gui& gui);
 
             void update(GLFWwindow *window, float deltatime, GameObject &gameObject);
-            bool changeCamera(GLFWwindow *window);
             bool checkFrameAccumulationReset();
             bool isRayTracingOn() { return isRaytracing; }
 
@@ -49,7 +48,6 @@ namespace mari {
             float currentSpeed{moveSpeed};
             float lookSpeed{0.002f};
             bool  changePipelinePressed = false;// TODO
-            bool  changeCameraPressed = false;// TODO
             bool  resetFrame = false;
             bool  isRaytracing = true;
     };

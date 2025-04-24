@@ -27,7 +27,7 @@ namespace mari {
 
     void RayTracingSystem::createImages(uint32_t width, uint32_t height) {
         accumImage   = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
-        presentImage = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        presentImage = std::make_unique<Image>(device, VkExtent3D{width, height, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_LAYOUT_GENERAL);
     }
 
     void RayTracingSystem::buildScene(const Scene &scene) {
@@ -228,7 +228,7 @@ namespace mari {
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             subresourceRange
         );
-/*
+
         VkImageCopy imageCopy{};
         imageCopy.srcSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         imageCopy.srcOffset         = {0, 0, 0};
@@ -240,7 +240,9 @@ namespace mari {
             frameInfo.commandBuffer, presentImage->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             swapchain.getImage(frameInfo.frameIndex), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy
         );
-*/
+
+
+/*
         VkImageSubresourceLayers subresourceLayers{};
         subresourceLayers.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
         subresourceLayers.baseArrayLayer    = 0;
@@ -265,6 +267,7 @@ namespace mari {
             &imageBlit,
             VK_FILTER_NEAREST
         );
+*/
 
         vkhelper::transitionImageLayout(
             frameInfo.commandBuffer, 

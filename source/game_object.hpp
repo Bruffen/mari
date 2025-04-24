@@ -25,6 +25,7 @@ namespace mari {
             //GameObject(GameObject &&) = default;
             //GameObject &operator=(GameObject &&) = default;
 
+            void start();
             void update();
             void render();
 

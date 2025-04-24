@@ -123,6 +123,8 @@ namespace mari {
             if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None)) {
                 bool a = true;
                 bool *a_ptr = &a;
+
+                // Scene tab
                 if (ImGui::BeginTabItem("Scene")) {
                     if (ImGui::TreeNode("Scene")) {
                         imGuiTransform(scene->transform);
@@ -133,6 +135,8 @@ namespace mari {
                     }
                     ImGui::EndTabItem();
                 }
+
+                // Textures tab
                 if (ImGui::BeginTabItem("Textures")) {
                     for (auto &image : scene->images) {
                         if (ImGui::CollapsingHeader(image->name.c_str(), a_ptr)) {
@@ -146,7 +150,19 @@ namespace mari {
                     }
                     ImGui::EndTabItem();
                 }
-                imGuiRender();
+                
+                // Materials tab
+                if (ImGui::BeginTabItem("Materials")) {
+                    for (auto &material : scene->materials) {
+                        if (ImGui::CollapsingHeader((std::to_string(material->index) + ". " + material->name).c_str(), a_ptr)) {
+                            imGuiMaterial(*material);
+                        }
+                    }
+                    ImGui::EndTabItem();
+                }
+
+                // Render tab
+                imGuiRender(frameInfo);
 
                 ImGui::EndTabBar();
             }
@@ -251,32 +267,30 @@ namespace mari {
         //bool a = true;
         //bool *a_ptr = &a;
         //if (ImGui::CollapsingHeader(submesh.material->name.c_str(), a_ptr)) {
+        if (ImGui::TreeNode(submesh.material->name.c_str(), ("Material: " + submesh.material->name).c_str())) {
             imGuiMaterial(*submesh.material);
-        //}
+            ImGui::TreePop();
+        }
     }
 
     void Gui::imGuiMaterial(const Material &material) {
-        if (ImGui::TreeNode(material.name.c_str(), ("Material: " + material.name).c_str())) {
-            ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
+        ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
-            MaterialConstants mc = material.data.constants;
+        MaterialConstants mc = material.data.constants;
 
-            ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
-            imGuiImage(*material.textures.albedo);
-            ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
-            ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
-            imGuiImage(*material.textures.metallicRoughness);
-            ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
+        imGuiImage(*material.textures.albedo);
+        ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
+        ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
+        imGuiImage(*material.textures.metallicRoughness);
+        ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
-            ImGui::TreePop();
-
-            if (mc.albedo != material.data.constants.albedo || 
-                mc.metallic != material.data.constants.metallic || 
-                mc.roughness != material.data.constants.roughness ||
-                mc.emission != material.data.constants.emission) {
-                inputChanged = true;
-                scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
-            }
+        if (mc.albedo != material.data.constants.albedo || 
+            mc.metallic != material.data.constants.metallic || 
+            mc.roughness != material.data.constants.roughness ||
+            mc.emission != material.data.constants.emission) {
+            inputChanged = true;
+            scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
         }
     }
 
@@ -306,27 +320,53 @@ namespace mari {
         }
     }
 
-    void Gui::imGuiRender() {
+    void Gui::imGuiRender(const FrameInfo &frameInfo) {
         if (ImGui::BeginTabItem("Render")) {
             int oldMaxDepth = system.maxDepth;
 
-            ImGui::SliderInt("##depth", &system.maxDepth, 1, 10, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
-            ImGui::DragFloat("##exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
+            ImGui::SliderInt("Depth", &system.maxDepth, 1, 10, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            ImGui::Checkbox("Russian Roulette", &system.russianRoulette);
+            ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
 
-            const char* items[] = { "None", "ACES", "AgX" };
+            const char* tonemappers[] = { "None", "ACES", "AgX" };
     
             // Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled from items[])
-            const char* value = items[system.tonemapper];
+            const char* selectedTonemapper = tonemappers[system.tonemapper];
     
-            if (ImGui::BeginCombo("Tonemapper", value, 0)) {
-                for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
-                    const bool is_selected = (system.tonemapper == n);
-                    if (ImGui::Selectable(items[n], is_selected)) {
+            if (ImGui::BeginCombo("Tonemapper", selectedTonemapper, 0)) {
+                for (int n = 0; n < IM_ARRAYSIZE(tonemappers); n++) {
+                    const bool isSelected = (system.tonemapper == n);
+                    if (ImGui::Selectable(tonemappers[n], isSelected)) {
                         system.tonemapper = n;
                     }
     
-                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                    if (is_selected) {
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            std::vector<char*> cameraNames;
+            for (const auto& camera : scene->cameraObjects) {
+                cameraNames.push_back(&camera->name[0]);
+            }
+    
+            const char* selectedCamera = &system.currentCamera->name[0];
+            if (ImGui::BeginCombo("Camera", selectedCamera, 0)) {
+                for (int n = 0; n < cameraNames.size(); n++) {
+                    const bool isSelected = (system.currentCamera->name == cameraNames[n]);
+                    if (ImGui::Selectable(cameraNames[n], isSelected)) {
+                        for (const auto& camera : scene->cameraObjects) {
+                            if (camera->name == cameraNames[n]) {
+                                system.currentCamera = camera;
+                                inputChanged = true;
+                                break;
+                            }
+                        }
+                    }
+    
+                    if (isSelected) {
                         ImGui::SetItemDefaultFocus();
                     }
                 }

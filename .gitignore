@@ -1,6 +1,7 @@
 build
 include
 models
+test
 
 .vscode
 .env.cmake

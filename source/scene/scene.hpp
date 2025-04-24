@@ -28,6 +28,7 @@ namespace mari {
             std::unordered_map<std::string, std::shared_ptr<GameObject>> nodes;
             std::vector<std::shared_ptr<GameObject>> topNodes;
             std::vector<std::shared_ptr<GameObject>> cameraObjects;
+            std::vector<std::shared_ptr<Material>>   materials;
             std::unique_ptr<Buffer> materialDataBuffer;
         private:
             void                    updateWorldMatrix(GameObject& g, const glm::mat4 &worldMatrix);
@@ -44,7 +45,6 @@ namespace mari {
             VkFormat                extractFormat(int channels); // TODO more complete implementation
 
             std::vector<std::shared_ptr<Mesh>>       meshes;
-            std::vector<std::shared_ptr<Material>>   materials;
             std::vector<std::shared_ptr<Camera>>     cameras;
             
             std::vector<VkSampler>  samplers;

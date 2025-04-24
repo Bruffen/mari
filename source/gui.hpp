@@ -31,7 +31,7 @@ namespace mari {
             void imGuiMaterial(const Material &material);
             void imGuiImage(const Image &image);
             void imGuiCamera(Camera &camera);
-            void imGuiRender();
+            void imGuiRender(const FrameInfo &frameInfo);
 
             Device  &device;
             Window  &window;

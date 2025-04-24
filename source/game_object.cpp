@@ -8,9 +8,13 @@ namespace mari {
         GameObject{currentId};
     }
 
+    void GameObject::start() {
+
+    }
+
     void GameObject::update() {
         if (camera) {
-            camera->update(transform);
+            camera->update(transform, worldMatrix);
         }
     }
 

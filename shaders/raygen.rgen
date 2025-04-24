@@ -7,33 +7,36 @@
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
-layout(binding = 2, set = 0, rgba32f) uniform image2D presentImage;
-layout(binding = 3, set = 0) uniform CameraProperties {
+layout(binding = 2, set = 0, rgba8) uniform image2D presentImage;
+layout(binding = 3, set = 0) uniform Properties {
     mat4 viewInverse;
     mat4 projInverse;
     int frameCount;
     int maxDepth;
     float exposure;
     int tonemapper;
-} cam;
+    bool russianRoulette;
+} properties;
 
 layout(location = 0) rayPayloadEXT Payload prd;
 
 void main() {
-    prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, cam.frameCount);
-	float r1 = rnd(prd.seed);
-    float r2 = rnd(prd.seed);
+    prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, properties.frameCount);
+	float r1 = random(prd.seed);
+    float r2 = random(prd.seed);
 
     const vec2 pixelJitter = vec2(r1, r2);
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + pixelJitter;
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
     vec2 s = inUV * 2.0 - 1.0;
 
-    vec4 origin     = cam.viewInverse * vec4(0, 0, 0, 1);
-    vec4 target     = cam.projInverse * vec4(s.x, s.y, 1, 1);
-    vec4 direction  = cam.viewInverse * vec4(normalize(target.xyz), 0);
+    vec4 origin     = properties.viewInverse * vec4(0, 0, 0, 1);
+    vec4 target     = properties.projInverse * vec4(s.x, s.y, 1, 1);
+    vec4 direction  = properties.viewInverse * vec4(normalize(target.xyz), 0);
 
-    float tmin = 0.001;
+    // tmin is 0 because position is offset along geometric normal instead. 
+    // Check offsetPositionAlongNormal() for more.
+    float tmin = 0.0;     
     float tmax = 10000.0;
 
     prd.radiance    = vec3(0.0);
@@ -42,30 +45,51 @@ void main() {
     prd.direction   = direction.xyz;
     prd.done        = 0;
 
-    for (int depth = 0; prd.done == 0 && depth < cam.maxDepth; depth++) {
+    for (int depth = 0; prd.done == 0 && depth < properties.maxDepth; depth++) {
+        if (isnan(prd.direction.r) || isnan(prd.direction.g) || isnan(prd.direction.b)) {
+            prd.radiance = vec3(1.0, 0.0, 1.0);
+            break;
+        }
+
         traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
+
+        if (properties.russianRoulette && depth > 3) { // TODO implement a minimum rr depth variable
+            float probability = (prd.throughput.r + prd.throughput.g + prd.throughput.b) / 3.0;
+            
+            if (random(prd.seed) > probability) {
+                break;
+            }
+            prd.throughput /= probability;
+        }
     }
 
+    vec4 newColor = vec4(prd.radiance, 1.0);
+
+    if (isnan(newColor.r) || isnan(newColor.g) || isnan(newColor.b)) newColor = vec4(1.0, 0.0, 1.0, 1.0);
+    if (isinf(newColor.r) || isinf(newColor.g) || isinf(newColor.b)) newColor = vec4(1.0, 0.0, 1.0, 1.0);
+
+    // Load existing accumulated color
     vec4 imageColor = vec4(0.0);
-    if (cam.frameCount > 0) {
+    if (properties.frameCount > 0) {
         imageColor = imageLoad(image, ivec2(gl_LaunchIDEXT.xy));
     }
 
-    float avg = 1.0 / (cam.frameCount + 1.0);
-    vec4 averageColor = (vec4(prd.radiance, 1.0) + imageColor * cam.frameCount) * avg;
+    // Calculate new average color
+    float avg = 1.0 / (properties.frameCount + 1.0);
+    vec4 averageColor = (newColor + imageColor * properties.frameCount) * avg;
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), averageColor);
 
     // Apply tone mapping
     vec3 tonemappedColor = averageColor.rgb;
-    switch (cam.tonemapper) {
+    switch (properties.tonemapper) {
         case 1:
-            tonemappedColor = toneACES(tonemappedColor, cam.exposure);
+            tonemappedColor = toneACES(tonemappedColor, properties.exposure);
             break;
         case 2:
-            tonemappedColor = toneAgX(tonemappedColor, cam.exposure);
+            tonemappedColor = toneAgX(tonemappedColor, properties.exposure);
             break;
         default:
-            tonemappedColor = pow(tonemappedColor * cam.exposure, vec3(1.0/2.2));
+            tonemappedColor = pow(tonemappedColor * properties.exposure, vec3(1.0/2.2));
             break;
     }
     imageStore(presentImage, ivec2(gl_LaunchIDEXT.xy), vec4(tonemappedColor, 1.0));

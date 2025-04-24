@@ -62,20 +62,6 @@ namespace mari {
         mouse.lastPositionY = y;
     }
 
-    bool KeyboardController::changeCamera(GLFWwindow *window) {
-        if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) {
-            changeCameraPressed = true;
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS && changeCameraPressed) {
-            changeCameraPressed = false;
-            resetFrame = true;
-            return true;
-        }
-
-        return false;
-    }
-
     void KeyboardController::handleInput(GLFWwindow *window) {
         if (glfwGetKey(window, keys.changePipeline) == GLFW_PRESS) {
             changePipelinePressed = true;

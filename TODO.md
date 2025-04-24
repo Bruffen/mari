@@ -7,9 +7,12 @@
 - Double check which methods should be const
 - Tonemapping compute shader
 - Figure out how to handle multiple glfw window callbacks
+- Quaternions
+- Save image to file
 
 ## Ray tracing pipeline
 
+- Store tonemapped result directly in swapchain image if possible
 - BLAS compacting
 - Better bounding boxes / bvh
 - Instancing
@@ -19,7 +22,6 @@
 
 - No longer force 4 color channels for loaded textures and add more format versatility
 - Import image buffers directly without stb_image
-- Import camera and add switching between existing cameras
 - See if min and max properties from position accessors can be used for better bounding boxes (although they might not be aligned after transformations)
 
 ## imGui

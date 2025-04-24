@@ -8,17 +8,6 @@
 #include "hitcommon.glsl"
 #include "random.glsl"
 
-layout(location = 0) rayPayloadInEXT Payload prd;
-hitAttributeEXT vec2 attribs;
-
-layout(binding = 4, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
-layout(binding = 6, set = 0) uniform sampler2D textures[];
-
-layout(buffer_reference, scalar) buffer PrimMeshInfos { PrimMeshInfo p[]; };
-layout(buffer_reference, scalar) buffer Vertices      { Vertex v[];       };
-layout(buffer_reference, scalar) buffer Indices       { uint i[];         };
-layout(buffer_reference, scalar) buffer Materials     { MaterialData m[]; };
-
 void main() {
     uint64_t meshDeviceAddress = pPrimMeshInfos.addresses[gl_InstanceID];
 
@@ -44,7 +33,7 @@ void main() {
     float alpha = texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
 
     //if (alpha < 0.9) {
-        if(rnd(prd.seed) > alpha) {
+        if(random(prd.seed) > alpha) {
             ignoreIntersectionEXT;
         }
     //}

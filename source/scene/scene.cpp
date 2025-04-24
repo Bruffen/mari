@@ -43,9 +43,9 @@ namespace mari {
             fastgltf::Options::AllowDouble | 
             fastgltf::Options::LoadExternalBuffers |
             fastgltf::Options::DecomposeNodeMatrices;
-
         constexpr auto parserOptions =
-            fastgltf::Extensions::KHR_materials_emissive_strength;
+            fastgltf::Extensions::KHR_materials_emissive_strength |
+            fastgltf::Extensions::KHR_lights_punctual;
 
         fastgltf::Parser parser{parserOptions};
         fastgltf::Expected<fastgltf::GltfDataBuffer> data = fastgltf::GltfDataBuffer::FromPath(path);
@@ -73,9 +73,13 @@ namespace mari {
         // TODO there's a gltf.scenes
 
         // load all nodes and their meshes
+        int nodeEmptyId = 0;
         for (fastgltf::Node& node : gltf.nodes) {
             std::shared_ptr<GameObject> newNode = std::make_shared<GameObject>();
             newNode->name = node.name.c_str();
+            if (newNode->name == "") {
+                newNode->name = "Node_" + std::to_string(nodeEmptyId++);
+            }
 
             if (node.meshIndex.has_value()) {
                 newNode->mesh = meshes[*node.meshIndex];
@@ -91,16 +95,16 @@ namespace mari {
             std::visit(fastgltf::visitor { 
                 [&](fastgltf::math::fmat4x4 matrix) {
                     memcpy(&newNode->worldMatrix, matrix.data(), sizeof(matrix));
-                    assert(true && "TODO Currently this world matrix value will be overwritten");
+                    assert(false && "TODO Currently this world matrix value will be overwritten");
                 },
                 [&](fastgltf::TRS transform) {
-                    glm::vec3 tl(transform.translation[0], transform.translation[1], transform.translation[2]);
-                    glm::quat rot(transform.rotation[3], transform.rotation[0], transform.rotation[1], transform.rotation[2]);
-                    glm::vec3 sc(transform.scale[0], transform.scale[1], transform.scale[2]);
+                    glm::vec3 tl(transform.translation.x(), transform.translation.y(), transform.translation.z());
+                    glm::quat rot(transform.rotation.w(), transform.rotation.x(), transform.rotation.y(), transform.rotation.z());
+                    glm::vec3 sc(transform.scale.x(), transform.scale.y(), transform.scale.z());
 
-                    newNode->transform.position = glm::vec3(transform.translation.x(), transform.translation.y(), transform.translation.z());
+                    newNode->transform.position = tl;
                     newNode->transform.rotation = glm::eulerAngles(rot);
-                    newNode->transform.scale    = glm::vec3(transform.scale.x(), transform.scale.y(), transform.scale.z());
+                    newNode->transform.scale    = sc;
                 } },
                 node.transform
             );
@@ -214,6 +218,15 @@ namespace mari {
                     );
                 }
 
+                // Tangents are calculated with MikkTSpace
+                /*auto tangents = p.findAttribute("TANGENT");
+                if (tangents != p.attributes.end()) {
+                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(gltf, gltf.accessors[(*tangents).accessorIndex],
+                        [&](fastgltf::math::fvec4 n, size_t index) {
+                            vertices[initialVertex + index].tangent = {n.x(), n.y(), n.z(), n.w()};
+                        });
+                }*/
+
                 // load vertex normals
                 auto normals = p.findAttribute("NORMAL");
                 if (normals != p.attributes.end()) {
@@ -235,10 +248,18 @@ namespace mari {
                 // load vertex colors
                 auto colors = p.findAttribute("COLOR_0");
                 if (colors != p.attributes.end()) {
-                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(gltf, gltf.accessors[(*colors).accessorIndex],
-                        [&](fastgltf::math::fvec4 c, size_t index) {
-                            vertices[initialVertex + index].color =  {c.x(), c.y(), c.z(), c.w()};
-                        });
+                    if (gltf.accessors[(*colors).accessorIndex].type == fastgltf::AccessorType::Vec3) {
+                        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(gltf, gltf.accessors[(*colors).accessorIndex],
+                            [&](fastgltf::math::fvec3 c, size_t index) {
+                                vertices[initialVertex + index].color =  {c.x(), c.y(), c.z(), 1.0f};
+                            });
+                    }
+                    if (gltf.accessors[(*colors).accessorIndex].type == fastgltf::AccessorType::Vec4) {
+                        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(gltf, gltf.accessors[(*colors).accessorIndex],
+                            [&](fastgltf::math::fvec4 c, size_t index) {
+                                vertices[initialVertex + index].color =  {c.x(), c.y(), c.z(), c.w()};
+                            });
+                    }
                 }
 
                 if (p.materialIndex.has_value()) {
@@ -252,8 +273,8 @@ namespace mari {
                 newMesh->primMeshes.push_back(newPrimitive);
             }
 
-            newMesh->createVertexBuffers(vertices);
             newMesh->createIndexBuffers(indices);
+            newMesh->createVertexBuffers(vertices);
             meshes.emplace_back(newMesh);
         }
     }
@@ -298,10 +319,6 @@ namespace mari {
                 }
             }
 
-            // Emission 
-            // TODO get texture
-            m->data.constants.emission = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
-
             // Normal
             // TODO Normal maps have a scale value
             if (gltfMat.normalTexture.has_value()) { 
@@ -313,6 +330,27 @@ namespace mari {
                 }
                 if (texture.samplerIndex.has_value()) {
                     m->textures.normal->sampler = samplers[texture.samplerIndex.value()];
+                }
+            }
+            
+            // Emission 
+            m->data.constants.emission = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
+
+            if (gltfMat.emissiveTexture.has_value()) {
+                const fastgltf::Texture& texture = gltfTextures[gltfMat.emissiveTexture.value().textureIndex];
+                if (texture.imageIndex.has_value()) {
+                    size_t img = texture.imageIndex.value();
+                    m->textures.emissive = images[img];
+                    m->data.indices.emissive = static_cast<int32_t>(img);
+
+                    // We multiply emission color by emissive texture,
+                    // therefore, when there's a texture, set emission color to 1 if it's 0.
+                    if (glm::length(glm::vec3(m->data.constants.emission)) <= 0.0f) {
+                        m->data.constants.emission = glm::vec4{1.0f, 1.0f, 1.0f, m->data.constants.emission.a};
+                    }
+                }
+                if (texture.samplerIndex.has_value()) {
+                    m->textures.emissive->sampler = samplers[texture.samplerIndex.value()];
                 }
             }
 
@@ -357,7 +395,7 @@ namespace mari {
                 std::cout << img->name << std::endl;
             }
             else {
-                images.emplace_back(DefaultObjects::getImageError());
+                images.emplace_back(DefaultObjects::getImageWhite());
                 std::cout << "glTF failed to load texture " << image.name << std::endl;
             }
         }

@@ -24,8 +24,10 @@ namespace mari {
             std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
             
             int                                     maxDepth = 10;
+            bool                                    russianRoulette = true;
             float                                   exposure = 1.0f;
             int                                     tonemapper = 0;
+            std::shared_ptr<GameObject>             currentCamera; // TODO shouldn't be here
         private:
             void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress);
             void                                    buildTLAS();

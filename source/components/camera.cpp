@@ -10,8 +10,11 @@ namespace mari {
 
     }
 
-    void Camera::update(Transform &transform) {
-        setViewYXZ(transform.position, transform.rotation);
+    void Camera::update(Transform &transform, glm::mat4 worldMatrix) {
+        //glm::vec3 worldPosition = worldMatrix * glm::vec4(transform.position, 1.0);
+        glm::vec3 worldPosition = transform.position;
+
+        setViewYZX(worldPosition, transform.rotation);
         setPerspectiveProjection(aspectRatio, 0.01f, 1000.0f);
     }
 
@@ -27,6 +30,8 @@ namespace mari {
     
     void Camera::setPerspectiveProjection(float fov, float aspect, float near, float far) {
         assert(glm::abs(aspect - std::numeric_limits<float>::epsilon()) > 0.0f);
+
+        this->fov = fov;
         const float tanHalfFovy = tan(fov / 2.f);
         projectionMatrix = glm::mat4{0.0f};
         projectionMatrix[0][0] = 1.f / (aspect * tanHalfFovy);
@@ -78,16 +83,16 @@ namespace mari {
         setViewDirection(position, target - position, up); //TODO normalize forward?
     }
 
-    void Camera::setViewYXZ(glm::vec3 position, glm::vec3 rotation) {
-        const float c3 = glm::cos(rotation.z);
-        const float s3 = glm::sin(rotation.z);
-        const float c2 = glm::cos(rotation.x);
-        const float s2 = glm::sin(rotation.x);
-        const float c1 = glm::cos(rotation.y);
-        const float s1 = glm::sin(rotation.y);
-        const glm::vec3 u{(c1 * c3 + s1 * s2 * s3), (c2 * s3), (c1 * s2 * s3 - c3 * s1)};
-        const glm::vec3 v{(c3 * s1 * s2 - c1 * s3), (c2 * c3), (c1 * c3 * s2 + s1 * s3)};
-        const glm::vec3 w{(c2 * s1), (-s2), (c1 * c2)};
+    void Camera::setViewYZX(glm::vec3 position, glm::vec3 rotation) {
+        const float cy = glm::cos(rotation.x);
+        const float sy = glm::sin(rotation.x);
+        const float cb = glm::cos(rotation.z);
+        const float sb = glm::sin(rotation.z);
+        const float ca = glm::cos(rotation.y);
+        const float sa = glm::sin(rotation.y);
+        const glm::vec3 u{(ca * cb), (sb), (-cb * sa)};
+        const glm::vec3 v{(sa * sy - ca * cy * sb), (cb * cy), (ca * sy + cy * sa * sb)};
+        const glm::vec3 w{(cy * sa + ca * sb * sy),(-cb * sy),(ca * cy - sa * sb * sy)};
         viewMatrix = glm::mat4{1.f};
         viewMatrix[0][0] = u.x;
         viewMatrix[1][0] = u.y;
