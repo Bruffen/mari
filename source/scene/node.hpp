@@ -15,22 +15,22 @@ namespace mari {
     };
 
     // TODO https://austinmorlan.com/posts/entity_component_system/
-    class GameObject {
+    class Node {
         public:
-            using Map = std::unordered_map<uint32_t, GameObject>;
+            using Map = std::unordered_map<uint32_t, Node>;
 
-            GameObject();
-            //GameObject(const GameObject &) = delete;
-            //GameObject &operator=(const GameObject &) = delete;
-            //GameObject(GameObject &&) = default;
-            //GameObject &operator=(GameObject &&) = default;
+            Node();
+            //Node(const Node &) = delete;
+            //Node &operator=(const Node &) = delete;
+            //Node(Node &&) = default;
+            //Node &operator=(Node &&) = default;
 
             void start();
             void update();
             void render();
 
             const uint32_t                              getId() { return id; }
-            static GameObject                           makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
+            static Node                                 makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
 
             std::string                                 name        = "";
             glm::vec3                                   color       {};         // TODO move to light component
@@ -40,8 +40,8 @@ namespace mari {
             float                                       fovy        {50.0f};
 
             // Optional pointer components
-            std::weak_ptr<GameObject>                   parent;
-            std::vector<std::shared_ptr<GameObject>>    children;
+            std::weak_ptr<Node>                         parent;
+            std::vector<std::shared_ptr<Node>>          children;
             std::shared_ptr<Mesh>                       mesh;
             std::shared_ptr<Camera>                     camera;
             // TODO skin component
@@ -49,7 +49,7 @@ namespace mari {
             std::unique_ptr<PointLightComponent>        pointLight  = nullptr;
 
         private:
-            GameObject(uint32_t id) : id{id} {}
             uint32_t id;
+            //Node(uint32_t id) : id{id} {}
     };
 }

@@ -19,6 +19,7 @@ namespace mari {
             void resetWindowsResizedFlag()      { framebufferResized = false; }
             GLFWwindow *getGLFWwindow() const   { return window; }
             
+            void resizeWindow(int width, int height);
             void createWindowSurface(VkInstance instance, VkSurfaceKHR *surface);
         private:
             void initialize();

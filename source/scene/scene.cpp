@@ -37,6 +37,21 @@ namespace mari {
         return pathStr.substr(0, recoverLastSeparatorPos(pathStr) + 1);
     }
 
+    std::shared_ptr<Node> Scene::getNode(const uint32_t id) {
+        for (auto& node : nodes) {
+            if (node.second->getId() == id) {
+                return node.second;
+            }
+        }
+
+        return nullptr;
+    }
+
+    void Scene::addNode(std::shared_ptr<Node> node) {
+        topNodes.emplace_back(node);
+        nodes[node->name] = node;
+    }
+
     Scene::Scene(Device &device, const std::string &path) : device{device} {
         constexpr auto gltfOptions = 
             fastgltf::Options::DontRequireValidAssetMember | 
@@ -62,8 +77,8 @@ namespace mari {
 
         // TODO increase descriptor pool size
 
-        std::vector<std::shared_ptr<GameObject>> tmpNodes;
-        std::vector<uint32_t>                    tmpImageIds;
+        std::vector<std::shared_ptr<Node>> tmpNodes;
+        std::vector<uint32_t>              tmpImageIds;
 
         loadSamplers(gltf.samplers);
         loadImages(gltf.images, gltf, folder); // TODO improve passing asset gltf
@@ -75,7 +90,7 @@ namespace mari {
         // load all nodes and their meshes
         int nodeEmptyId = 0;
         for (fastgltf::Node& node : gltf.nodes) {
-            std::shared_ptr<GameObject> newNode = std::make_shared<GameObject>();
+            std::shared_ptr<Node> newNode = std::make_shared<Node>();
             newNode->name = node.name.c_str();
             if (newNode->name == "") {
                 newNode->name = "Node_" + std::to_string(nodeEmptyId++);
@@ -114,7 +129,7 @@ namespace mari {
         for (int i = 0; i < gltf.nodes.size(); i++) {
             fastgltf::Node& node = gltf.nodes[i];
 
-            std::shared_ptr<GameObject>& sceneNode = tmpNodes[i];
+            std::shared_ptr<Node>& sceneNode = tmpNodes[i];
 
             for (auto& c : node.children) {
                 sceneNode->children.emplace_back(tmpNodes[c]);
@@ -136,7 +151,7 @@ namespace mari {
         }
     }
 
-    void Scene::updateWorldMatrix(GameObject& g, const glm::mat4 &worldMatrix) { // TODO don't update for static objects after the first time (maybe have a second set function)
+    void Scene::updateWorldMatrix(Node& g, const glm::mat4 &worldMatrix) { // TODO don't update for static objects after the first time (maybe have a second set function)
         g.worldMatrix = worldMatrix * g.transform.mat4();
         for (auto& c : g.children) {
             updateWorldMatrix(*c, g.worldMatrix);
@@ -283,7 +298,7 @@ namespace mari {
     void Scene::loadMaterials(const std::vector<fastgltf::Material> &gltfMaterials, const std::vector<fastgltf::Texture> &gltfTextures) {
         for (const fastgltf::Material& gltfMat : gltfMaterials) {
             std::shared_ptr<Material> m = std::make_shared<Material>();
-            m->name                     = gltfMat.name.c_str();
+            m->name                     = gltfMat.name.empty() ? "mari_unnamed_material" : gltfMat.name.c_str();
             
             if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque)  m->transparent = true;
 
@@ -390,7 +405,7 @@ namespace mari {
             std::shared_ptr<Image> img = loadImage(folderPath, asset, image);
 
             if (img) {
-                img->name = image.name.c_str();
+                img->name = image.name.empty() ? "mari_unnamed_texture" : image.name.c_str();
                 images.emplace_back(img);
                 std::cout << img->name << std::endl;
             }
@@ -418,7 +433,7 @@ namespace mari {
             [&](fastgltf::sources::Array& vector) {
                 const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data());
                 data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()), &width, &height, &nrChannels, 4);
-                newImage = loadImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
+                newImage = extractImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
             },
             [&](fastgltf::sources::BufferView& view) {
                 auto& bufferView = asset.bufferViews[view.bufferViewIndex];
@@ -429,7 +444,7 @@ namespace mari {
                     [&](fastgltf::sources::Array& vector) {
                         const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data()) + bufferView.byteOffset;
                         data = stbi_load_from_memory(imgBytes, static_cast<int>(bufferView.byteLength), &width, &height, &nrChannels, 4);
-                        newImage = loadImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
+                        newImage = extractImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
                     }},
                     buffer.data
                 );
@@ -439,7 +454,7 @@ namespace mari {
         return newImage;
     }
 
-    std::shared_ptr<Image> Scene::loadImage(void* data, VkFormat format, int width, int height) {
+    std::shared_ptr<Image> Scene::extractImage(void* data, VkFormat format, int width, int height) {
         assert(data && "Null pointer to image data");
         std::shared_ptr<Image> image;
 
@@ -476,7 +491,7 @@ namespace mari {
         }
 
         if (data) {
-            return loadImage(data, format, width, height);
+            return extractImage(data, format, width, height);
         }
         return {};
     }

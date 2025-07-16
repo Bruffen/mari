@@ -1,7 +1,7 @@
 #pragma once
 
 #include "components/camera.hpp"
-#include "game_object.hpp"
+#include "scene/node.hpp"
 #include "gui.hpp"
 #include "window.hpp"
 
@@ -21,6 +21,7 @@ namespace mari {
                 int lookDown = GLFW_KEY_DOWN;
                 int sprint = GLFW_KEY_LEFT_SHIFT;
                 int changePipeline = GLFW_KEY_P;
+                int hideshowGui = GLFW_KEY_H;
             };
 
             struct Mouse {
@@ -32,13 +33,13 @@ namespace mari {
 
             KeyboardController(Gui& gui);
 
-            void update(GLFWwindow *window, float deltatime, GameObject &gameObject);
+            void update(GLFWwindow *window, float deltatime, Node &node);
             bool checkFrameAccumulationReset();
             bool isRayTracingOn() { return isRaytracing; }
 
         private:
-            void moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
-            void rotateCamera(GLFWwindow *window, float deltatime, GameObject &gameObject);
+            void moveCamera(GLFWwindow *window, float deltatime, Node &node);
+            void rotateCamera(GLFWwindow *window, float deltatime, Node &node);
             void handleInput(GLFWwindow *window);
 
             const KeyMappings keys;
@@ -50,6 +51,7 @@ namespace mari {
             bool  changePipelinePressed = false;// TODO
             bool  resetFrame = false;
             bool  isRaytracing = true;
+            bool  hideshowGuiPressed = false;
     };
     
 }

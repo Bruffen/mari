@@ -198,6 +198,11 @@ namespace mari {
         featuresRTV.rayTracingValidation = VK_TRUE;
         featuresRTV.pNext = &featuresDI;
 
+        VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures featuresSDHIF{};
+        featuresSDHIF.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
+        featuresSDHIF.shaderDemoteToHelperInvocation = VK_TRUE;
+        featuresSDHIF.pNext = &featuresRTV;
+
         if (enableShaderRelaxed) {
             VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR featuresSREI{};
             featuresSREI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR;
@@ -205,7 +210,7 @@ namespace mari {
             featuresBDA.pNext = &featuresSREI;
         }
 
-        createInfo.pNext = &featuresRTV;
+        createInfo.pNext = &featuresSDHIF;
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
 
@@ -353,7 +358,7 @@ namespace mari {
             // Required by VK_KHR_spirv_1_4
             VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
 
-            // Optional useful ray tracing validation layour // TODO use it only in debug mode
+            // Optional useful ray tracing validation layer // TODO use it only in debug mode
             VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME       
         };
         
@@ -567,6 +572,22 @@ namespace mari {
             &region);
 
         vkhelper::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, oldLayout);
+
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    void Device::copyImageToBuffer(VkImage image, VkExtent3D extent, VkImageLayout layout, VkBuffer buffer) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkBufferImageCopy bufferImageCopy{};
+        bufferImageCopy.bufferImageHeight = extent.height;
+        bufferImageCopy.bufferRowLength   = extent.width;
+        bufferImageCopy.bufferOffset      = 0;
+        bufferImageCopy.imageSubresource  = VkImageSubresourceLayers{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        bufferImageCopy.imageExtent       = extent;
+        bufferImageCopy.imageOffset       = {0};
+        // TODO synchronization
+        vkCmdCopyImageToBuffer(commandBuffer, image, layout, buffer, 1, &bufferImageCopy);
 
         endSingleTimeCommands(commandBuffer);
     }

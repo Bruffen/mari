@@ -2,9 +2,17 @@
 
 #include "gui.hpp"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define __STDC_LIB_EXT1__
+#include "stb_image_write.h"
+
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vk_enum_string_helper.h> 
+
+#include <iomanip>
+#include <ctime>
+#include <sstream>
 
 namespace mari {
     Gui::Gui(Device &device, Window &window, Renderer &renderer, RayTracingSystem &system) : device{device}, window{window}, system{system} {
@@ -114,19 +122,35 @@ namespace mari {
             ImGui::Text("Samples: %i", frameInfo.frameCounter);
             ImGui::Text("Triangle count: %i", triangleCount);
 
+            ImGui::BeginChild("TabChild", ImVec2(0, 0), ImGuiChildFlags_None);
             if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None)) {
                 bool a = true;
                 bool *a_ptr = &a;
 
                 // Scene tab
                 if (ImGui::BeginTabItem("Scene")) {
-                    if (ImGui::TreeNode("Scene")) {
-                        imGuiTransform(scene->transform);
-                        for (std::shared_ptr<GameObject> &g : scene->topNodes) {
+
+                    ImGui::BeginChild("SceneChild", ImVec2(0, 200), ImGuiChildFlags_None);
+                    for (std::shared_ptr<Node> &g : scene->topNodes) {                            
                             imGuiObject(*g);
                         }
-                        ImGui::TreePop();
+                    ImGui::EndChild();
+                    
+                    if (ImGui::BeginTabBar("##tabsInspector", ImGuiTabBarFlags_None)) {
+                        if (ImGui::BeginTabItem("Inspector")) {
+                            ImGui::BeginChild("InspectChild", ImVec2(0, -10), ImGuiChildFlags_None);
+                            if (sceneObjectSelected > 0) {
+                                const std::shared_ptr<Node> g = scene->getNode(sceneObjectSelected);
+                                if (g != nullptr) {
+                                    imGuiInspector(*g);
+                                }
+                            }
+                            ImGui::EndChild();
+                            ImGui::EndTabItem();
+                        }
+                        ImGui::EndTabBar();
                     }
+
                     ImGui::EndTabItem();
                 }
 
@@ -155,6 +179,7 @@ namespace mari {
 
                 ImGui::EndTabBar();
             }
+            ImGui::EndChild();
             ImGui::End();
         }
 
@@ -190,8 +215,8 @@ namespace mari {
         ImGui::PlotLines("##frameplot", values, IM_ARRAYSIZE(values), values_offset, 0, 0.0f);
     }
 
-    void Gui::imGuiObject(GameObject &g) {
-        if (ImGui::TreeNode(g.name.c_str(), g.name.c_str())) {
+    void Gui::imGuiInspector(Node &g) {
+        ImGui::Text(("ID: " + std::to_string(g.getId())).c_str());
             imGuiTransform(g.transform);
             if (g.mesh) {
                 imGuiMesh(*g.mesh);
@@ -199,9 +224,22 @@ namespace mari {
             if (g.camera) {
                 imGuiCamera(*g.camera);
             }
-            for (const std::shared_ptr<GameObject> &child : g.children) {
+    }
+
+    void Gui::imGuiObject(Node &g) {
+        ImGuiTreeNodeFlags flag = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnDoubleClick; //ImGuiTreeNodeFlags_OpenOnArrow;
+        if (g.children.empty()) flag |= ImGuiTreeNodeFlags_Leaf;
+        if (g.getId() == sceneObjectSelected) flag |= ImGuiTreeNodeFlags_Selected; 
+        
+        if (ImGui::TreeNodeEx(g.name.c_str(), flag)) {
+            if (ImGui::IsItemClicked()) { // TODO Only works if item is open
+                sceneObjectSelected = g.getId();
+            }
+
+            for (const std::shared_ptr<Node> &child : g.children) {
                 imGuiObject(*child);
             }
+
             ImGui::TreePop();
         }
     }
@@ -213,6 +251,8 @@ namespace mari {
         glm::vec3 s = transform.scale;
         glm::vec3 rd = glm::degrees(transform.rotation);
 
+        ImGui::Text("Transform");
+        ImGui::Indent(20.0f);
         ImGui::Text("Position:");
         ImGui::SameLine();
         ImGui::DragFloat3("##pos", &transform.position.x, 0.005f);
@@ -230,15 +270,21 @@ namespace mari {
         if (p != transform.position || r != transform.rotation || s != transform.scale) {
             inputChanged = true;
         }
+
+        ImGui::Indent(-20.0f);
     }
 
     void Gui::imGuiMesh(const Mesh &mesh) {
-        if (ImGui::TreeNode(mesh.name.c_str(), ("Mesh: " + mesh.name).c_str())) {
+        ImGui::Text("Mesh");
+        ImGui::Indent(20.0f);
+
+        ImGui::Text((mesh.name).c_str());
             ImGui::Text("%i vertices", mesh.vertexCount);
             if (mesh.hasIndexBuffer) {
                 ImGui::Text("%i indices", mesh.indexCount);
             }
             ImGui::Text("%i triangles", mesh.hasIndexBuffer ? mesh.indexCount / 3 : mesh.vertexCount / 3);
+        ImGui::Indent(-20.0f);
 
             std::vector<std::string> materials;
             for (const PrimMesh &s : mesh.primMeshes) {
@@ -247,19 +293,33 @@ namespace mari {
                     materials.push_back(s.material->name);
                     imGuiSubMesh(s);
                 }
-            }
-            ImGui::TreePop();
         }
     }
 
     void Gui::imGuiSubMesh(const PrimMesh &submesh) { // TODO dropdown list of materials
-        //bool a = true;
-        //bool *a_ptr = &a;
-        //if (ImGui::CollapsingHeader(submesh.material->name.c_str(), a_ptr)) {
-        if (ImGui::TreeNode(submesh.material->name.c_str(), ("Material: " + submesh.material->name).c_str())) {
-            imGuiMaterial(*submesh.material);
-            ImGui::TreePop();
+        ImGui::Text("Material");
+        ImGui::Indent(20.0f);
+        ImGui::Text(submesh.material->name.c_str());
+
+        static int itemSelected = 0;
+
+        if (ImGui::BeginCombo("##materialcombo", scene->materials[submesh.material->index]->name.c_str(), 0)) {
+            for (int n = 0; n < scene->materials.size(); n++) {
+                const bool isSelected = (itemSelected == n);
+                if (ImGui::Selectable(scene->materials[n]->name.c_str(), isSelected))
+                    itemSelected = n;
+
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+
+                // TODO currently material is indexed directly with its device address in the material buffer
+                // have an intermediary material index buffer that points to the materials in the material buffer
+            }
+            ImGui::EndCombo();
         }
+
+            imGuiMaterial(*submesh.material);
+        ImGui::Indent(-20.0f);
     }
 
     void Gui::imGuiMaterial(const Material &material) {
@@ -293,7 +353,8 @@ namespace mari {
     }
 
     void Gui::imGuiCamera(Camera &camera) {
-        if (ImGui::TreeNode("##cam", "Camera")) {
+        ImGui::Text("Camera");
+        ImGui::Indent(20.0f);
             float fov = camera.fov;
             float fovDegrees = glm::degrees(fov);
 
@@ -305,18 +366,32 @@ namespace mari {
             if (fov != camera.fov) {
                 inputChanged = true;
             }
-            ImGui::TreePop();
-        }
+        ImGui::Indent(-20.0f);
     }
 
     void Gui::imGuiRender(const FrameInfo &frameInfo) {
         if (ImGui::BeginTabItem("Render")) {
+            // Window size and resize
+            VkExtent2D windowSize = window.getExtent();
+            int inputWindowSize[2] = {static_cast<int>(windowSize.width), static_cast<int>(windowSize.height)};
+
+            ImGui::InputInt2("Screen resolution", inputWindowSize);
+
+            if (inputWindowSize[0] != windowSize.width || inputWindowSize[1] != windowSize.height) {
+                if (!ImGui::IsItemActive())
+                window.resizeWindow(inputWindowSize[0], inputWindowSize[1]);
+            }
+
+            // Path tracing parameters
             int oldMaxDepth = system.maxDepth;
-
             ImGui::SliderInt("Depth", &system.maxDepth, 1, 10, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            if (oldMaxDepth != system.maxDepth) {
+                inputChanged = true;
+            } 
             ImGui::Checkbox("Russian Roulette", &system.russianRoulette);
+            
+            // Tonemapping
             ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
-
             const char* tonemappers[] = { "None", "ACES", "AgX" };
             const char* selectedTonemapper = tonemappers[system.tonemapper];
     
@@ -334,19 +409,20 @@ namespace mari {
                 ImGui::EndCombo();
             }
 
+            // Camera
             std::vector<char*> cameraNames;
             for (const auto& camera : scene->cameraObjects) {
                 cameraNames.push_back(&camera->name[0]);
             }
     
-            const char* selectedCamera = system.currentCamera->name.c_str();
+            const char* selectedCamera = scene->currentCamera->name.c_str();
             if (ImGui::BeginCombo("Camera", selectedCamera, 0)) {
                 for (int n = 0; n < cameraNames.size(); n++) {
-                    const bool isSelected = (system.currentCamera->name == cameraNames[n]);
+                    const bool isSelected = (scene->currentCamera->name == cameraNames[n]);
                     if (ImGui::Selectable(cameraNames[n], isSelected)) {
                         for (const auto& camera : scene->cameraObjects) {
                             if (camera->name == cameraNames[n]) {
-                                system.currentCamera = camera;
+                                scene->currentCamera = camera;
                                 inputChanged = true;
                                 break;
                             }
@@ -360,19 +436,20 @@ namespace mari {
                 ImGui::EndCombo();
             }
 
+            // Environments
             std::vector<char*> environmentNames;
             for (const auto& environment : scene->images) {
                 environmentNames.push_back(&environment->name[0]);
             }
 
-            const char* selectedEnvironment = scene->images.at(system.environmentID)->name.c_str();
+            const char* selectedEnvironment = scene->images.at(scene->environmentID)->name.c_str();
             if (ImGui::BeginCombo("Environment", selectedEnvironment, 0)) {
                 for (int n = 0; n < scene->images.size(); n++) {
-                    const bool isSelected = (system.environmentID == n);
+                    const bool isSelected = (scene->environmentID == n);
                     if (ImGui::Selectable(environmentNames[n], isSelected)) {
                         for (const auto& environment : scene->images) {
                             if (environment->name == environmentNames[n]) {
-                                system.environmentID = n;
+                                scene->environmentID = n;
                                 inputChanged = true;
                                 break;
                             }
@@ -386,10 +463,38 @@ namespace mari {
                 ImGui::EndCombo();
             }
 
-            if (oldMaxDepth != system.maxDepth) {
-                inputChanged = true;
+            if (ImGui::Button("Save render")) {
+                saveRender();
             } 
+
             ImGui::EndTabItem();
         }
+    }
+
+    void Gui::saveRender() {
+        const int width  = static_cast<int>(system.presentImage->size.width);
+        const int height = static_cast<int>(system.presentImage->size.height);
+        const int comp   = 4;
+
+        Buffer imageBuffer {
+            device,
+            sizeof(float) * comp * width * height, 
+            1, 
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        };
+
+        device.copyImageToBuffer(system.presentImage->handle, system.presentImage->size, system.presentImage->layout, imageBuffer.handle());
+
+        auto t = std::time(nullptr);
+        std::tm tm{};
+        localtime_s(&tm, &t);
+
+        std::ostringstream oss;
+        oss << std::put_time(&tm, "%Y-%m-%d %H-%M-%S");
+        std::string filename = oss.str();
+        
+        stbi_write_bmp((filename + ".bmp").c_str(), width, height, comp, (void*)imageBuffer.getMappedMemory());
+        //stbi_write_png((filename + ".png").c_str(), width, height, comp, (void*)imageBuffer.getMappedMemory(), width * comp);
     }
 }

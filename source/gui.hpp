@@ -19,12 +19,15 @@ namespace mari {
             void set(std::shared_ptr<Scene> scene);
             void prepare(FrameInfo &frameInfo);
             void render(VkCommandBuffer commandBuffer);
+            void saveRender();
 
             bool inputChanged = false;
+            bool isActive = true;
         private:
             static void checkVkResult(VkResult err);
             void imGuiFramerate(float duration);
-            void imGuiObject(GameObject &g);
+            void imGuiInspector(Node &g);
+            void imGuiObject(Node &g);
             void imGuiTransform(Transform &transform);
             void imGuiMesh(const Mesh &mesh);
             void imGuiSubMesh(const PrimMesh &submesh);
@@ -40,6 +43,8 @@ namespace mari {
             std::shared_ptr<Scene> scene;
 
             uint32_t triangleCount = 0;
+
+            int sceneObjectSelected = -1;
 
             VkDescriptorPool descriptorPool;
     };

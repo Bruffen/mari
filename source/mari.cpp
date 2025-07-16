@@ -113,16 +113,14 @@ namespace mari {
         //glfwSetScrollCallback(window.getGLFWwindow(), camera.scrollCallback);
         glfwSetWindowUserPointer(window.getGLFWwindow(), &window);
 
-        std::shared_ptr<GameObject> cameraObject = std::make_shared<GameObject>();
+        std::shared_ptr<Node> cameraObject = std::make_shared<Node>();
         cameraObject->name = "Free Camera";
         cameraObject->camera = std::make_shared<Camera>();
         cameraObject->transform.position.y = -0.7f;
         cameraObject->transform.position.z = -1.5f;
-        scene->topNodes.emplace_back(cameraObject);
+        scene->addNode(cameraObject);
         scene->cameraObjects.emplace_back(cameraObject);
-        rayTracingSystem.currentCamera = cameraObject;
-
-        rayTracingSystem.environmentID = static_cast<int>(scene->images.size() - 1);
+        scene->currentCamera = cameraObject;
         
         KeyboardController controller{*gui};
         
@@ -141,11 +139,11 @@ namespace mari {
 
             // If window is resized and aspect ratio is different
             float aspect = renderer.getAspectRatio();
-            rayTracingSystem.currentCamera->camera->setAspectRatio(aspect);
+            scene->currentCamera->camera->setAspectRatio(aspect);
 
             // TODO on camera move when free camera isn't set, set free camera's transform equal to current camera and change to free camera
-            controller.update(window.getGLFWwindow(), deltaTime, *rayTracingSystem.currentCamera);
-            rayTracingSystem.currentCamera->update(); // TODO call every gameobject's update
+            controller.update(window.getGLFWwindow(), deltaTime, *scene->currentCamera);
+            scene->currentCamera->update(); // TODO call every node's update
             
             if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
@@ -155,23 +153,23 @@ namespace mari {
                     deltaTime,
                     elapsedTime,
                     commandBuffer,
-                    *rayTracingSystem.currentCamera,
+                    *scene->currentCamera,
                     controller.isRayTracingOn() ? rayTracingDescriptorSets[frameIndex] : rasterizationDescriptorSets[frameIndex],
-                    gameObjects
+                    nodes
                 };
 
                 if (controller.isRayTracingOn()) {
                     // update
                     RayTracingUbo ubo{};
-                    ubo.viewInverse     = rayTracingSystem.currentCamera->camera->getInverseView();
-                    ubo.projInverse     = rayTracingSystem.currentCamera->camera->getInverseProjection();
+                    ubo.viewInverse     = scene->currentCamera->camera->getInverseView();
+                    ubo.projInverse     = scene->currentCamera->camera->getInverseProjection();
                     frameCounter        = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
                     ubo.frameCount      = frameCounter;
                     ubo.maxDepth        = rayTracingSystem.maxDepth;
                     ubo.russianRoulette = static_cast<int>(rayTracingSystem.russianRoulette);
                     ubo.exposure        = rayTracingSystem.exposure;
                     ubo.tonemapper      = rayTracingSystem.tonemapper;
-                    ubo.environmentID   = rayTracingSystem.environmentID;
+                    ubo.environmentID   = scene->environmentID;
                     rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                     rayTracingUboBuffers[frameIndex]->flush();
 
@@ -198,11 +196,12 @@ namespace mari {
                 */
 
                 // GUI
-                
-                gui->prepare(frameInfo);
-                renderer.beginSwapchainRenderPass(commandBuffer);
-                gui->render(commandBuffer);
-                renderer.endSwapchainRenderPass(commandBuffer);
+                if (gui->isActive) {
+                    gui->prepare(frameInfo);
+                    renderer.beginSwapchainRenderPass(commandBuffer);
+                    gui->render(commandBuffer);
+                    renderer.endSwapchainRenderPass(commandBuffer);
+                }
                 
                 renderer.endFrame();
 
@@ -230,7 +229,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  0  ) {
+        switch (  6  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -257,21 +256,35 @@ namespace mari {
                 ));
                 break;
             case 6:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
                 break;
             case 7:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 break;
             case 8:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
+                break;
+            case 9:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
+                break;
+            case 10:
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
                 break;
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
-        scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
+        //scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
         scene->images.emplace_back(scene->loadImage("../../models/solitude_interior_8k.hdr",    VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior"));
-        scene->images.emplace_back(scene->loadImage("../../models/meadow_8k.hdr",               VK_FORMAT_R32G32B32A32_SFLOAT, "meadow"));
-        scene->images.emplace_back(scene->loadImage("../../models/qwantani_noon_8k.hdr",        VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon"));
+        //scene->images.emplace_back(scene->loadImage("../../models/meadow_8k.hdr",               VK_FORMAT_R32G32B32A32_SFLOAT, "meadow"));
+        //scene->images.emplace_back(scene->loadImage("../../models/qwantani_noon_8k.hdr",        VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon"));
+        scene->images.emplace_back(DefaultObjects::getImageWhite());
+        scene->images.emplace_back(DefaultObjects::getImageBlack());
+        scene->environmentID = static_cast<int>(scene->images.size() - 3);
 
         scene->update();
     }

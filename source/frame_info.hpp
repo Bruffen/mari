@@ -1,7 +1,7 @@
 #pragma once
 
 #include "components/camera.hpp"
-#include "game_object.hpp"
+#include "scene/node.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -41,8 +41,8 @@ namespace mari {
         float deltaTime;
         float elapsedTime;
         VkCommandBuffer commandBuffer;
-        GameObject &cameraObject;
+        Node &cameraObject;
         VkDescriptorSet globalDescriptorSet;
-        GameObject::Map &gameObjects; // TODO should point to scene now and go through game objects that way
+        Node::Map &nodes; // TODO should point to scene now and go through game objects that way
     };
 }

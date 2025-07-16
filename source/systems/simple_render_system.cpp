@@ -71,7 +71,7 @@ namespace mari {
             nullptr
         );
 
-        for (auto& kv : frameInfo.gameObjects) { // TODO needs scene mesh objects now
+        for (auto& kv : frameInfo.nodes) { // TODO needs scene mesh objects now
             auto& obj = kv.second;
             if (obj.mesh == nullptr) continue;
 

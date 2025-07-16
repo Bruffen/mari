@@ -70,7 +70,7 @@ namespace mari {
         );
 
         int lightIndex = 0;
-        for (auto &kv: frameInfo.gameObjects) {
+        for (auto &kv: frameInfo.nodes) {
             auto &obj = kv.second;
             if (obj.pointLight == nullptr) continue;
 
@@ -106,7 +106,7 @@ namespace mari {
             nullptr
         );
 
-        for (auto &kv: frameInfo.gameObjects) {
+        for (auto &kv: frameInfo.nodes) {
             auto &obj = kv.second;
             if (obj.pointLight == nullptr) continue;
 

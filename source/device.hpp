@@ -69,6 +69,7 @@ namespace mari {
                                         VkDeviceMemory &imageMemory);
         void                        copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void                        copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D extent, uint32_t layerCount, VkImageLayout oldLayout);
+        void                        copyImageToBuffer(VkImage image, VkExtent3D extent, VkImageLayout layout, VkBuffer buffer);
 
         VkPhysicalDeviceProperties properties;
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR propertiesRT{

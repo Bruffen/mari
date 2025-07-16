@@ -4,16 +4,16 @@
 namespace mari {
     KeyboardController::KeyboardController(Gui& gui) : gui{gui} {}
 
-    void KeyboardController::update(GLFWwindow *window, float deltatime, GameObject &gameObject) {
-        moveCamera(window, deltatime, gameObject);
-        rotateCamera(window, deltatime, gameObject);
+    void KeyboardController::update(GLFWwindow *window, float deltatime, Node &node) {
+        moveCamera(window, deltatime, node);
+        rotateCamera(window, deltatime, node);
         handleInput(window);
     }
 
-    void KeyboardController::moveCamera(GLFWwindow *window, float deltatime, GameObject &gameObject) {
-        glm::vec3 f = gameObject.transform.forward();
-        glm::vec3 r = gameObject.transform.right();
-        glm::vec3 u = gameObject.transform.up();
+    void KeyboardController::moveCamera(GLFWwindow *window, float deltatime, Node &node) {
+        glm::vec3 f = node.transform.forward();
+        glm::vec3 r = node.transform.right();
+        glm::vec3 u = node.transform.up();
         float acceleration = 1.0f;
 
         glm::vec3 moveDir{0.0f};
@@ -28,12 +28,12 @@ namespace mari {
         if (glfwGetKey(window, keys.sprint)         == GLFW_RELEASE || glm::length(moveDir) == 0.0f) currentSpeed = moveSpeed;
 
         if (glm::dot(moveDir, moveDir) > glm::epsilon<float>()) {
-            gameObject.transform.position += currentSpeed * deltatime * glm::normalize(moveDir);
+            node.transform.position += currentSpeed * deltatime * glm::normalize(moveDir);
             resetFrame = true;
         }
     }
 
-    void KeyboardController::rotateCamera(GLFWwindow *window, float deltatime, GameObject &gameObject) {
+    void KeyboardController::rotateCamera(GLFWwindow *window, float deltatime, Node &node) {
         double x, y;
         glfwGetCursorPos(window, &x, &y);
 
@@ -49,11 +49,11 @@ namespace mari {
         if (!gui.getIO()->WantCaptureMouse && mouse.cameraDragDown) {
             glm::vec2 movement{static_cast<float>(x - mouse.lastPositionX), static_cast<float>(y - mouse.lastPositionY)};
             if (glm::dot(movement, movement) > glm::epsilon<float>()) {
-                gameObject.transform.rotation.x -= movement.y * lookSpeed;
-                gameObject.transform.rotation.y += movement.x * lookSpeed;
+                node.transform.rotation.x -= movement.y * lookSpeed;
+                node.transform.rotation.y += movement.x * lookSpeed;
 
-                //gameObject.transform.rotation.x = glm::clamp(gameObject.transform.rotation.x, -1.5f, 1.5f);
-                gameObject.transform.rotation.y = glm::mod(gameObject.transform.rotation.y, glm::two_pi<float>());       
+                //node.transform.rotation.x = glm::clamp(node.transform.rotation.x, -1.5f, 1.5f);
+                node.transform.rotation.y = glm::mod(node.transform.rotation.y, glm::two_pi<float>());       
                 resetFrame = true;     
             }
         }
@@ -66,13 +66,20 @@ namespace mari {
         if (glfwGetKey(window, keys.changePipeline) == GLFW_PRESS) {
             changePipelinePressed = true;
         }
-
         if (glfwGetKey(window, keys.changePipeline) == GLFW_RELEASE && changePipelinePressed) {
             changePipelinePressed = false;
             isRaytracing = !isRaytracing;
             resetFrame = true;
         }
 
+        if (glfwGetKey(window, keys.hideshowGui) == GLFW_PRESS && !hideshowGuiPressed) {
+            gui.isActive = !gui.isActive;
+            hideshowGuiPressed = true;
+        }
+        if (glfwGetKey(window, keys.hideshowGui) == GLFW_RELEASE) {
+            hideshowGuiPressed = false;
+        }
+        
         if (gui.inputChanged) {
             gui.inputChanged = false;
             resetFrame = true;

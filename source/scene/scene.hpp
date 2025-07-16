@@ -4,7 +4,7 @@
 #include "default_objects.hpp"
 #include "components/mesh.hpp"
 #include "image.hpp"
-#include "game_object.hpp"
+#include "node.hpp"
 #include "material.hpp"
 
 #include <fastgltf/core.hpp>
@@ -22,20 +22,25 @@ namespace mari {
             void                    update();
             std::shared_ptr<Image>  loadImage(const std::string &path, VkFormat format);
             std::shared_ptr<Image>  loadImage(const std::string &path, VkFormat format, const std::string &name);
+            std::shared_ptr<Node>   getNode(const uint32_t id);
+            void                    addNode(std::shared_ptr<Node> node);
+
 
             Transform transform;
 
-            std::vector<std::shared_ptr<Image>>                          images;
-            std::unordered_map<std::string, std::shared_ptr<GameObject>> nodes;
-            std::vector<std::shared_ptr<GameObject>> topNodes;
-            std::vector<std::shared_ptr<GameObject>> cameraObjects;
-            std::vector<std::shared_ptr<Material>>   materials;
-            std::unique_ptr<Buffer> materialDataBuffer;
+            
+            std::vector<std::shared_ptr<Image>>                             images;
+            std::unordered_map<std::string, std::shared_ptr<Node>>          nodes;
+            std::vector<std::shared_ptr<Node>>                              topNodes;
+            std::vector<std::shared_ptr<Node>>                              cameraObjects;
+            std::vector<std::shared_ptr<Material>>                          materials;
+            std::unique_ptr<Buffer>                                         materialDataBuffer;
+            std::shared_ptr<Node>                                           currentCamera;
+            int                                                             environmentID = 0;
         private:
-            void                    updateWorldMatrix(GameObject& g, const glm::mat4 &worldMatrix);
+            void                    updateWorldMatrix(Node& g, const glm::mat4 &worldMatrix);
 
             void                    loadSamplers(const std::vector<fastgltf::Sampler> &gltfSamplers);
-            std::shared_ptr<Image>  loadImage(void* data, VkFormat format, int width, int height);
             std::shared_ptr<Image>  loadImage(const std::string &folder, fastgltf::Asset& asset, fastgltf::Image& image);
             void                    loadImages(std::vector<fastgltf::Image> &gltfImages, fastgltf::Asset& asset, const std::string& folderPath);
             void                    loadMaterials(const std::vector<fastgltf::Material> &gltfMaterials, const std::vector<fastgltf::Texture> &gltfTextures);
@@ -43,7 +48,7 @@ namespace mari {
             void                    loadCameras(const std::vector<fastgltf::Camera> &gltfCameras);
             VkFilter                extractFilter(fastgltf::Filter filter);
             VkSamplerMipmapMode     extractMipmapMode(fastgltf::Filter filter);
-            std::shared_ptr<Image>  extractImage(void* data, int width, int height, VkFormat format);
+            std::shared_ptr<Image>  extractImage(void* data, VkFormat format, int width, int height);
             VkFormat                extractFormat(int channels); // TODO more complete implementation
 
             std::vector<std::shared_ptr<Mesh>>       meshes;

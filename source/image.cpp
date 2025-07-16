@@ -13,7 +13,7 @@ namespace mari {
      : device{device}, size{size}, format{format}, flags{flags}, layout{layout} {
         auto formatInfo = vkuGetFormatInfo(format);
         channels = formatInfo.component_count;
-        texelBytes = formatInfo.block_size;
+        texelBytes = formatInfo.texel_block_size;
         sampler = DefaultObjects::getSamplerLinear();
         createImage();
         createImageView();

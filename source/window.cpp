@@ -22,6 +22,10 @@ namespace mari {
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
 
+    void Window::resizeWindow(int width, int height) {
+        glfwSetWindowSize(window, width, height);
+    }
+
     void Window::createWindowSurface(VkInstance instance, VkSurfaceKHR *surface) {
         if (glfwCreateWindowSurface(instance, window, nullptr, surface) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create window surface.");

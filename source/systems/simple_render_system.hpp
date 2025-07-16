@@ -2,7 +2,7 @@
 
 #include "device.hpp"
 #include "pipeline.hpp"
-#include "game_object.hpp"
+#include "scene/node.hpp"
 #include "frame_info.hpp"
 
 #include <memory>

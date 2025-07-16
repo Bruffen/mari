@@ -2,7 +2,7 @@
 
 #include "window.hpp"
 #include "device.hpp"
-#include "game_object.hpp"
+#include "scene/node.hpp"
 #include "renderer.hpp"
 #include "default_objects.hpp"
 #include "frame_info.hpp"
@@ -34,7 +34,7 @@ namespace mari {
             RayTracingSystem    rayTracingSystem{device, window};
 
             std::shared_ptr<Scene> scene; // TODO
-            GameObject::Map gameObjects;
+            Node::Map nodes;
             std::unique_ptr<DescriptorPool> globalPool;
             std::unique_ptr<Gui> gui;
     };
