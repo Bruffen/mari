@@ -132,8 +132,8 @@ namespace mari {
 
                     ImGui::BeginChild("SceneChild", ImVec2(0, 200), ImGuiChildFlags_None);
                     for (std::shared_ptr<Node> &g : scene->topNodes) {                            
-                            imGuiObject(*g);
-                        }
+                        imGuiObject(*g);
+                    }
                     ImGui::EndChild();
                     
                     if (ImGui::BeginTabBar("##tabsInspector", ImGuiTabBarFlags_None)) {
@@ -217,13 +217,13 @@ namespace mari {
 
     void Gui::imGuiInspector(Node &g) {
         ImGui::Text(("ID: " + std::to_string(g.getId())).c_str());
-            imGuiTransform(g.transform);
-            if (g.mesh) {
-                imGuiMesh(*g.mesh);
-            }
-            if (g.camera) {
-                imGuiCamera(*g.camera);
-            }
+        imGuiTransform(g.transform);
+        if (g.mesh) {
+            imGuiMesh(*g.mesh);
+        }
+        if (g.camera) {
+            imGuiCamera(*g.camera);
+        }
     }
 
     void Gui::imGuiObject(Node &g) {
@@ -279,20 +279,20 @@ namespace mari {
         ImGui::Indent(20.0f);
 
         ImGui::Text((mesh.name).c_str());
-            ImGui::Text("%i vertices", mesh.vertexCount);
-            if (mesh.hasIndexBuffer) {
-                ImGui::Text("%i indices", mesh.indexCount);
-            }
-            ImGui::Text("%i triangles", mesh.hasIndexBuffer ? mesh.indexCount / 3 : mesh.vertexCount / 3);
+        ImGui::Text("%i vertices", mesh.vertexCount);
+        if (mesh.hasIndexBuffer) {
+            ImGui::Text("%i indices", mesh.indexCount);
+        }
+        ImGui::Text("%i triangles", mesh.hasIndexBuffer ? mesh.indexCount / 3 : mesh.vertexCount / 3);
         ImGui::Indent(-20.0f);
 
-            std::vector<std::string> materials;
-            for (const PrimMesh &s : mesh.primMeshes) {
-                // avoid showing the same material multiple times
-                if (std::find(materials.begin(), materials.end(), s.material->name) == materials.end()) {
-                    materials.push_back(s.material->name);
-                    imGuiSubMesh(s);
-                }
+        std::vector<std::string> materials;
+        for (const PrimMesh &s : mesh.primMeshes) {
+            // avoid showing the same material multiple times
+            if (std::find(materials.begin(), materials.end(), s.material->name) == materials.end()) {
+                materials.push_back(s.material->name);
+                imGuiSubMesh(s);
+            }
         }
     }
 
@@ -318,7 +318,7 @@ namespace mari {
             ImGui::EndCombo();
         }
 
-            imGuiMaterial(*submesh.material);
+        imGuiMaterial(*submesh.material);
         ImGui::Indent(-20.0f);
     }
 
@@ -327,17 +327,24 @@ namespace mari {
 
         MaterialConstants mc = material.data.constants;
 
+        ImGui::PushID(material.name.c_str());
         ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
         imGuiImage(*material.textures.albedo);
         ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
         ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
         imGuiImage(*material.textures.metallicRoughness);
         ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::SliderFloat("Thickness", (float*)&material.data.constants.thickness, 0.0f, 1.0f, "%.3f", silderFlags);
+        ImGui::SliderFloat("Refraction Index", (float*)&material.data.constants.ior, 1.0f, 3.0f, "%.3f", silderFlags);
+        ImGui::PopID();
 
-        if (mc.albedo != material.data.constants.albedo || 
-            mc.metallic != material.data.constants.metallic || 
-            mc.roughness != material.data.constants.roughness ||
-            mc.emission != material.data.constants.emission) {
+
+        if (mc.albedo       != material.data.constants.albedo       || 
+            mc.metallic     != material.data.constants.metallic     || 
+            mc.roughness    != material.data.constants.roughness    ||
+            mc.emission     != material.data.constants.emission     ||
+            mc.thickness    != material.data.constants.thickness    ||
+            mc.ior          != material.data.constants.ior) {
             inputChanged = true;
             scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
         }
@@ -355,17 +362,17 @@ namespace mari {
     void Gui::imGuiCamera(Camera &camera) {
         ImGui::Text("Camera");
         ImGui::Indent(20.0f);
-            float fov = camera.fov;
-            float fovDegrees = glm::degrees(fov);
+        float fov = camera.fov;
+        float fovDegrees = glm::degrees(fov);
 
-            ImGui::Text("Field of View:");
-            ImGui::SameLine();
-            ImGui::DragFloat("##fov", &fovDegrees, 0.1f, glm::degrees(Camera::MIN_FOV), glm::degrees(Camera::MAX_FOV), "%.1f", ImGuiSliderFlags_ClampOnInput);
+        ImGui::Text("Field of View:");
+        ImGui::SameLine();
+        ImGui::DragFloat("##fov", &fovDegrees, 0.1f, glm::degrees(Camera::MIN_FOV), glm::degrees(Camera::MAX_FOV), "%.1f", ImGuiSliderFlags_ClampOnInput);
 
-            camera.fov = glm::radians(fovDegrees);
-            if (fov != camera.fov) {
-                inputChanged = true;
-            }
+        camera.fov = glm::radians(fovDegrees);
+        if (fov != camera.fov) {
+            inputChanged = true;
+        }
         ImGui::Indent(-20.0f);
     }
 
@@ -465,7 +472,7 @@ namespace mari {
 
             if (ImGui::Button("Save render")) {
                 saveRender();
-            } 
+            }
 
             ImGui::EndTabItem();
         }

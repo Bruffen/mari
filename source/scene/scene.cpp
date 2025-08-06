@@ -60,6 +60,8 @@ namespace mari {
             fastgltf::Options::DecomposeNodeMatrices;
         constexpr auto parserOptions =
             fastgltf::Extensions::KHR_materials_emissive_strength |
+            fastgltf::Extensions::KHR_materials_ior |
+            fastgltf::Extensions::KHR_materials_volume |
             fastgltf::Extensions::KHR_lights_punctual;
 
         fastgltf::Parser parser{parserOptions};
@@ -378,6 +380,39 @@ namespace mari {
                 }
             }
 
+            // KHR_materials_ior
+            if (gltfMat.ior != 1.5f) {
+                m->data.constants.ior = gltfMat.ior;
+            }
+
+            // KHR_materials_volume
+            if (gltfMat.volume) {
+                m->data.constants.thickness = gltfMat.volume->thicknessFactor;
+
+                if (gltfMat.volume->thicknessTexture.has_value()) {
+                    const fastgltf::Texture& texture = gltfTextures[gltfMat.volume->thicknessTexture.value().textureIndex];
+                    if (texture.imageIndex.has_value()) {
+                        size_t img = texture.imageIndex.value();
+                        m->textures.thickness = images[img];
+                        m->data.indices.thickness = static_cast<int32_t>(img);
+                    }
+                }
+            }
+
+            materials.emplace_back(m);
+        }
+
+        // TODO if there are no materials in scene, add a default one to avoid problems
+        if (materials.empty()) {
+            std::shared_ptr<Material> m = std::make_shared<Material>();
+            m->name = "mari_default";
+
+            m->data.constants.albedo.x  = 1.0f;
+            m->data.constants.albedo.y  = 1.0f;
+            m->data.constants.albedo.z  = 1.0f;
+            m->data.constants.albedo.w  = 0.0f;
+            m->data.constants.metallic  = 0.0f;
+            m->data.constants.roughness = 1.0f;
             materials.emplace_back(m);
         }
 
@@ -502,6 +537,7 @@ namespace mari {
         if (data) {
             return extractImage(data, format, width, height);
         }
+        throw std::runtime_error("Failed to load " + path);
         return {};
     }
 

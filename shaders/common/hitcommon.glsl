@@ -8,45 +8,17 @@ struct PrimMeshInfo {
 
 struct Vertex {
     vec3 position;
-    float pad0;
     vec4 tangent;
     vec3 normal;
-    float pad1;
     vec4 color;
     vec2 uv;
-    vec2 pad2;
-}; 
-
-struct MaterialConstants {
-    vec4  albedo;
-    float metallic;
-    float roughness;
-    float ior;
-    float pad0;
-    vec4  emission;   // rgb for color, a for strength
-};
-
-struct TextureIndices {
-    int albedo;
-    int metallicRoughness;
-    int normal;
-    int emissive;
-    int anisotropy;
-    int thickness;
-    int iridescence;
-    int clearcoat;
-};
-
-struct MaterialData {
-    MaterialConstants constants;
-    TextureIndices    indices;
 };
 
 struct Triangle {
     Vertex vertices[3];
     vec4 color;
     vec3 hit;
-    vec3 normalS;       // Surface normal from vertex normal and normal map
+    vec3 normalS;       // Shading normal from interpolated vertex normals and normal map
     vec3 normalG;       // Geometric normal indicating where triangle is facing
     vec4 tangent;
     vec2 uv;
@@ -54,7 +26,7 @@ struct Triangle {
 };
 
 layout(buffer_reference, scalar) readonly buffer PrimMeshInfos { PrimMeshInfo p[]; };
-layout(buffer_reference, scalar) readonly buffer Vertices      { Vertex v[];       }; // TODO buffer_reference_align = 4
+layout(buffer_reference, scalar) readonly buffer Vertices      { Vertex v[];       };
 layout(buffer_reference, scalar) readonly buffer Indices       { uint i[];         };
 layout(buffer_reference, scalar) readonly buffer Materials     { MaterialData m[]; };
 
@@ -120,12 +92,40 @@ Triangle unpackTriangle(uint index) {
     //tri.tangent.w   = tri.vertices[0].tangent.w;
 
     // TODO fix mikktspace tangents so we don't have to calculate them here
-    vec3 up = abs(tri.normalS.z) < 0.9999999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    vec3 up = abs(tri.normalS.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
     tri.tangent.xyz = normalize(cross(up, tri.normalS));
     tri.tangent.w = 1.0;
+    
+    //tri.tangent.xyz = abs(tri.normalS.z) < 0.99999 ? normalize(cross(vec3(0, 0, 1), tri.normalS)) : vec3(1, 0, 0);
+    //tri.tangent.xyz = cross(tri.normalS, tri.tangent.xyz);
+    //tri.tangent.w = 1.0;
 
     tri.material = materials.m[0];
 
-
     return tri;
+}
+
+
+MaterialConstants getMaterial(Triangle tri) {
+    MaterialConstants m = tri.material.constants;
+    m.albedo     *= tri.color;
+    m.emission   *= tri.material.constants.emission.a;
+
+    if (tri.material.indices.albedo > -1) {
+        m.albedo *= pow(texture(textures[nonuniformEXT(tri.material.indices.albedo)], tri.uv), vec4(2.2));
+    }
+
+    if (tri.material.indices.metallicRoughness > -1) {
+        vec2 rm = texture(textures[nonuniformEXT(tri.material.indices.metallicRoughness)], tri.uv).gb;
+        m.roughness *= rm.x;
+        m.metallic  *= rm.y;
+
+        m.roughness = m.roughness * m.roughness;
+    }
+
+    if (tri.material.indices.emissive > -1) {
+        m.emission *= texture(textures[nonuniformEXT(tri.material.indices.emissive)], tri.uv);
+    }
+
+    return m;
 }

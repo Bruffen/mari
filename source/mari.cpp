@@ -231,7 +231,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  2  ) {
+        switch (  11  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -266,8 +266,8 @@ namespace mari {
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 break;
             case 8:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
                 break;
             case 9:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
@@ -279,12 +279,13 @@ namespace mari {
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
                 break;
             case 11:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
-        scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
+        //scene->images.emplace_back(scene->loadImage("../../models/zhengyang_gate_4k.hdr",       VK_FORMAT_R32G32B32A32_SFLOAT, "zhengyang_gate"));
+        //scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
         scene->images.emplace_back(scene->loadImage("../../models/solitude_interior_8k.hdr",    VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior"));
         scene->images.emplace_back(scene->loadImage("../../models/meadow_8k.hdr",               VK_FORMAT_R32G32B32A32_SFLOAT, "meadow"));
         scene->images.emplace_back(scene->loadImage("../../models/qwantani_noon_8k.hdr",        VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon"));

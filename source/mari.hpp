@@ -33,7 +33,7 @@ namespace mari {
             Renderer            renderer{window, device};
             RayTracingSystem    rayTracingSystem{device, window};
 
-            std::shared_ptr<Scene> scene; // TODO
+            std::shared_ptr<Scene> scene;
             std::unique_ptr<DescriptorPool> globalPool;
             std::unique_ptr<Gui> gui;
     };

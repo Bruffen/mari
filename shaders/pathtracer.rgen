@@ -1,5 +1,6 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_scalar_block_layout : enable
 
 #include "common/raycommon.glsl"
 #include "common/random.glsl"
@@ -44,6 +45,7 @@ void main() {
     prd.throughput  = vec3(1.0);
     prd.origin      = origin.xyz;
     prd.direction   = direction.xyz;
+    prd.eta         = 1.0;
     prd.done        = 0;
 
     for (int depth = 0; prd.done == 0 && depth < properties.maxDepth; depth++) {
@@ -58,7 +60,7 @@ void main() {
             float probability = (prd.throughput.r + prd.throughput.g + prd.throughput.b) / 3.0;
             
             if (random(prd.seed) > probability) {
-                break;
+                break; // TODO don't terminate on dielectri/transmission rays?
             }
             prd.throughput /= probability;
         }
@@ -90,7 +92,6 @@ void main() {
             tonemappedColor = toneAgX(tonemappedColor, properties.exposure);
             break;
         default:
-            tonemappedColor = pow(tonemappedColor * properties.exposure, vec3(1.0/2.2));
             break;
     }
     imageStore(presentImage, ivec2(gl_LaunchIDEXT.xy), vec4(tonemappedColor, 1.0));

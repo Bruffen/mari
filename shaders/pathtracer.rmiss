@@ -26,10 +26,8 @@ void main()
 {
     vec3 color = vec3(1.0, 1.0, 1.0);
 
-    float u = (1.0 + atan(prd.direction.x, -prd.direction.z) * M_1_PI) * 0.5; // TODO create pi constants
+    float u = (1.0 + atan(prd.direction.x, -prd.direction.z) * M_1_PI) * 0.5;
     float v = acos(prd.direction.y) * M_1_PI;
-
-    //color *= texture(environment, vec2(u, -v)).rgb;
 
     if (properties.environmentID > -1) {
         color *= texture(textures[nonuniformEXT(properties.environmentID)], vec2(u, -v)).rgb;

@@ -31,12 +31,12 @@ namespace mari {
         // KHR_materials_iridescence
         std::shared_ptr<Image>      iridescence;
         std::shared_ptr<Image>      iridescenceThickness;
-        
-        // KHR_materials_volume
-        std::shared_ptr<Image>      thickness;
 
         // KHR_materials_transmission
         std::shared_ptr<Image>      transmission;
+        
+        // KHR_materials_volume
+        std::shared_ptr<Image>      thickness;
 
         // KHR_materials_clearcoat
         std::shared_ptr<Image>      clearcoat;
@@ -53,7 +53,20 @@ namespace mari {
         glm::vec4                   albedo;
         float                       metallic;
         float                       roughness;
-        float                       ior;
+
+        // KHR_materials_ior
+        float                       ior = 1.5f;
+
+        // KHR_materials_volume
+        float                       thickness = 0.0f;
+        // TODO
+        //float                       attenuationDistance;
+        //glm::vec3                   attenuationColor;
+
+        // KHR_materials_anisotropy // TODO convert from gltf anisotropy parameters to pbrt's
+        //float                       anisotropyStrength = 0.0f;
+        //float                       anisotropyRotation = 0.0f; 
+
         alignas(16) glm::vec4       emission;   // rgb for color, a for strength
     };
 

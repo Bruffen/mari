@@ -39,13 +39,37 @@ float random(inout uint prev) {
 /**
  * 2 Dimensional Sampling
  *
- * Uniform disk
+ * Uniform disk polar
  */
- vec2 sampleUniformDisk(float r1, float r2) {
+ vec2 sampleUniformDiskPolar(float r1, float r2) {
     float radius = sqrt(r1);
     float theta  = 2.0 * M_PI * r2;
     return vec2(radius * cos(theta), radius * sin(theta));
  }
+
+/*
+ * Uniform disk concentric
+ */
+
+vec2 sampleUniformDiskConcentric(float r1, float r2) {
+    vec2 offset = 2.0 * vec2(r1, r2) - vec2(1, 1);
+    if (offset.x == 0.0 && offset.y == 0.0) {
+        return vec2(0, 0);
+    }
+
+    float theta;
+    float r;
+
+    if (abs(offset.x) > abs(offset.y)) {
+        r = offset.x;
+        theta = M_PI_4 * (offset.y / offset.x);
+    } else {
+        r = offset.y;
+        theta = M_PI_2 - M_PI_4 * (offset.x / offset.y);
+    }
+
+    return r * vec2(cos(theta), sin(theta));
+}
 
 /**
  * 3 Dimensional Sampling
@@ -66,8 +90,8 @@ float pdfUniformHemisphere() { return M_1_2PI; }
  * Cosine weighted hemisphere
  */
 vec3 sampleCosineHemisphere(float r1, float r2) {
-    vec2 d  = sampleUniformDisk(r1, r2);        // TODO pbrt uses sampleUniformDiskConcentric
-    float z = sqrt(1.0 - d.x*d.x - d.y*d.y);    // pbrt uses a safesqrt method here
+    vec2 d  = sampleUniformDiskConcentric(r1, r2);
+    float z = sqrt(max(0.0, 1.0 - d.x*d.x - d.y*d.y));
     return vec3(d.x, d.y, z);
 }
 
@@ -88,27 +112,11 @@ vec3 sampleUniformSphere(float r1, float r2) {
 float pdfUniformSphere() { return M_1_4PI; }
 
 /**
- * Samples a new diffuse direction with a normal only for testing purposes
+ * Samples a new diffuse direction with just a normal with no shading frame only for testing purposes
  */
 vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
     const float theta = 6.2831853 * r1;  // Random in [0, 2pi]
     const float u     = 2.0 * r2 - 1.0;  // Random in [-1, 1]
     const float r     = sqrt(1.0 - u * u);
     return normalize(worldNormal + vec3(r * cos(theta), u, r * sin(theta)));
-}
-
-/**
- * Shading frame to world frame transformations
- */
-vec3 toLocal(vec3 t, vec3 b, vec3 n, vec3 v) {
-    return vec3(dot(v, t), dot(v, b), dot(v, n));
-}
-
-vec3 fromLocal(vec3 t, vec3 b, vec3 n, vec3 v) {
-    return v.x * t + v.y * b + v.z * n;
-}
-
-vec3 fromLocal(vec4 worldTangent, vec3 worldNormal, vec3 v) {
-    vec3 worldBitangent = cross(worldNormal, worldTangent.xyz) * worldTangent.w;
-    return fromLocal(worldTangent.xyz, worldBitangent, worldNormal, v);
 }
