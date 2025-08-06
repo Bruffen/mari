@@ -203,6 +203,11 @@ namespace mari {
         featuresSDHIF.shaderDemoteToHelperInvocation = VK_TRUE;
         featuresSDHIF.pNext = &featuresRTV;
 
+        VkPhysicalDeviceScalarBlockLayoutFeatures featuresSBL{};
+        featuresSBL.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
+        featuresSBL.scalarBlockLayout = VK_TRUE;
+        featuresSBL.pNext = &featuresSDHIF;
+
         if (enableShaderRelaxed) {
             VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR featuresSREI{};
             featuresSREI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR;
@@ -210,7 +215,7 @@ namespace mari {
             featuresBDA.pNext = &featuresSREI;
         }
 
-        createInfo.pNext = &featuresSDHIF;
+        createInfo.pNext = &featuresSBL;
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
 

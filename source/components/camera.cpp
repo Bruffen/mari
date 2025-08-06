@@ -11,10 +11,9 @@ namespace mari {
     }
 
     void Camera::update(Transform &transform, glm::mat4 worldMatrix) {
-        //glm::vec3 worldPosition = worldMatrix * glm::vec4(transform.position, 1.0);
-        glm::vec3 worldPosition = transform.position;
-
-        setViewYZX(worldPosition, transform.rotation);
+        glm::vec3 position = worldMatrix * glm::vec4(transform.position, 1.0);
+        glm::vec3 rotation = worldMatrix * glm::vec4(transform.rotation, 0.0);
+        setViewYZX(position, rotation);
         setPerspectiveProjection(aspectRatio, 0.01f, 1000.0f);
     }
 

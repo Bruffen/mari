@@ -19,6 +19,7 @@ namespace mari {
             Scene(Device &device, const std::string &path);
             ~Scene();
 
+            void                    start();
             void                    update();
             std::shared_ptr<Image>  loadImage(const std::string &path, VkFormat format);
             std::shared_ptr<Image>  loadImage(const std::string &path, VkFormat format, const std::string &name);
@@ -38,7 +39,7 @@ namespace mari {
             std::shared_ptr<Node>                                           currentCamera;
             int                                                             environmentID = 0;
         private:
-            void                    updateWorldMatrix(Node& g, const glm::mat4 &worldMatrix);
+            void                    initializeWorldMatrix(Node& g, const glm::mat4 &worldMatrix);
 
             void                    loadSamplers(const std::vector<fastgltf::Sampler> &gltfSamplers);
             std::shared_ptr<Image>  loadImage(const std::string &folder, fastgltf::Asset& asset, fastgltf::Image& image);

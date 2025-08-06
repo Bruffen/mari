@@ -18,7 +18,6 @@
 #include <chrono>
 #include <cassert>
 #include <stdexcept>
-#include <iostream>
 
 namespace mari {
     Mari::Mari() {
@@ -82,7 +81,7 @@ namespace mari {
         std::vector<VkDescriptorSet> rasterizationDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < rasterizationDescriptorSets.size(); i++) {
             DescriptorWriter(*rasterizationSetLayout, *globalPool)
-                .writeBuffer(0, &rasterizationUboBuffers[i]->descriptorInfo())
+                .writeBuffer(0, rasterizationUboBuffers[i]->descriptorInfo())
                 .build(rasterizationDescriptorSets[i]);
         }
 
@@ -99,11 +98,11 @@ namespace mari {
         std::vector<VkDescriptorSet> rayTracingDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < rayTracingDescriptorSets.size(); i++) {
             DescriptorWriter(*rayTracingSetLayout, *globalPool)
-                .writeAccelerationStructure(0, &rayTracingSystem.tlas->descriptor())
-                .writeImage(                1, &rayTracingSystem.accumImage->descriptorInfo())
-                .writeImage(                2, &rayTracingSystem.presentImage->descriptorInfo())
-                .writeBuffer(               3, &rayTracingUboBuffers[i]->descriptorInfo())
-                .writeBuffer(               4, &rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
+                .writeAccelerationStructure(0, rayTracingSystem.tlas->descriptor())
+                .writeImage(                1, rayTracingSystem.accumImage->descriptorInfo())
+                .writeImage(                2, rayTracingSystem.presentImage->descriptorInfo())
+                .writeBuffer(               3, rayTracingUboBuffers[i]->descriptorInfo())
+                .writeBuffer(               4, rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
                 .writeImages(               5, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
@@ -116,8 +115,9 @@ namespace mari {
         std::shared_ptr<Node> cameraObject = std::make_shared<Node>();
         cameraObject->name = "Free Camera";
         cameraObject->camera = std::make_shared<Camera>();
-        cameraObject->transform.position.y = -0.7f;
-        cameraObject->transform.position.z = -1.5f;
+        cameraObject->transform.position.y = 0.7f;
+        cameraObject->transform.position.z = 1.5f;
+        cameraObject->isStatic = false;
         scene->addNode(cameraObject);
         scene->cameraObjects.emplace_back(cameraObject);
         scene->currentCamera = cameraObject;
@@ -143,8 +143,10 @@ namespace mari {
 
             // TODO on camera move when free camera isn't set, set free camera's transform equal to current camera and change to free camera
             controller.update(window.getGLFWwindow(), deltaTime, *scene->currentCamera);
-            scene->currentCamera->update(); // TODO call every node's update
-            
+            scene->update();
+
+            // TODO call every node's update
+
             if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
                 FrameInfo frameInfo {
@@ -155,7 +157,7 @@ namespace mari {
                     commandBuffer,
                     *scene->currentCamera,
                     controller.isRayTracingOn() ? rayTracingDescriptorSets[frameIndex] : rasterizationDescriptorSets[frameIndex],
-                    nodes
+                    scene->nodes
                 };
 
                 if (controller.isRayTracingOn()) {
@@ -217,8 +219,8 @@ namespace mari {
 
                     for (int i = 0; i < rayTracingDescriptorSets.size(); i++) {
                         DescriptorWriter::DescriptorWriter(*rayTracingSetLayout, *globalPool)
-                            .writeImage(1, &rayTracingSystem.accumImage->descriptorInfo())
-                            .writeImage(2, &rayTracingSystem.presentImage->descriptorInfo())
+                            .writeImage(1, rayTracingSystem.accumImage->descriptorInfo())
+                            .writeImage(2, rayTracingSystem.presentImage->descriptorInfo())
                             .overwrite(rayTracingDescriptorSets[i]);
                     }
                 }
@@ -229,7 +231,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  6  ) {
+        switch (  2  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -269,23 +271,27 @@ namespace mari {
                 break;
             case 9:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/cube.glb");
                 break;
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
                 break;
+            case 11:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
-        //scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
+        scene->images.emplace_back(scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio"));
         scene->images.emplace_back(scene->loadImage("../../models/solitude_interior_8k.hdr",    VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior"));
-        //scene->images.emplace_back(scene->loadImage("../../models/meadow_8k.hdr",               VK_FORMAT_R32G32B32A32_SFLOAT, "meadow"));
-        //scene->images.emplace_back(scene->loadImage("../../models/qwantani_noon_8k.hdr",        VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon"));
+        scene->images.emplace_back(scene->loadImage("../../models/meadow_8k.hdr",               VK_FORMAT_R32G32B32A32_SFLOAT, "meadow"));
+        scene->images.emplace_back(scene->loadImage("../../models/qwantani_noon_8k.hdr",        VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon"));
         scene->images.emplace_back(DefaultObjects::getImageWhite());
         scene->images.emplace_back(DefaultObjects::getImageBlack());
-        scene->environmentID = static_cast<int>(scene->images.size() - 3);
+        scene->environmentID = static_cast<int>(scene->images.size() - 4);
 
-        scene->update();
+        scene->start();
     }
 }

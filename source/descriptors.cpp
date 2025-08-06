@@ -151,7 +151,7 @@ namespace mari {
         : setLayout{setLayout}, pool{pool} {}
  
     DescriptorWriter &DescriptorWriter::writeBuffer(
-        uint32_t binding, VkDescriptorBufferInfo *bufferInfo) {
+        uint32_t binding, VkDescriptorBufferInfo bufferInfo) {
         assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
     
         auto &bindingDescription = setLayout.bindings[binding];
@@ -164,14 +164,14 @@ namespace mari {
         write.sType             = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         write.descriptorType    = bindingDescription.descriptorType;
         write.dstBinding        = binding;
-        write.pBufferInfo       = bufferInfo;
+        write.pBufferInfo       = &bufferInfo;
         write.descriptorCount   = 1;
         
         writes.push_back(write);
         return *this;
     }
  
-    DescriptorWriter &DescriptorWriter::writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo) {
+    DescriptorWriter &DescriptorWriter::writeImage(uint32_t binding, VkDescriptorImageInfo imageInfo) {
         assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
         
         auto &bindingDescription = setLayout.bindings[binding];
@@ -185,7 +185,7 @@ namespace mari {
         write.sType             = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         write.descriptorType    = bindingDescription.descriptorType;
         write.dstBinding        = binding;
-        write.pImageInfo        = imageInfo;
+        write.pImageInfo        = &imageInfo;
         write.descriptorCount   = 1;
         
         writes.push_back(write);
@@ -213,7 +213,7 @@ namespace mari {
         return *this;
     }
 
-    DescriptorWriter &DescriptorWriter::writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *accelerationStructureDescriptor) {
+    DescriptorWriter &DescriptorWriter::writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureDescriptor) {
         assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
         
         auto &bindingDescription = setLayout.bindings[binding];
@@ -228,7 +228,7 @@ namespace mari {
         write.descriptorType    = bindingDescription.descriptorType;
         write.dstBinding        = binding;
         write.descriptorCount   = 1;
-        write.pNext             = accelerationStructureDescriptor;
+        write.pNext             = &accelerationStructureDescriptor;
         
         writes.push_back(write);
         return *this;

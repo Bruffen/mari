@@ -72,18 +72,18 @@ namespace mari {
         int lightIndex = 0;
         for (auto &kv: frameInfo.nodes) {
             auto &obj = kv.second;
-            if (obj.pointLight == nullptr) continue;
+            if (obj->pointLight == nullptr) continue;
 
             assert(lightIndex < MAX_LIGHTS && "Point lights exceed maximum specified");
 
 
             // Update light position
-            obj.transform.position = glm::vec3(rotateLight * glm::vec4(obj.transform.position, 1.0f));
-            obj.transform.position.y = -1.7f + 1.5f * std::sin(frameInfo.elapsedTime + lightIndex * 3.0f);
+            obj->transform.position = glm::vec3(rotateLight * glm::vec4(obj->transform.position, 1.0f));
+            obj->transform.position.y = -1.7f + 1.5f * std::sin(frameInfo.elapsedTime + lightIndex * 3.0f);
 
             // Copy light to ubo
-            ubo.pointLights[lightIndex].position = glm::vec4(obj.transform.position, 1.0f);
-            ubo.pointLights[lightIndex].color = glm::vec4(obj.color, obj.pointLight->lightIntensity);
+            ubo.pointLights[lightIndex].position = glm::vec4(obj->transform.position, 1.0f);
+            ubo.pointLights[lightIndex].color = glm::vec4(obj->color, obj->pointLight->lightIntensity);
 
             lightIndex++;
         }
@@ -108,12 +108,12 @@ namespace mari {
 
         for (auto &kv: frameInfo.nodes) {
             auto &obj = kv.second;
-            if (obj.pointLight == nullptr) continue;
+            if (obj->pointLight == nullptr) continue;
 
             PointLightPushConstants push{};
-            push.position = glm::vec4(obj.transform.position, 1.0f);
-            push.color = glm::vec4(obj.color, obj.pointLight->lightIntensity);
-            push.radius = obj.transform.scale.x;
+            push.position = glm::vec4(obj->transform.position, 1.0f);
+            push.color = glm::vec4(obj->color, obj->pointLight->lightIntensity);
+            push.radius = obj->transform.scale.x;
 
             vkCmdPushConstants(
                 frameInfo.commandBuffer,

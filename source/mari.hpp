@@ -34,7 +34,6 @@ namespace mari {
             RayTracingSystem    rayTracingSystem{device, window};
 
             std::shared_ptr<Scene> scene; // TODO
-            Node::Map nodes;
             std::unique_ptr<DescriptorPool> globalPool;
             std::unique_ptr<Gui> gui;
     };

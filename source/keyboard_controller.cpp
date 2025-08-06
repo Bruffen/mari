@@ -17,12 +17,12 @@ namespace mari {
         float acceleration = 1.0f;
 
         glm::vec3 moveDir{0.0f};
-        if (glfwGetKey(window, keys.moveForward)    == GLFW_PRESS) moveDir += f;
-        if (glfwGetKey(window, keys.moveBackward)   == GLFW_PRESS) moveDir -= f;
+        if (glfwGetKey(window, keys.moveForward)    == GLFW_PRESS) moveDir -= f;
+        if (glfwGetKey(window, keys.moveBackward)   == GLFW_PRESS) moveDir += f;
         if (glfwGetKey(window, keys.moveRight)      == GLFW_PRESS) moveDir += r;
         if (glfwGetKey(window, keys.moveLeft)       == GLFW_PRESS) moveDir -= r;
-        if (glfwGetKey(window, keys.moveUp)         == GLFW_PRESS) moveDir -= u;
-        if (glfwGetKey(window, keys.moveDown)       == GLFW_PRESS) moveDir += u;
+        if (glfwGetKey(window, keys.moveUp)         == GLFW_PRESS) moveDir += u;
+        if (glfwGetKey(window, keys.moveDown)       == GLFW_PRESS) moveDir -= u;
 
         if (glfwGetKey(window, keys.sprint)         == GLFW_PRESS) currentSpeed += currentSpeed * acceleration * deltatime;
         if (glfwGetKey(window, keys.sprint)         == GLFW_RELEASE || glm::length(moveDir) == 0.0f) currentSpeed = moveSpeed;
@@ -50,7 +50,7 @@ namespace mari {
             glm::vec2 movement{static_cast<float>(x - mouse.lastPositionX), static_cast<float>(y - mouse.lastPositionY)};
             if (glm::dot(movement, movement) > glm::epsilon<float>()) {
                 node.transform.rotation.x -= movement.y * lookSpeed;
-                node.transform.rotation.y += movement.x * lookSpeed;
+                node.transform.rotation.y -= movement.x * lookSpeed;
 
                 //node.transform.rotation.x = glm::clamp(node.transform.rotation.x, -1.5f, 1.5f);
                 node.transform.rotation.y = glm::mod(node.transform.rotation.y, glm::two_pi<float>());       

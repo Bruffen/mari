@@ -17,8 +17,6 @@ namespace mari {
     // TODO https://austinmorlan.com/posts/entity_component_system/
     class Node {
         public:
-            using Map = std::unordered_map<uint32_t, Node>;
-
             Node();
             //Node(const Node &) = delete;
             //Node &operator=(const Node &) = delete;
@@ -26,7 +24,7 @@ namespace mari {
             //Node &operator=(Node &&) = default;
 
             void start();
-            void update();
+            void update(const glm::mat4& parent);
             void render();
 
             const uint32_t                              getId() { return id; }
@@ -34,10 +32,9 @@ namespace mari {
 
             std::string                                 name        = "";
             glm::vec3                                   color       {};         // TODO move to light component
-            glm::mat4                                   worldMatrix {};         // world values
+            glm::mat4                                   worldMatrix {1.0f};     // World values
             Transform                                   transform   {};         // local values
             bool                                        isStatic    {true};
-            float                                       fovy        {50.0f};
 
             // Optional pointer components
             std::weak_ptr<Node>                         parent;
@@ -50,6 +47,5 @@ namespace mari {
 
         private:
             uint32_t id;
-            //Node(uint32_t id) : id{id} {}
     };
 }

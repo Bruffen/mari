@@ -43,6 +43,6 @@ namespace mari {
         VkCommandBuffer commandBuffer;
         Node &cameraObject;
         VkDescriptorSet globalDescriptorSet;
-        Node::Map &nodes; // TODO should point to scene now and go through game objects that way
+        std::unordered_map<std::string, std::shared_ptr<Node>> &nodes;
     };
 }

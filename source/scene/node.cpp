@@ -11,9 +11,17 @@ namespace mari {
 
     }
 
-    void Node::update() {
+    void Node::update(const glm::mat4& parent) {
+        if (isStatic) {
+            return;
+        }
+
         if (camera) {
-            camera->update(transform, worldMatrix);
+            camera->update(transform, parent);
+        }
+
+        for (auto &child : children) {
+            child->update(parent);
         }
     }
 

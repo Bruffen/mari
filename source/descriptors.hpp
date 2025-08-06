@@ -90,10 +90,10 @@ namespace mari {
         public:
             DescriptorWriter(DescriptorSetLayout &setLayout, DescriptorPool &pool);
     
-            DescriptorWriter &writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo);
-            DescriptorWriter &writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo);
+            DescriptorWriter &writeBuffer(uint32_t binding, VkDescriptorBufferInfo bufferInfo);
+            DescriptorWriter &writeImage(uint32_t binding, VkDescriptorImageInfo imageInfo);
             DescriptorWriter &writeImages(uint32_t binding, std::vector<VkDescriptorImageInfo> *imageInfos);
-            DescriptorWriter &writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *accelerationStructureDescriptor);
+            DescriptorWriter &writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureDescriptor);
             
             bool build(VkDescriptorSet &set);
             void overwrite(VkDescriptorSet &set);

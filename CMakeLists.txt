@@ -82,7 +82,7 @@ file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
  
 add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES} ${MIKKTSPACE_SOURCES})
  
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
 set(OPTIONS "/Zi") 
 set(OPTIONS "/DEBUG")

@@ -18,13 +18,10 @@ namespace mari {
         public:
             struct Vertex {
                 glm::vec3 position;
-                float pad0;
                 glm::vec4 tangent;
                 glm::vec3 normal;
-                float pad1;
                 glm::vec4 color;
                 glm::vec2 uv;
-                glm::vec2 pad2;
                 
                 static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
                 static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
@@ -60,8 +57,8 @@ namespace mari {
             uint32_t                    indexCount;
             bool                        hasIndexBuffer = false;
 
-            std::vector<Vertex>     vertices{};
-            std::vector<uint32_t>   indices{};
+            std::vector<Vertex>         vertices{};
+            std::vector<uint32_t>       indices{};
             /**/
 
             std::string                 name = "";
@@ -72,14 +69,14 @@ namespace mari {
 
     class TangentHelper {
         public:
-        static Mesh::Vertex*    getVertex(const SMikkTSpaceContext *context, int iFace, int iVert);
-        static int              getNumFaces(const SMikkTSpaceContext * pContext);
-	    static int              getNumVerticesOfFace(const SMikkTSpaceContext * pContext, const int iFace);
-	    static void             getPosition(const SMikkTSpaceContext * pContext, float fvPosOut[], const int iFace, const int iVert);
-	    static void             getNormal(const SMikkTSpaceContext * pContext, float fvNormOut[], const int iFace, const int iVert);
-	    static void             getTexCoord(const SMikkTSpaceContext * pContext, float fvTexcOut[], const int iFace, const int iVert);
-	    static void             setTSpaceBasic(const SMikkTSpaceContext * pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert);
-	    static void             setTSpace(const SMikkTSpaceContext * pContext, const float fvTangent[], const float fvBiTangent[], const float fMagS, const float fMagT,
-						            const tbool bIsOrientationPreserving, const int iFace, const int iVert);
+            static Mesh::Vertex*    getVertex(const SMikkTSpaceContext *pcontext, int iFace, int iVert);
+            static int              getNumFaces(const SMikkTSpaceContext *pContext);
+            static int              getNumVerticesOfFace(const SMikkTSpaceContext *pContext, const int iFace);
+            static void             getPosition(const SMikkTSpaceContext *pContext, float fvPosOut[], const int iFace, const int iVert);
+            static void             getNormal(const SMikkTSpaceContext *pContext, float fvNormOut[], const int iFace, const int iVert);
+            static void             getTexCoord(const SMikkTSpaceContext *pContext, float fvTexcOut[], const int iFace, const int iVert);
+            static void             setTSpaceBasic(const SMikkTSpaceContext *pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert);
+            static void             setTSpace(const SMikkTSpaceContext *pContext, const float fvTangent[], const float fvBiTangent[], const float fMagS, const float fMagT,
+                                        const tbool bIsOrientationPreserving, const int iFace, const int iVert);
     };
 }

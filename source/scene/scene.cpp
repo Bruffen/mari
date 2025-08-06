@@ -102,6 +102,7 @@ namespace mari {
             if (node.cameraIndex.has_value()) {
                 newNode->camera = cameras[*node.cameraIndex];
                 cameraObjects.emplace_back(newNode);
+                newNode->isStatic = false; // TODO cameras could still be static, just switch to free camera on movement
             }
 
             tmpNodes.emplace_back(newNode);
@@ -145,16 +146,24 @@ namespace mari {
         }
     }
 
-    void Scene::update() {
+    // Calculate matrices whether they're static nodes or not
+    void Scene::start() {
         for (auto& g : topNodes) {
-            updateWorldMatrix(*g, transform.mat4());
+            initializeWorldMatrix(*g, transform.mat4());
         }
     }
 
-    void Scene::updateWorldMatrix(Node& g, const glm::mat4 &worldMatrix) { // TODO don't update for static objects after the first time (maybe have a second set function)
+    void Scene::initializeWorldMatrix(Node& g, const glm::mat4 &worldMatrix) {
         g.worldMatrix = worldMatrix * g.transform.mat4();
         for (auto& c : g.children) {
-            updateWorldMatrix(*c, g.worldMatrix);
+            initializeWorldMatrix(*c, g.worldMatrix);
+        }
+    }
+
+    // Update non static nodes
+    void Scene::update() {
+        for (auto& g : topNodes) {
+            g->update(transform.mat4());
         }
     }
 
