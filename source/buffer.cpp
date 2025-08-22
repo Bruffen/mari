@@ -14,7 +14,7 @@
 namespace mari {
 
     Buffer::Buffer(
-        Device &device,
+        const Device &device,
         VkDeviceSize instanceSize,
         uint32_t instanceCount,
         VkBufferUsageFlags usageFlags,

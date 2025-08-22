@@ -44,6 +44,7 @@ namespace mari {
 
     // class member functions
     Device::Device(Window &window) : window{window} {
+        addShaderDebugPrintf();
         createInstance();
         setupDebugMessenger();
         createSurface();
@@ -94,6 +95,12 @@ namespace mari {
 
             populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
+
+            VkValidationFeaturesEXT validationFeatures{};
+            validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+            validationFeatures.enabledValidationFeatureCount = static_cast<uint32_t>(validationFeaturesEnable.size());
+            validationFeatures.pEnabledValidationFeatures = validationFeaturesEnable.data();
+            debugCreateInfo.pNext = &validationFeatures;
         } else {
             createInfo.enabledLayerCount = 0;
             createInfo.pNext = nullptr;
@@ -145,7 +152,7 @@ namespace mari {
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily, indices.presentFamily};
+        std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily, indices.presentFamily, indices.computeFamily };
 
         float queuePriority = 1.0f;
         for (uint32_t queueFamily : uniqueQueueFamilies) {
@@ -225,6 +232,7 @@ namespace mari {
 
         vkGetDeviceQueue(device_, indices.graphicsFamily, 0, &graphicsQueue_);
         vkGetDeviceQueue(device_, indices.presentFamily, 0, &presentQueue_);
+        vkGetDeviceQueue(device_, indices.computeFamily, 0, &computeQueue_);
     }
 
     void Device::createCommandPool() {
@@ -263,12 +271,14 @@ namespace mari {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         createInfo.messageSeverity = 
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT    |
             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
             VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         createInfo.messageType = 
             VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+            //VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
         createInfo.pfnUserCallback = debugCallback;
         createInfo.pUserData = nullptr;  // Optional
     }
@@ -293,10 +303,10 @@ namespace mari {
             bool layerFound = false;
 
             for (const auto &layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
-            }
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
             }
 
             if (!layerFound) {
@@ -347,6 +357,12 @@ namespace mari {
         }
     }
 
+    void Device::addShaderDebugPrintf() {  // TODO debug mode only
+        deviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+
+        validationFeaturesEnable.push_back(VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT);
+    }
+
     void Device::addRayTracingExtensions() {
         std::vector<const char*> rtExtensions = { 
             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -364,9 +380,9 @@ namespace mari {
             VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
 
             // Optional useful ray tracing validation layer // TODO use it only in debug mode
-            VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME       
+            VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
         };
-        
+
         deviceExtensions.insert(deviceExtensions.end(), rtExtensions.begin(), rtExtensions.end());
     }
 
@@ -407,6 +423,12 @@ namespace mari {
                 indices.presentFamily = i;
                 indices.presentFamilyHasValue = true;
             }
+            VkBool32 computeSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface_, &computeSupport);
+            if (queueFamily.queueCount > 0 && computeSupport) {
+                indices.computeFamily = i;
+                indices.computeFamilyHasValue = true;
+            }
             if (indices.isComplete()) {
                 break;
             }
@@ -417,7 +439,7 @@ namespace mari {
         return indices;
     }
 
-    SwapchainSupportDetails Device::querySwapchainSupport(VkPhysicalDevice device) {
+    SwapchainSupportDetails Device::querySwapchainSupport(VkPhysicalDevice device) const {
         SwapchainSupportDetails details;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
 
@@ -459,7 +481,7 @@ namespace mari {
         throw std::runtime_error("Failed to find supported format!");
     }
 
-    uint32_t Device::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    uint32_t Device::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
         VkPhysicalDeviceMemoryProperties memProperties;
         vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
@@ -472,7 +494,7 @@ namespace mari {
         throw std::runtime_error("Failed to find suitable memory type!");
     }
 
-    void Device::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
+    void Device::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -506,7 +528,7 @@ namespace mari {
         vkBindBufferMemory(device_, buffer, bufferMemory, 0);
     }
 
-    VkCommandBuffer Device::beginSingleTimeCommands() {
+    VkCommandBuffer Device::beginSingleTimeCommands() const {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -524,7 +546,7 @@ namespace mari {
         return commandBuffer;
     }
 
-    void Device::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    void Device::endSingleTimeCommands(VkCommandBuffer commandBuffer) const {
         vkEndCommandBuffer(commandBuffer);
 
         VkSubmitInfo submitInfo{};
@@ -538,7 +560,7 @@ namespace mari {
         vkFreeCommandBuffers(device_, commandPool, 1, &commandBuffer);
     }
 
-    void Device::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    void Device::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) const {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkBufferCopy copyRegion{};
@@ -595,6 +617,129 @@ namespace mari {
         vkCmdCopyImageToBuffer(commandBuffer, image, layout, buffer, 1, &bufferImageCopy);
 
         endSingleTimeCommands(commandBuffer);
+    }
+
+    void Device::copyImageToImage(VkCommandBuffer commandBuffer, VkImage imageSrc, VkImage imageDst, VkExtent3D imageSize) {
+        VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageSrc, 
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            {},
+            VK_ACCESS_TRANSFER_READ_BIT,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            subresourceRange
+        );
+
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageDst, 
+            VK_IMAGE_LAYOUT_UNDEFINED, 
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        );
+
+        VkImageCopy imageCopy{};
+        imageCopy.srcSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        imageCopy.srcOffset         = {0, 0, 0};
+        imageCopy.dstSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        imageCopy.dstOffset         = {0, 0, 0};
+        imageCopy.extent            = {imageSize.width, imageSize.height, 1};
+        
+        vkCmdCopyImage(
+            commandBuffer, 
+            imageSrc, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            imageDst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+            1, &imageCopy
+        );
+        
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageSrc, 
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+            VK_ACCESS_TRANSFER_READ_BIT,
+            {},
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            subresourceRange
+        );
+
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageDst, 
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        );
+    }
+
+    void Device::blitImageToImage(VkCommandBuffer commandBuffer, VkImage imageSrc, VkExtent3D sizeSrc, VkImage imageDst, VkExtent3D sizeDst) {
+        VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageSrc, 
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            {},
+            VK_ACCESS_TRANSFER_READ_BIT,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            subresourceRange
+        );
+
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageDst, 
+            VK_IMAGE_LAYOUT_UNDEFINED, 
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        );
+
+        VkImageSubresourceLayers subresourceLayers{};
+        subresourceLayers.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresourceLayers.baseArrayLayer    = 0;
+        subresourceLayers.layerCount        = 1;
+        subresourceLayers.mipLevel          = 0;
+
+        VkImageBlit imageBlit{};
+        imageBlit.srcSubresource = subresourceLayers;
+        imageBlit.dstSubresource = subresourceLayers;
+        imageBlit.srcOffsets[0] = {0, 0, 0}; 
+        imageBlit.srcOffsets[1] = {static_cast<int32_t>(sizeSrc.width), static_cast<int32_t>(sizeSrc.height), 1}; 
+        imageBlit.dstOffsets[0] = {0, 0, 0}; 
+        imageBlit.dstOffsets[1] = {static_cast<int32_t>(sizeDst.width), static_cast<int32_t>(sizeDst.height), 1};
+
+        vkCmdBlitImage(
+            commandBuffer, 
+            imageSrc, 
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            imageDst,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &imageBlit,
+            VK_FILTER_NEAREST
+        );
+        
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageSrc, 
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
+            VK_ACCESS_TRANSFER_READ_BIT,
+            {},
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            subresourceRange
+        );
+
+        vkhelper::transitionImageLayout(
+            commandBuffer, 
+            imageDst, 
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        );
     }
 
     void Device::createImageWithInfo(

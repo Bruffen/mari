@@ -19,7 +19,8 @@ namespace mari {
             void set(std::shared_ptr<Scene> scene);
             void prepare(FrameInfo &frameInfo);
             void render(VkCommandBuffer commandBuffer);
-            void saveRender();
+            void saveImage(const Image& image);
+            void saveImageFromData(const void* data, const int width, const int height, const int comp, bool hdr = false);
 
             bool inputChanged = false;
             bool isActive = true;

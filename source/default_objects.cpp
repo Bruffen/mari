@@ -8,9 +8,12 @@
 namespace mari {
     VkSampler              DefaultObjects::samplerNearest;
     VkSampler              DefaultObjects::samplerLinear;
+    VkSampler              DefaultObjects::samplerLinearClampEdge;
     std::shared_ptr<Image> DefaultObjects::imageWhite;
     std::shared_ptr<Image> DefaultObjects::imageBlack;
     std::shared_ptr<Image> DefaultObjects::imageError;
+    std::shared_ptr<Image> DefaultObjects::imageWhite32f;
+    std::shared_ptr<Image> DefaultObjects::imageBlack32f;
 
     void DefaultObjects::initialize(Device &device) {
         VkSamplerCreateInfo samplerInfo{};
@@ -21,6 +24,10 @@ namespace mari {
         samplerInfo.magFilter = VK_FILTER_LINEAR;
         samplerInfo.minFilter = VK_FILTER_LINEAR;
         vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerLinear);
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vkCreateSampler(device.handle(), &samplerInfo, nullptr, &samplerLinearClampEdge);
 
         uint32_t white   = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
         uint32_t black   = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
@@ -64,14 +71,41 @@ namespace mari {
         );
         imageError->name = "default_error";
         imageError->sampler = samplerNearest;
+
+        glm::vec4 white32f = glm::vec4(1, 1, 1, 1);
+        glm::vec4 black32f = glm::vec4(0, 0, 0, 1);
+        imageWhite32f = std::make_shared<Image>(
+            device, 
+            VkExtent3D{1, 1, 1}, 
+            VK_FORMAT_R32G32B32A32_SFLOAT, 
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            (void*)&white32f
+        );
+        imageWhite32f->name = "default_white32f";
+        imageWhite32f->sampler = samplerLinearClampEdge;
+
+        imageBlack32f = std::make_shared<Image>(
+            device, 
+            VkExtent3D{1, 1, 1}, 
+            VK_FORMAT_R32G32B32A32_SFLOAT, 
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            (void*)&black32f
+        );
+        imageBlack32f->name = "default_black32f";
+        imageBlack32f->sampler = samplerLinearClampEdge;
     }
 
     void DefaultObjects::cleanup(Device &device) {
         vkDestroySampler(device.handle(), samplerNearest, nullptr);
         vkDestroySampler(device.handle(), samplerLinear, nullptr);
+        vkDestroySampler(device.handle(), samplerLinearClampEdge, nullptr);
 
         imageWhite.reset();
         imageBlack.reset();
         imageError.reset();
+        imageWhite32f.reset();
+        imageBlack32f.reset();
     } 
 }

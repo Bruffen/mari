@@ -7,7 +7,7 @@
 #include "common/material.glsl"
 #include "common/raycommon.glsl"
 #include "common/hitcommon.glsl"
-#include "common/random.glsl"
+#include "common/sampling.glsl"
 
 void main() {
     uint64_t meshDeviceAddress = pPrimMeshInfos.addresses[gl_InstanceID];

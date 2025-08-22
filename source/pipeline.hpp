@@ -3,6 +3,7 @@
 #include "device.hpp"
 #include "renderer.hpp"
 #include "buffer.hpp"
+#include "pipeline_layout.hpp"
 
 #include <string>
 #include <vector>
@@ -38,6 +39,8 @@ namespace mari {
             Pipeline(const Pipeline&) = delete;
             Pipeline &operator=(const Pipeline&) = delete;
 
+            VkPipelineBindPoint             bindPoint() { return pipelineBindPoint; }
+            
             void                            bind(VkCommandBuffer commandBuffer);
             static void                     defaultPipelineConfigInfo(PipelineConfigInfo &configInfo);
             static void                     enableAlphaBlending(PipelineConfigInfo &configInfo);
@@ -45,7 +48,8 @@ namespace mari {
                                                 const std::string &vertFilepath, 
                                                 const std::string &fragFilepath, 
                                                 const PipelineConfigInfo &configInfo);
-            void                            createRayTracingPipeline(VkPipelineLayout &pipelineLayout);
+            void                            createRayTracingPipeline(const PipelineLayout &pipelineLayout);
+            void                            createComputePipeline(const std::string &compFilepath, const PipelineLayout& pipelineLayout);
             VkStridedDeviceAddressRegionKHR raygenSBTEntry, missSBTEntry, hitSBTEntry, callableSBTEntry; // TODO private?
         private:
             VkPipelineShaderStageCreateInfo loadShader(const std::string &filepath, VkShaderStageFlagBits flag);

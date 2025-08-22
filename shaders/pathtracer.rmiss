@@ -1,36 +1,27 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_buffer_reference2 : require
-#extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/raycommon.glsl"
 #include "common/constants.glsl"
+#include "common/math.glsl"
+
+layout(binding = 6, set = 0) uniform sampler2D textures[];
 
 layout(location = 0) rayPayloadInEXT Payload prd;
 
-layout(binding = 3, set = 0) uniform Properties {
-    mat4 viewInverse;
-    mat4 projInverse;
-    int frameCount;
-    int maxDepth;
-    float exposure;
-    int tonemapper;
-    int russianRoulette;
-    int environmentID;
-} properties;
-layout(binding = 5, set = 0) uniform sampler2D textures[];
+void main() {
+    if (properties.nextEventEstimation == 1 && prd.depth != 0)
+        return;
 
-
-void main()
-{
     vec3 color = vec3(1.0, 1.0, 1.0);
 
-    float u = (1.0 + atan(prd.direction.x, -prd.direction.z) * M_1_PI) * 0.5;
-    float v = acos(prd.direction.y) * M_1_PI;
+    vec3 dir = vec3(-prd.direction.x, prd.direction.z, -prd.direction.y);
+    vec2 uv = equalAreaSphereToSquare(dir);
 
-    if (properties.environmentID > -1) {
-        color *= texture(textures[nonuniformEXT(properties.environmentID)], vec2(u, -v)).rgb;
+    if (infiniteLight.environmentID > -1) {
+        color *= texture(textures[nonuniformEXT(infiniteLight.environmentID)], uv).rgb;
     }
 
     prd.radiance += prd.throughput * color;

@@ -1,6 +1,9 @@
-#include "random.glsl"
+#include "sampling.glsl"
 #include "complex.glsl"
 #include "math.glsl"
+
+const uint TransportMode_Radiance   = 0; // Camera paths
+const uint TransportMode_Importance = 1; // Light paths
 
 float fresnelDielectric(float cosTheta_i, float eta) {
     cosTheta_i = clamp(cosTheta_i, -1.0, 1.0);
@@ -128,15 +131,15 @@ vec3 TR_Sample(vec3 w, vec2 random) {
     return normalize(vec3(alpha_x * nh.x, alpha_y * nh.y, max(1e-6, nh.z)));
 }
 
-struct BsdfSample {
-    vec3 wi;
+struct BxdfSample {
+    vec3  wi;
     float f;
     float pdf;
-    bool failed;
+    bool  failed;
 };
 
-BsdfSample sampleFail() {
-    return BsdfSample(vec3(0), 0, 0, true);
+BxdfSample sampleFail() {
+    return BxdfSample(vec3(0), 0, 0, true);
 }
 
 /****************************************************************
@@ -144,19 +147,18 @@ BsdfSample sampleFail() {
  ****************************************************************
  */
 
-BsdfSample brdfDiffuseSample(vec3 wo, vec2 random) {
+BxdfSample brdfDiffuseSample(vec3 wo, vec2 random) {
     vec3 wi = sampleCosineHemisphere(random.x, random.y);
     if (wo.z < 0.0) wi.z *= -1;
     float pdf = pdfCosineHemisphere(absCosTheta(wi));
-    float f =  1.0 / M_1_PI;
+    float f =  M_1_PI;
 
-    return BsdfSample(wi, f, pdf, false);
+    return BxdfSample(wi, f, pdf, false);
 }
 
 float brdfDiffuseF(vec3 wo, vec3 wi) {
-    float r = 1.0;
     if (!sameHemisphere(wo, wi)) return 0.0;
-    return r * M_1_PI;  // TODO what to do with r;
+    return M_1_PI;
 }
 
 float brdfDiffusePDF(vec3 wo, vec3 wi) {
@@ -169,14 +171,14 @@ float brdfDiffusePDF(vec3 wo, vec3 wi) {
  ****************************************************************
  */
 
-BsdfSample brdfConductorSample(vec3 wo, vec2 random) {
+BxdfSample brdfConductorSample(vec3 wo, vec2 random) {
     float eta = material.ior;
 
     if (material.roughness == 0.0) {
         vec3 wi = vec3(-wo.x, -wo.y, wo.z);
         float act = absCosTheta(wi);
         float f = fresnelComplex(act, Complex(eta, 3.0)/* TODO conductors have a spectrally varying absorption coefficient k */) / act;
-        return BsdfSample(wi, f, 1.0, false);
+        return BxdfSample(wi, f, 1.0, false);
     }
 
     vec3 wm = TR_Sample(wo, random);
@@ -189,7 +191,7 @@ BsdfSample brdfConductorSample(vec3 wo, vec2 random) {
     float fresnel = fresnelComplex(abs(dot(wo, wm)), Complex(eta, 3.0)/* TODO conductors have a spectrally varying absorption coefficient k */);
     float f = TR_D(wm) * fresnel * TR_G(wo, wi) / (4.0 * cosTheta_i * cosTheta_o);
 
-    return BsdfSample(wi, f, pdf, false);
+    return BxdfSample(wi, f, pdf, false);
 }
 
 float brdfConductorF(vec3 wo, vec3 wi) {
@@ -203,7 +205,7 @@ float brdfConductorF(vec3 wo, vec3 wi) {
     if (cosTheta_o == 0.0 || cosTheta_i == 0.0) return 0.0;
 
     vec3 wm = wi + wo;
-    if (lengthSquared(wm) == 0.0) return 0.0;
+    if (lengthSquared(wm) < 1e-5) return 0.0;
     wm = normalize(wm);
     // Evaluate fresnel  factor for conductor brdf
     float fresnel = fresnelComplex(abs(dot(wo, wm)), Complex(material.ior, 3.0)/*, 3.0 TODO conductors have a spectrally varying absorption coefficient k */);
@@ -215,8 +217,9 @@ float brdfConductorPDF(vec3 wo, vec3 wi) {
     if (material.roughness == 0.0) return 0.0;
 
     vec3 wm = wo + wi;
-    if (lengthSquared(wm) == 0.0) return 0.0;
-    wm = faceforward(normalize(wm), vec3(0, 0, 1), wm);
+    if (lengthSquared(wm) < 1e-5) return 0.0;
+    wm = normalize(wm);
+    wm = faceforward(wm, vec3(0, 0, -1), wm);
     return TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm)));
 }
 
@@ -226,7 +229,7 @@ float brdfConductorPDF(vec3 wo, vec3 wi) {
  ****************************************************************
  */
 
-BsdfSample bsdfDielectricSample(vec3 wo, vec3 random) {
+BxdfSample bsdfDielectricSample(vec3 wo, vec3 random, const uint mode) {
     float eta = material.ior;
 
     // Perfectly specular 
@@ -238,18 +241,22 @@ BsdfSample bsdfDielectricSample(vec3 wo, vec3 random) {
         if (random.z < probability_reflection) { 
             vec3 wi = vec3(-wo.x, -wo.y, wo.z);
             float f = r / absCosTheta(wi);
-            return BsdfSample(wi, f, probability_reflection, false);
+            return BxdfSample(wi, f, probability_reflection, false);
 
         // Sample btdf 
         } else {
             float etap = -1.0;
             vec3 wt = mRefract(wo, vec3(0, 0, 1), eta, etap);
             if (etap == -1.0) return sampleFail();
-            float probability_transmission = t / r + t;
+            float probability_transmission = t / (r + t);
             float ft = t / absCosTheta(wt);
-            // TODO account for non symmetry between camera paths and light paths
 
-            return BsdfSample(wt, ft, probability_transmission, false);
+            // Account for non symmetry between camera paths and light paths
+            if (mode == TransportMode_Radiance) {
+                ft /= sqr(etap);
+            }
+
+            return BxdfSample(wt, ft, probability_transmission, false);
         }
     }
 
@@ -264,9 +271,9 @@ BsdfSample bsdfDielectricSample(vec3 wo, vec3 random) {
     if (random.z < probability_reflection) {
         vec3 wi = mReflect(wo, wm);
         if (!sameHemisphere(wo, wi)) return sampleFail();
-        pdf = TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm)) * probability_reflection);
+        pdf = TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm))) * probability_reflection;
         float f = TR_D(wm) * TR_G(wo, wi) * r / (4.0 * cosTheta(wi) * cosTheta(wo));
-        return BsdfSample(wi, f, pdf, false);
+        return BxdfSample(wi, f, pdf, false);
 
     // Sample btdf
     } else {
@@ -278,13 +285,17 @@ BsdfSample bsdfDielectricSample(vec3 wo, vec3 random) {
         float dwm_dwt = abs(dot(wt, wm)) / denom;
         pdf = TR_PDF(wo, wm) * dwm_dwt * probability_transmission;
         float ft = t * TR_D(wm) * TR_G(wo, wt) * abs(dot(wt, wm) * dot(wo, wm) / (cosTheta(wt) * cosTheta(wo) * denom));
-        // TODO account for non symmetry between camera paths and light paths
 
-        return BsdfSample(wt, ft, pdf, false);
+        // Account for non symmetry between camera paths and light paths
+        if (mode == TransportMode_Radiance) {
+            ft /= sqr(etap);
+        }
+
+        return BxdfSample(wt, ft, pdf, false);
     }
 }
 
-float bsdfDielectricF(vec3 wo, vec3 wi) {
+float bsdfDielectricF(vec3 wo, vec3 wi, const uint mode) {
     float eta = material.ior;
     
     if (eta == 1.0 || material.roughness == 0.0) {
@@ -302,12 +313,13 @@ float bsdfDielectricF(vec3 wo, vec3 wi) {
     }
 
     vec3 wm = wi * etap + wo;
-    if (cosTheta_i == 0 || cosTheta_o == 0 ||  lengthSquared(wm) == 0) return 0.0;  // TODO return 0? need to handle discards
-    wm = faceforward(normalize(wm), vec3(0, 0, 1), wm);
+    if (cosTheta_i == 0 || cosTheta_o == 0 ||  lengthSquared(wm) < 1e-5) return 0.0;
+    wm = normalize(wm);
+    wm = faceforward(wm, vec3(0, 0, -1), wm);
 
     // Discard backfacing microfacets
     if (dot(wm, wi) * cosTheta_i < 0 || dot(wm, wo) * cosTheta_o < 0) {
-        return 0.0; // TODO return 0? need to handle discards
+        return 0.0;
     }
 
     float fresnel = fresnelDielectric(dot(wo, wm), eta);
@@ -319,7 +331,11 @@ float bsdfDielectricF(vec3 wo, vec3 wi) {
         // Compute transmission at rough dielectric interface
         float denom = sqr(dot(wi, wm) + dot(wo, wm) / etap) * cosTheta_i * cosTheta_o;
         float ft = TR_D(wm) * TR_G(wo, wi) * (1.0 - fresnel) * abs(dot(wi, wm) * dot(wo, wm) / denom);
-        // TODO account for non symmetry between camera paths and light paths
+        
+        // Account for non symmetry between camera paths and light paths
+        if (mode == TransportMode_Radiance) {
+            ft /= sqr(etap);
+        }
         return ft;
     }
 }
@@ -344,7 +360,9 @@ float bsdfDielectricPDF(vec3 wo, vec3 wi) {
     }
 
     vec3 wm = wi * etap + wo;
-    wm = faceforward(normalize(wm), vec3(0, 0, 1), wm);
+    if (cosTheta_i == 0 || cosTheta_o == 0 ||  lengthSquared(wm) < 1e-5) return 0.0;
+    wm = normalize(wm);
+    wm = faceforward(wm, vec3(0, 0, -1), wm);
 
     // Discard backfacing microfacets
     if (dot(wm, wi) * cosTheta_i < 0 || dot(wm, wo) * cosTheta_o < 0) {
@@ -355,13 +373,12 @@ float bsdfDielectricPDF(vec3 wo, vec3 wi) {
     float r = fresnelDielectric(dot(wo, wm), eta);
     float t = 1.0 - r;
 
-    // Return pdf for rough dielectric
-    // pdf of rough reflection
+    // Return pdf of rough reflection
     if (reflect) {
         float probability_reflection = r / (r + t);
-        return TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm)) * probability_reflection);
+        return TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm))) * probability_reflection;
 
-    // pdf of rough transmission
+    // Return pdf of rough transmission
     } else {
         float probability_transmission = t / (r + t);
         float denom = sqr(dot(wi, wm) + dot(wo, wm) / etap);
@@ -372,3 +389,57 @@ float bsdfDielectricPDF(vec3 wo, vec3 wi) {
 
 // TODO thin dielectric bsdf
 
+
+BxdfSample bxdfSampleMaterial(int materialId, vec3 wo, inout uint seed) {
+    switch(materialId) {
+        case 0:         // Diffuse
+            return brdfDiffuseSample(wo, vec2(random(seed), random(seed)));
+        break;
+        case 1:         // Dielectric
+            return bsdfDielectricSample(wo, vec3(random(seed), random(seed), random(seed)), TransportMode_Radiance);
+        break;
+        case 2:         // Conductor
+            if (random(seed) < material.metallic) {
+                return brdfConductorSample(wo, vec2(random(seed), random(seed)));
+            } else {
+                return brdfDiffuseSample(wo, vec2(random(seed), random(seed)));
+            }
+        break;
+    }
+}
+
+float bxdfF(int materialId, vec3 wo, vec3 wi, inout uint seed) {
+    switch(materialId) {
+        case 0:         // Diffuse
+            return brdfDiffuseF(wo, wi);
+        break;
+        case 1:         // Dielectric
+            return bsdfDielectricF(wo, wi, TransportMode_Radiance);
+        break;
+        case 2:         // Conductor
+            if (random(seed) < material.metallic) {
+                return brdfConductorF(wo, wi);
+            } else {
+                return brdfDiffuseF(wo, wi);
+            }
+        break;
+    }
+}
+
+float bxdfPDF(int materialId, vec3 wo, vec3 wi, inout uint seed) {
+    switch(materialId) {
+        case 0:         // Diffuse
+            return brdfDiffusePDF(wo, wi);
+        break;
+        case 1:         // Dielectric
+            return bsdfDielectricPDF(wo, wi);
+        break;
+        case 2:         // Conductor
+            if (random(seed) < material.metallic) {
+                return brdfConductorPDF(wo, wi);
+            } else {
+                return brdfDiffusePDF(wo, wi);
+            }
+        break;
+    }
+}

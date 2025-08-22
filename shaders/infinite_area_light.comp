@@ -1,0 +1,22 @@
+#version 450
+
+#extension GL_GOOGLE_include_directive  : require
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0) uniform sampler2D inputImage;
+layout (binding = 1, rgba32f) uniform image2D resultImage;
+
+#include "common/constants.glsl"
+#include "common/math.glsl"
+
+void main() {
+    vec2 uv = vec2(gl_GlobalInvocationID.x / 4096.0, gl_GlobalInvocationID.y / 4096.0); // TODO input texture size
+
+    vec3 direction = equalAreaSquareToSphere(uv);
+
+    uv.x = (1.0 + atan(-direction.y, -direction.x) * M_1_PI) * 0.5;
+    uv.y = acos(direction.z) * M_1_PI;
+
+    vec4 color = texture(inputImage, uv);
+    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), color);
+}

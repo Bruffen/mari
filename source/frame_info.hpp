@@ -32,7 +32,8 @@ namespace mari {
         float exposure;
         int tonemapper;
         int russianRoulette;
-        int environmentID;
+        int nextEventEstimation;
+        int samplesPerPixel;
     };
 
     struct FrameInfo {

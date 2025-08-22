@@ -2,6 +2,7 @@
 
 #include "acceleration_structure.hpp"
 #include "pipeline.hpp"
+#include "pipeline_layout.hpp"
 #include "scene/scene.hpp"
 #include "frame_info.hpp"
 #include "image.hpp"
@@ -23,10 +24,12 @@ namespace mari {
             std::unique_ptr<Buffer>                 primMeshesInfosBuffer;
             std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
             
-            int                                     maxDepth = 10;
-            bool                                    russianRoulette = true;
-            float                                   exposure = 1.0f;
-            int                                     tonemapper = 0;
+            int                                     maxDepth            = 10;
+            bool                                    russianRoulette     = true;
+            bool                                    nextEventEstimation = true;
+            float                                   exposure            = 1.0f;
+            int                                     tonemapper          = 0;
+            int                                     samplesPerPixel     = 1;
         private:
             void                                    buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress);
             void                                    buildTLAS();
@@ -35,7 +38,7 @@ namespace mari {
             Device                                  &device;
             std::vector<std::unique_ptr<AccelerationStructure>> blases;
             std::unique_ptr<Pipeline>               pipeline; 
-            VkPipelineLayout                        pipelineLayout;
+            std::unique_ptr<PipelineLayout>         pipelineLayout;
             std::vector<PrimMeshInfo>               primMeshesInfos;
     };
 }

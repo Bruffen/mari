@@ -391,12 +391,21 @@ namespace mari {
 
             // Path tracing parameters
             int oldMaxDepth = system.maxDepth;
-            ImGui::SliderInt("Depth", &system.maxDepth, 1, 10, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
-            if (oldMaxDepth != system.maxDepth) {
-                inputChanged = true;
-            } 
+            ImGui::SliderInt("Depth", &system.maxDepth, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            if (oldMaxDepth != system.maxDepth) inputChanged = true; 
+
+            int oldSamplesPerPixel = system.samplesPerPixel;
+            ImGui::SliderInt("Samples per pixel", &system.samplesPerPixel, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            if (oldSamplesPerPixel != system.samplesPerPixel) inputChanged = true;
+
+            bool oldRussianRoulette = system.russianRoulette;
             ImGui::Checkbox("Russian Roulette", &system.russianRoulette);
-            
+            if (oldRussianRoulette != system.russianRoulette) inputChanged = true;
+
+            bool oldNextEventEstimation = system.nextEventEstimation;
+            ImGui::Checkbox("Next Event Estimation", &system.nextEventEstimation);
+            if (oldNextEventEstimation != system.nextEventEstimation) inputChanged = true;
+
             // Tonemapping
             ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
             const char* tonemappers[] = { "None", "ACES", "AgX" };
@@ -445,18 +454,19 @@ namespace mari {
 
             // Environments
             std::vector<char*> environmentNames;
-            for (const auto& environment : scene->images) {
+            for (const auto& environment : scene->lightObjects) {
                 environmentNames.push_back(&environment->name[0]);
             }
 
-            const char* selectedEnvironment = scene->images.at(scene->environmentID)->name.c_str();
+            const int offset = static_cast<int>(scene->images.size());
+            const char* selectedEnvironment = scene->lightObjects.at(scene->environmentID - offset)->name.c_str();
             if (ImGui::BeginCombo("Environment", selectedEnvironment, 0)) {
-                for (int n = 0; n < scene->images.size(); n++) {
-                    const bool isSelected = (scene->environmentID == n);
+                for (int n = 0; n < scene->lightObjects.size(); n++) {
+                    const bool isSelected = (scene->environmentID - offset == n);
                     if (ImGui::Selectable(environmentNames[n], isSelected)) {
-                        for (const auto& environment : scene->images) {
+                        for (const auto& environment : scene->lightObjects) {
                             if (environment->name == environmentNames[n]) {
-                                scene->environmentID = n;
+                                scene->environmentID = n + offset;
                                 inputChanged = true;
                                 break;
                             }
@@ -471,16 +481,16 @@ namespace mari {
             }
 
             if (ImGui::Button("Save render")) {
-                saveRender();
+                saveImage(*system.presentImage);
             }
 
             ImGui::EndTabItem();
         }
     }
 
-    void Gui::saveRender() {
-        const int width  = static_cast<int>(system.presentImage->size.width);
-        const int height = static_cast<int>(system.presentImage->size.height);
+    void Gui::saveImage(const Image& image) {
+        const int width  = static_cast<int>(image.size.width);
+        const int height = static_cast<int>(image.size.height);
         const int comp   = 4;
 
         Buffer imageBuffer {
@@ -491,8 +501,12 @@ namespace mari {
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         };
 
-        device.copyImageToBuffer(system.presentImage->handle, system.presentImage->size, system.presentImage->layout, imageBuffer.handle());
+        device.copyImageToBuffer(image.handle, image.size, image.layout, imageBuffer.handle());
 
+        saveImageFromData((void*)imageBuffer.getMappedMemory(), width, height, comp);
+    }
+
+    void Gui::saveImageFromData(const void* data, const int width, const int height, const int comp, bool hdr) {
         auto t = std::time(nullptr);
         std::tm tm{};
         localtime_s(&tm, &t);
@@ -501,7 +515,12 @@ namespace mari {
         oss << std::put_time(&tm, "%Y-%m-%d %H-%M-%S");
         std::string filename = oss.str();
         
-        stbi_write_bmp((filename + ".bmp").c_str(), width, height, comp, (void*)imageBuffer.getMappedMemory());
-        //stbi_write_png((filename + ".png").c_str(), width, height, comp, (void*)imageBuffer.getMappedMemory(), width * comp);
+        if (hdr) {
+            stbi_write_hdr((filename + ".hdr").c_str(), width, height, comp, (float*)data);
+        }
+        else {
+            stbi_write_bmp((filename + ".bmp").c_str(), width, height, comp, (void*)data);
+            //stbi_write_png((filename + ".png").c_str(), width, height, comp, (void*)data, width * comp);
+        }
     }
 }

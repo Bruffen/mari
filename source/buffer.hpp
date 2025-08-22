@@ -9,7 +9,7 @@ namespace mari {
     class Buffer {
         public:
             Buffer(
-                Device& device,
+                const Device& device,
                 VkDeviceSize instanceSize,
                 uint32_t instanceCount,
                 VkBufferUsageFlags usageFlags,
@@ -55,7 +55,7 @@ namespace mari {
             uint64_t                getBufferDeviceAddress();
 
             
-            Device&                 device;
+            const Device&           device;
             void*                   mapped = nullptr;
             VkBuffer                buffer = VK_NULL_HANDLE;
             VkDeviceMemory          memory = VK_NULL_HANDLE;

@@ -22,6 +22,6 @@ namespace mari {
 
             Device &device;
             std::unique_ptr<Pipeline> pipeline; 
-            VkPipelineLayout pipelineLayout;
+            VkPipelineLayout pipelineLayout; // TODO replace with our PipelineLayout class
     };
 }

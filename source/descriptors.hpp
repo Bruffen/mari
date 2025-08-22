@@ -22,7 +22,7 @@ namespace mari {
                         uint32_t count = 1,
                         VkDescriptorBindingFlags flags = 0);
 
-                    std::unique_ptr<DescriptorSetLayout> build() const;
+                    DescriptorSetLayout build() const;
                     
                 private:
                     Device &device;

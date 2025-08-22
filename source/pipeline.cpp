@@ -197,8 +197,23 @@ namespace mari {
         }
     }
 
-    void Pipeline::createRayTracingPipeline(VkPipelineLayout &pipelineLayout) {
-        assert(pipelineLayout != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
+    void Pipeline::createComputePipeline(const std::string &compFilepath, const PipelineLayout& pipelineLayout) {
+        assert(pipelineLayout.handle() && "Cannot create compute pipeline: Null PipelineLayout");
+
+        pipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+
+        VkComputePipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.layout = pipelineLayout.handle();
+        pipelineInfo.stage = loadShader(compFilepath, VK_SHADER_STAGE_COMPUTE_BIT);
+
+        if (vkCreateComputePipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &handle) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create compute pipeline");
+        }
+    }
+
+    void Pipeline::createRayTracingPipeline(const PipelineLayout &pipelineLayout) {
+        assert(pipelineLayout.handle() != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
 
         pipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
@@ -226,6 +241,9 @@ namespace mari {
             missGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
             missGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
             shaderGroups.push_back(missGroupCreateInfo);
+            shaderStages.push_back(loadShader("../../shaders/spv/shadow.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
+            missGroupCreateInfo.generalShader               = static_cast<uint32_t>(shaderStages.size() - 1);
+            shaderGroups.push_back(missGroupCreateInfo);
         }
 
         {
@@ -239,6 +257,7 @@ namespace mari {
             shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rahit.spv", VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
             hitGroupCreateInfo.anyHitShader                 = static_cast<uint32_t>(shaderStages.size() - 1);
             shaderGroups.push_back(hitGroupCreateInfo);
+            // TODO any hit shadow
         }
 
         VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
@@ -247,7 +266,7 @@ namespace mari {
         rayTracingPipelineCreateInfo.pStages                = shaderStages.data();
         rayTracingPipelineCreateInfo.groupCount             = static_cast<uint32_t>(shaderGroups.size());
         rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
-        rayTracingPipelineCreateInfo.layout                 = pipelineLayout;
+        rayTracingPipelineCreateInfo.layout                 = pipelineLayout.handle();
 
         if (device.propertiesRT.maxRayRecursionDepth <= 1)  {
             throw std::runtime_error("Device only supports maximum ray recursion depth of 1 or less."); // TODO check if shadow rays count as depth 1 or more
@@ -278,7 +297,7 @@ namespace mari {
         // TODO vma
 
         raygenSBT = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        missSBT   = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        missSBT   = std::make_unique<Buffer>(device, handleSize, 2, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
         hitSBT    = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
         std::vector<uint8_t> shaderHandleStorage(sbtSize);
@@ -287,8 +306,8 @@ namespace mari {
         }
 
         memcpy(raygenSBT->getMappedMemory(), shaderHandleStorage.data() + handleSizeAligned * 0, handleSize);
-        memcpy(missSBT->getMappedMemory()  , shaderHandleStorage.data() + handleSizeAligned * 1, handleSize);
-        memcpy(hitSBT->getMappedMemory()   , shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
+        memcpy(missSBT->getMappedMemory()  , shaderHandleStorage.data() + handleSizeAligned * 1, handleSize * 2);
+        memcpy(hitSBT->getMappedMemory()   , shaderHandleStorage.data() + handleSizeAligned * 3, handleSize);
 
         raygenSBT->unmap();
         missSBT->unmap();
@@ -300,7 +319,7 @@ namespace mari {
         raygenSBTEntry.stride           = handleSizeAligned;
 
         missSBTEntry.deviceAddress      = missSBT->deviceAddress();
-        missSBTEntry.size               = handleSizeAligned;
+        missSBTEntry.size               = handleSizeAligned * 2;
         missSBTEntry.stride             = handleSizeAligned;
 
         hitSBTEntry.deviceAddress       = hitSBT->deviceAddress();

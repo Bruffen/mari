@@ -27,12 +27,12 @@ namespace mari {
         return *this;
     }
  
-    std::unique_ptr<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const {
+    DescriptorSetLayout DescriptorSetLayout::Builder::build() const {
         VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
         bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
         bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
         bindingFlagsInfo.pBindingFlags = bindingFlags.data();
-        return std::make_unique<DescriptorSetLayout>(device, bindings, bindingFlagsInfo);
+        return {device, bindings, bindingFlagsInfo};
     }
  
     // *************** Descriptor Set Layout *********************
@@ -98,7 +98,7 @@ namespace mari {
         descriptorPoolInfo.flags = poolFlags;
     
         if (vkCreateDescriptorPool(device.handle(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor pool!");
+            throw std::runtime_error("Failed to create descriptor pool!");
         }
     }
  
@@ -192,14 +192,14 @@ namespace mari {
         return *this;
     }
 
-        DescriptorWriter &DescriptorWriter::writeImages(uint32_t binding, std::vector<VkDescriptorImageInfo> *imageInfos) {
+    DescriptorWriter &DescriptorWriter::writeImages(uint32_t binding, std::vector<VkDescriptorImageInfo> *imageInfos) {
         assert(setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
         
         auto &bindingDescription = setLayout.bindings[binding];
 
         assert(
             bindingDescription.descriptorCount == static_cast<uint32_t>(imageInfos->size()) &&
-            "Binding single descriptor info, but binding expects multiple. Use writeImages() instead."
+            "Binding single descriptor info, but binding expects multiple. Use writeImage() instead."
         );
         
         VkWriteDescriptorSet write{};

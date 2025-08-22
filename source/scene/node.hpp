@@ -3,6 +3,7 @@
 #include "components/camera.hpp"
 #include "components/mesh.hpp"
 #include "components/transform.hpp"
+#include "components/light.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -42,7 +43,7 @@ namespace mari {
             std::shared_ptr<Mesh>                       mesh;
             std::shared_ptr<Camera>                     camera;
             // TODO skin component
-            // TODO light component
+            std::shared_ptr<Light>                      light;
             std::unique_ptr<PointLightComponent>        pointLight  = nullptr;
 
         private:

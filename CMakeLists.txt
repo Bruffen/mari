@@ -14,7 +14,7 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
     set(CMAKE_C_COMPILER ${MINGW_PATH}/bin/gcc.exe)
     set(CMAKE_CXX_COMPILER  ${MINGW_PATH}/bin/g++.exe)
 endif()
- 
+
 project(${NAME} VERSION 0.1.0)
  
 # 1. Set VULKAN_SDK_PATH in .env.cmake to target specific vulkan version
@@ -38,10 +38,10 @@ if (DEFINED GLFW_PATH)
     message(STATUS "Using GLFW path specified in .env")
     set(GLFW_INCLUDE_DIRS "${GLFW_PATH}/include")
     if (MSVC)
-        set(GLFW_LIB "${GLFW_PATH}/lib-vc2022") # 2.1 Update lib-vc2019 to use same version as your visual studio
+        set(GLFW_LIB "${GLFW_PATH}/lib-vc2022")
     elseif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
         message(STATUS "USING MINGW")
-        set(GLFW_LIB "${GLFW_PATH}/lib-mingw-w64") # 2.1 make sure matches glfw mingw subdirectory
+        set(GLFW_LIB "${GLFW_PATH}/lib-mingw-w64")
     endif()
 else()
     find_package(glfw3 3.4 REQUIRED)
@@ -145,6 +145,7 @@ find_program(GLSL_VALIDATOR glslangValidator HINTS
 file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.frag"
     "${PROJECT_SOURCE_DIR}/shaders/*.vert"
+    "${PROJECT_SOURCE_DIR}/shaders/*.comp"
     "${PROJECT_SOURCE_DIR}/shaders/*.rgen"
     "${PROJECT_SOURCE_DIR}/shaders/*.rchit"
     "${PROJECT_SOURCE_DIR}/shaders/*.rahit"

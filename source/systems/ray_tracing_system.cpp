@@ -22,7 +22,7 @@ namespace mari {
     }
 
     RayTracingSystem::~RayTracingSystem() {
-        vkDestroyPipelineLayout(device.handle(), pipelineLayout, nullptr);
+
     }
 
     void RayTracingSystem::createImages(uint32_t width, uint32_t height) {
@@ -188,16 +188,10 @@ namespace mari {
     }
 
     void RayTracingSystem::buildPipeline(VkDescriptorSetLayout descriptorSetLayout) {
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-        pipelineLayoutCreateInfo.sType                      = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutCreateInfo.setLayoutCount             = 1;
-        pipelineLayoutCreateInfo.pSetLayouts                = &descriptorSetLayout;
-        if (vkCreatePipelineLayout(device.handle(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout)) {
-            throw std::runtime_error("Failed to create pipeline layout");
-        }
-
+        auto descriptorSetLayouts = std::vector<VkDescriptorSetLayout>{descriptorSetLayout};
+        pipelineLayout = std::make_unique<PipelineLayout>(device, &descriptorSetLayouts);
         pipeline = std::make_unique<Pipeline>(device);
-        pipeline->createRayTracingPipeline(pipelineLayout);
+        pipeline->createRayTracingPipeline(*pipelineLayout);
     }
 
     void RayTracingSystem::render(FrameInfo &frameInfo, Swapchain &swapchain) {
@@ -205,87 +199,9 @@ namespace mari {
         uint32_t height = swapchain.getSwapchainExtent().height;
         pipeline->bind(frameInfo.commandBuffer);
 
-        vkCmdBindDescriptorSets(frameInfo.commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &frameInfo.globalDescriptorSet, 0, 0);
+        vkCmdBindDescriptorSets(frameInfo.commandBuffer, pipeline->bindPoint(), pipelineLayout->handle(), 0, 1, &frameInfo.globalDescriptorSet, 0, 0);
         vkCmdTraceRaysKHR(frameInfo.commandBuffer, &pipeline->raygenSBTEntry, &pipeline->missSBTEntry, &pipeline->hitSBTEntry, &pipeline->callableSBTEntry, width, height, 1);
 
-        // TODO could this copying of images be a generic function in device
-        VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        vkhelper::transitionImageLayout(
-            frameInfo.commandBuffer, 
-            swapchain.getImage(frameInfo.frameIndex), 
-            VK_IMAGE_LAYOUT_UNDEFINED, 
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-        );
-
-        vkhelper::transitionImageLayout(
-            frameInfo.commandBuffer, 
-            presentImage->handle, 
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            {},
-            VK_ACCESS_TRANSFER_READ_BIT,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            subresourceRange
-        );
-
-        VkImageCopy imageCopy{};
-        imageCopy.srcSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        imageCopy.srcOffset         = {0, 0, 0};
-        imageCopy.dstSubresource    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        imageCopy.dstOffset         = {0, 0, 0};
-        imageCopy.extent            = {width, height, 1};
-        
-        vkCmdCopyImage(
-            frameInfo.commandBuffer, presentImage->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            swapchain.getImage(frameInfo.frameIndex), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy
-        );
-
-
-/*
-        VkImageSubresourceLayers subresourceLayers{};
-        subresourceLayers.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
-        subresourceLayers.baseArrayLayer    = 0;
-        subresourceLayers.layerCount        = 1;
-        subresourceLayers.mipLevel          = 0;
-
-        VkImageBlit imageBlit{};
-        imageBlit.srcSubresource = subresourceLayers;
-        imageBlit.dstSubresource = subresourceLayers;
-        imageBlit.srcOffsets[0] = {0, 0, 0}; 
-        imageBlit.srcOffsets[1] = {static_cast<int32_t>(width), static_cast<int32_t>(height), 1}; 
-        imageBlit.dstOffsets[0] = {0, 0, 0}; 
-        imageBlit.dstOffsets[1] = {static_cast<int32_t>(width), static_cast<int32_t>(height), 1};
-
-        vkCmdBlitImage(
-            frameInfo.commandBuffer, 
-            presentImage->handle, 
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            swapchain.getImage(frameInfo.frameIndex),
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1,
-            &imageBlit,
-            VK_FILTER_NEAREST
-        );
-*/
-
-        vkhelper::transitionImageLayout(
-            frameInfo.commandBuffer, 
-            swapchain.getImage(frameInfo.frameIndex), 
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-        );
-
-        vkhelper::transitionImageLayout(
-            frameInfo.commandBuffer, 
-            presentImage->handle, 
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
-            VK_ACCESS_TRANSFER_READ_BIT,
-            {},
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            subresourceRange
-        );
+        device.copyImageToImage(frameInfo.commandBuffer, presentImage->handle, swapchain.getImage(frameInfo.frameIndex), presentImage->size);
     }
 }

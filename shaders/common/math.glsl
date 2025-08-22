@@ -78,3 +78,73 @@ vec3 mRefract(vec3 wi, vec3 normal, float eta, inout float etap) {
     etap = eta;
     return -wi / eta + (cosTheta_i / eta - cosTheta_t) * normal;
 }
+
+vec3 equalAreaSquareToSphere(vec2 p) {
+    float u = 2.0 * p.x - 1.0;
+    float v = 2.0 * p.y - 1.0;
+    float up = abs(u);
+    float vp = abs(v);
+
+    float signedDistance = 1.0 - (up + vp);
+    float d = abs(signedDistance);
+    float r = 1.0 - d;
+
+    float phi = (r == 0 ? 1 : (vp - up) / r + 1) * M_PI_4;
+    float z = abs(1.0 - sqr(r)) * sign(signedDistance);
+
+    float cosPhi = abs(cos(phi)) * sign(u);
+    float sinPhi = abs(sin(phi)) * sign(v);
+
+    float x = cosPhi * r * safeSqrt(2.0 - sqr(r));
+    float y = sinPhi * r * safeSqrt(2.0 - sqr(r));
+    return vec3(x, y, z);
+}
+
+vec2 equalAreaSphereToSquare(vec3 d) {
+    float x = abs(d.x);
+    float y = abs(d.y);
+    float z = abs(d.z);
+
+    float r = safeSqrt(1.0 - z);
+
+    float a = max(x, y);
+    float b = min(x, y);
+    b = a == 0 ? 0 : b / a;
+
+    float phi = atan(b) * 2.0 * M_1_PI;
+
+    if (x < y)
+        phi = 1 - phi;
+
+    float v = phi * r;
+    float u = r - v;
+
+    if (d.z < 0) {
+        float tmp = u;
+        u = 1 - v;
+        v = 1 - tmp;
+    }
+
+    u = abs(u) * sign(d.x);
+    v = abs(v) * sign(d.y);
+
+    return vec2(0.5 * (u + 1.0), 0.5 * (v + 1.0));
+}
+
+vec2 equalAreaWrapSquare(vec2 uv) {
+    if (uv.x < 0) {
+        uv.x = -uv.x;     // mirror across u = 0
+        uv.y = 1 - uv.y;  // mirror across v = 0.5
+    } else if (uv.x > 1) {
+        uv.x = 2 - uv.x;  // mirror across u = 1
+        uv.y = 1 - uv.y;  // mirror across v = 0.5
+    }
+    if (uv.y < 0) {
+        uv.x = 1 - uv.x;  // mirror across u = 0.5
+        uv.y = -uv.y;     // mirror across v = 0;
+    } else if (uv.y > 1) {
+        uv.x = 1 - uv.x;  // mirror across u = 0.5
+        uv.y = 2 - uv.y;  // mirror across v = 1
+    }
+    return uv;
+}

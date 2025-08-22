@@ -1,5 +1,5 @@
 /*
- * Taken from nvpro-samples/vk_raytracing_tutorial_KHR jitter camera
+ * Random generation taken from nvpro-samples/vk_raytracing_tutorial_KHR jitter camera
  * https://github.com/nvpro-samples/vk_raytracing_tutorial_KHR
  */
 
@@ -37,20 +37,79 @@ float random(inout uint prev) {
 #include "constants.glsl"
 
 /**
+ * 1 Dimensional Sampling
+ * 
+ * Piecewise Constant 1D
+ */ 
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(buffer_reference, scalar) readonly buffer FunctionBuffer { float func[]; };
+layout(buffer_reference, scalar) readonly buffer CdfBuffer      { float cdf[];  };
+layout(buffer_reference, scalar) readonly buffer ConditionalIntegralBuffer      { float integrals[];  };
+
+float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, uint cdfSize, float integral, float random, inout float pdf, inout uint offset) {
+    FunctionBuffer funcBuffer = FunctionBuffer(functionAddress);
+    CdfBuffer cdfBuffer = CdfBuffer(cdfAddress);
+
+    // Find interval
+    uint size = cdfSize - 2;
+    uint first = 1;
+    while (size > 0) {
+        uint halfsize = size >> 1;
+        uint middle = first + halfsize;
+
+        bool result = cdfBuffer.cdf[middle] <= random;
+        first = result ? middle + 1 : first;
+        size  = result ? size - (halfsize + 1) : halfsize;
+    }
+
+    offset = clamp(first - 1, 0, size - 2);
+
+    // Compute offset along CDF segment
+    float du = random - cdfBuffer.cdf[offset];
+    if (cdfBuffer.cdf[offset + 1] - cdfBuffer.cdf[offset] > 0) {
+        du /= cdfBuffer.cdf[offset + 1] - cdfBuffer.cdf[offset];
+    }
+
+    pdf = integral > 0.0 ? funcBuffer.func[offset] / integral : 0.0;
+    return mix(0.0, 1.0, (offset + du) / (cdfSize - 1));
+}
+
+/**
  * 2 Dimensional Sampling
  *
+ * Piecewise Constant 2D
+ */
+vec2 samplePiecewiseConstant2D(uint64_t marginalFunctionAddress, uint64_t marginalCdfAddress, float marginalIntegral, uint64_t conditionalFunctionAddress, uint64_t conditionalCdfAddress, uint64_t conditionalIntegralAddress,
+uint cdfSize, vec2 random, inout float pdf, inout uvec2 offset) {
+    float pdfy;
+    float pdfx;
+    uint uvy;
+    uint uvx;
+    float d1 = samplePiecewiseConstant1D(marginalFunctionAddress, marginalCdfAddress, cdfSize, marginalIntegral, random.y, pdfy, uvy);
+    float conditionalIntegral = ConditionalIntegralBuffer(conditionalIntegralAddress).integrals[uvy];
+    uint64_t byteOffset = 4 * uvy;
+    float d0 = samplePiecewiseConstant1D(conditionalFunctionAddress + (byteOffset * uint64_t(cdfSize - 1)), conditionalCdfAddress + (byteOffset * uint64_t(cdfSize)), cdfSize, conditionalIntegral, random.x, pdfx, uvx);
+
+    pdf = pdfx * pdfy;
+    offset = uvec2(uvx, uvy);
+    return vec2(d0, d1);
+}
+
+/**
  * Uniform disk polar
  */
- vec2 sampleUniformDiskPolar(float r1, float r2) {
+vec2 sampleUniformDiskPolar(float r1, float r2) {
     float radius = sqrt(r1);
     float theta  = 2.0 * M_PI * r2;
     return vec2(radius * cos(theta), radius * sin(theta));
- }
+}
 
-/*
+/**
  * Uniform disk concentric
  */
-
 vec2 sampleUniformDiskConcentric(float r1, float r2) {
     vec2 offset = 2.0 * vec2(r1, r2) - vec2(1, 1);
     if (offset.x == 0.0 && offset.y == 0.0) {

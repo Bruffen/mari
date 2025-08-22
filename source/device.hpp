@@ -15,9 +15,11 @@ namespace mari {
     struct QueueFamilyIndices {
         uint32_t graphicsFamily;
         uint32_t presentFamily;
+        uint32_t computeFamily;
         bool graphicsFamilyHasValue = false;
         bool presentFamilyHasValue = false;
-        bool isComplete() { return graphicsFamilyHasValue && presentFamilyHasValue; }
+        bool computeFamilyHasValue = false;
+        bool isComplete() { return graphicsFamilyHasValue && presentFamilyHasValue && computeFamilyHasValue; }
     };
 
     class Device {
@@ -39,37 +41,40 @@ namespace mari {
         Device(Device &&) = delete;
         Device &operator=(Device &&) = delete;
 
-        VkDevice                    handle()                      { return device_; }
-        VkSurfaceKHR                surface()                     { return surface_; }
-        VkQueue                     graphicsQueue()               { return graphicsQueue_; }
-        VkQueue                     presentQueue()                { return presentQueue_; }
-        VkInstance                  getInstance()                 { return instance; }
-        VkCommandPool               getCommandPool()              { return commandPool; }
-        VkPhysicalDevice            getPhysicalDevice()           { return physicalDevice; }
-        SwapchainSupportDetails     getSwapchainSupport()         { return querySwapchainSupport(physicalDevice); }
+        VkDevice                    handle()                      const { return device_; }
+        VkSurfaceKHR                surface()                     const { return surface_; }
+        VkQueue                     graphicsQueue()               const { return graphicsQueue_; }
+        VkQueue                     presentQueue()                const { return presentQueue_; }
+        VkQueue                     computeQueue()                const { return computeQueue_; }
+        VkInstance                  getInstance()                 const { return instance; }
+        VkCommandPool               getCommandPool()              const { return commandPool; }
+        VkPhysicalDevice            getPhysicalDevice()           const { return physicalDevice; }
+        SwapchainSupportDetails     getSwapchainSupport()         const { return querySwapchainSupport(physicalDevice); }
 
         QueueFamilyIndices          findPhysicalQueueFamilies()   { return findQueueFamilies(physicalDevice); } // TODO do this once and save it as a member variable
-        uint32_t                    findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+        uint32_t                    findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
         VkFormat                    findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
-        VkCommandBuffer             beginSingleTimeCommands();
-        void                        endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        VkCommandBuffer             beginSingleTimeCommands() const;
+        void                        endSingleTimeCommands(VkCommandBuffer commandBuffer) const;
 
         void                        createBuffer(
                                         VkDeviceSize size, 
                                         VkBufferUsageFlags usage, 
                                         VkMemoryPropertyFlags properties, 
                                         VkBuffer &buffer, 
-                                        VkDeviceMemory &bufferMemory);
+                                        VkDeviceMemory &bufferMemory) const;
 
         void                        createImageWithInfo(
                                         const VkImageCreateInfo &imageInfo,
                                         VkMemoryPropertyFlags properties,
                                         VkImage &image,
                                         VkDeviceMemory &imageMemory);
-        void                        copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void                        copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) const;
         void                        copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent3D extent, uint32_t layerCount, VkImageLayout oldLayout);
         void                        copyImageToBuffer(VkImage image, VkExtent3D extent, VkImageLayout layout, VkBuffer buffer);
+        void                        copyImageToImage(VkCommandBuffer commandBuffer, VkImage imageSrc, VkImage imageDst, VkExtent3D imageSize); // TODO transition layouts
+        void                        blitImageToImage(VkCommandBuffer commandBuffer, VkImage imageSrc, VkExtent3D sizeSrc, VkImage imageDst, VkExtent3D sizeDst);
 
         VkPhysicalDeviceProperties properties;
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR propertiesRT{
@@ -90,8 +95,9 @@ namespace mari {
         void                        populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
         void                        hasGflwRequiredInstanceExtensions();
         bool                        checkDeviceExtensionSupport(VkPhysicalDevice device);
-        SwapchainSupportDetails     querySwapchainSupport(VkPhysicalDevice device);
+        SwapchainSupportDetails     querySwapchainSupport(VkPhysicalDevice device) const;
 
+        void                        addShaderDebugPrintf();
         void                        addRayTracingExtensions();
 
         VkInstance                  instance;
@@ -104,8 +110,11 @@ namespace mari {
         VkSurfaceKHR                surface_;
         VkQueue                     graphicsQueue_;
         VkQueue                     presentQueue_;
+        VkQueue                     computeQueue_;
 
-        const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"/*, "VK_NV_ray_tracing_validation", "VK_LAYER_LUNARG_api_dump"*/};
+        const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"/*, "VK_LAYER_LUNARG_api_dump"*/};
+        std::vector<VkValidationFeatureEnableEXT> validationFeaturesEnable{};
+
         std::vector<const char *> deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME

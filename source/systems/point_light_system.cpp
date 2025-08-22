@@ -97,7 +97,7 @@ namespace mari {
 
         vkCmdBindDescriptorSets(
             frameInfo.commandBuffer,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipeline->bindPoint(),
             pipelineLayout,
             0,
             1,

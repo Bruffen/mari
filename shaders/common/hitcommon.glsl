@@ -1,4 +1,5 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_scalar_block_layout   : require
 
 struct PrimMeshInfo {
     uint64_t vertexBufferDeviceAddress;
@@ -30,8 +31,8 @@ layout(buffer_reference, scalar) readonly buffer Vertices      { Vertex v[];    
 layout(buffer_reference, scalar) readonly buffer Indices       { uint i[];         };
 layout(buffer_reference, scalar) readonly buffer Materials     { MaterialData m[]; };
 
-layout(binding = 4, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
-layout(binding = 5, set = 0) uniform sampler2D textures[];
+layout(binding = 5, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
+layout(binding = 6, set = 0) uniform sampler2D textures[];
 
 layout(location = 0) rayPayloadInEXT Payload prd;
 hitAttributeEXT vec2 attribs;
