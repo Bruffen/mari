@@ -65,8 +65,8 @@ void main() {
 
     result /= properties.samplesPerPixel;
 
-    if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = vec4(1.0, 0.0, 1.0, 1.0);
-    if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = vec4(1.0, 0.0, 1.0, 1.0);
+    if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = vec4(1000.0, 0.0, 1000.0, 1.0);
+    if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = vec4(1000.0, 0.0, 1000.0, 1.0);
 
     // Load existing accumulated color
     vec4 imageColor = vec4(0.0);

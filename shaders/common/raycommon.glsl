@@ -33,6 +33,7 @@ layout(binding = 3, set = 0, scalar) uniform Properties {
 layout(binding = 4, set = 0, scalar) uniform InfiniteLight {
     int environmentID;
     float marginalIntegral;
+    uvec2 textureSize;
     uint64_t marginalFunctionBufferAddress;
     uint64_t marginalCdfBufferAddress;
     uint64_t conditionalIntegralBufferAddress;

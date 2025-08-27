@@ -59,7 +59,7 @@ float Complex_abs(Complex c) {
 
 Complex Complex_sqrt(Complex c) {
     float n = Complex_abs(c);
-    float t1 = sqrt(0.5) * (n + abs(c.real));
+    float t1 = sqrt(0.5 * (n + abs(c.real)));
     float t2 = 0.5 * c.imag / t1;
 
     if (n == 0) return Complex(0.0, 0.0);

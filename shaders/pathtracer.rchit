@@ -59,6 +59,8 @@ void main() {
     prd.radiance += prd.throughput * material.emission.rgb;
     prd.throughput *= material.albedo.rgb;
 
+    // TODO sample bxdf for indirect light if light direction points away from normal
+
     if (properties.nextEventEstimation == 1) {
         float light_pdf;
         uvec2 offset;
@@ -70,7 +72,7 @@ void main() {
             infiniteLight.conditionalFunctionBufferAddress, 
             infiniteLight.conditionalCdfBufferAddress, 
             infiniteLight.conditionalIntegralBufferAddress,
-            4097, // TODO 
+            infiniteLight.textureSize, 
             vec2(random(prd.seed), random(prd.seed)), 
             light_pdf, 
             offset
@@ -83,9 +85,8 @@ void main() {
         }
 
         vec3 dir = equalAreaSquareToSphere(uv);
-        vec3 direction = vec3(-dir.x, -dir.z, dir.y);
-
-        vec3 wi = toLocal(tangent, btangent, normal_s, direction);
+        vec3 light_dir = vec3(-dir.x, -dir.z, dir.y);
+        vec3 wi = toLocal(tangent, btangent, normal_s, light_dir);
 
         float bxdf_f = bxdfF(materialId, wo, wi, prd.seed);
         float bxdf_pdf = bxdfPDF(materialId, wo, wi, prd.seed);
@@ -94,7 +95,7 @@ void main() {
         float tmax = 1000.0;
         shadowPrd.visibility = false;
         if (bxdf_f > 0.0 && bxdf_pdf > 1e-3 && light_pdf > 1e-3) {
-            traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT /*| gl_RayFlagsOpaqueEXT*/ | gl_RayFlagsSkipClosestHitShaderEXT, 0xff, 0, 0, 1, prd.origin, tmin, direction, tmax, 1);
+            traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT /*| gl_RayFlagsOpaqueEXT*/ | gl_RayFlagsSkipClosestHitShaderEXT, 0xff, 0, 0, 1, prd.origin, tmin, light_dir, tmax, 1);
 
             if (shadowPrd.visibility) {
                 prd.radiance += prd.throughput * le * bxdf_f * absCosTheta(wi) / (light_pdf); // TODO what about bxdf_pdf?
@@ -102,5 +103,5 @@ void main() {
         }
     }
 
-    prd.throughput *= bxdfSample.f * absCosTheta(bxdfSample.wi) / bxdfSample.pdf; // TODO conductors look a little dark
+    //prd.throughput *= bxdfSample.f * absCosTheta(bxdfSample.wi) / bxdfSample.pdf; // TODO conductors look a little dark
 }

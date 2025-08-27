@@ -13,7 +13,6 @@ struct TextureIndices {
     int normal;
     int emissive;
     int anisotropy;
-    int thickness;
     int iridescence;
     int clearcoat;
 };

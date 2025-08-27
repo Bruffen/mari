@@ -120,9 +120,8 @@ MaterialConstants getMaterial(Triangle tri) {
         vec2 rm = texture(textures[nonuniformEXT(tri.material.indices.metallicRoughness)], tri.uv).gb;
         m.roughness *= rm.x;
         m.metallic  *= rm.y;
-
-        m.roughness = m.roughness * m.roughness;
     }
+    m.roughness = m.roughness * m.roughness;
 
     if (tri.material.indices.emissive > -1) {
         m.emission *= texture(textures[nonuniformEXT(tri.material.indices.emissive)], tri.uv);

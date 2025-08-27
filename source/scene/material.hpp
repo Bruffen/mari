@@ -36,7 +36,9 @@ namespace mari {
         std::shared_ptr<Image>      transmission;
         
         // KHR_materials_volume
-        std::shared_ptr<Image>      thickness;
+        // We are never going to need a volume thickness texture in a path tracer
+        // The traced rays' travelled distance tells us the thickness
+        // std::shared_ptr<Image>      thickness;
 
         // KHR_materials_clearcoat
         std::shared_ptr<Image>      clearcoat;
@@ -58,6 +60,9 @@ namespace mari {
         float                       ior = 1.5f;
 
         // KHR_materials_volume
+        // Realistically, we do not need the glTF thicknessFactor value
+        // yet a material with transmission of 1 can be both thin walled and a volume
+        // and thickness value is used to tell them apart, so we set it to 1 when it's a volume
         float                       thickness = 0.0f;
         // TODO
         //float                       attenuationDistance;
@@ -67,7 +72,7 @@ namespace mari {
         //float                       anisotropyStrength = 0.0f;
         //float                       anisotropyRotation = 0.0f; 
 
-        alignas(16) glm::vec4       emission;   // rgb for color, a for strength
+        glm::vec4                   emission;   // rgb for color, a for strength
     };
 
     struct TextureIndices {
@@ -76,10 +81,8 @@ namespace mari {
         int32_t                     normal              = -1;
         int32_t                     emissive            = -1;
         int32_t                     anisotropy          = -1;
-        int32_t                     thickness           = -1;
         int32_t                     iridescence         = -1;
         int32_t                     clearcoat           = -1;
-
     };
     
     struct MaterialData {

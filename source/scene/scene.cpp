@@ -387,16 +387,17 @@ namespace mari {
 
             // KHR_materials_volume
             if (gltfMat.volume) {
-                m->data.constants.thickness = gltfMat.volume->thicknessFactor;
+                // Check material.hpp for info
+                m->data.constants.thickness = 1.0; // gltfMat.volume->thicknessFactor; 
 
-                if (gltfMat.volume->thicknessTexture.has_value()) {
+                /* if (gltfMat.volume->thicknessTexture.has_value()) {
                     const fastgltf::Texture& texture = gltfTextures[gltfMat.volume->thicknessTexture.value().textureIndex];
                     if (texture.imageIndex.has_value()) {
                         size_t img = texture.imageIndex.value();
                         m->textures.thickness = images[img];
                         m->data.indices.thickness = static_cast<int32_t>(img);
                     }
-                }
+                } */
             }
 
             materials.emplace_back(m);

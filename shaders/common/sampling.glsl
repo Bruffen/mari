@@ -49,12 +49,12 @@ layout(buffer_reference, scalar) readonly buffer FunctionBuffer { float func[]; 
 layout(buffer_reference, scalar) readonly buffer CdfBuffer      { float cdf[];  };
 layout(buffer_reference, scalar) readonly buffer ConditionalIntegralBuffer      { float integrals[];  };
 
-float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, uint cdfSize, float integral, float random, inout float pdf, inout uint offset) {
+float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, uint functionSize, float integral, float random, inout float pdf, inout uint offset) {
     FunctionBuffer funcBuffer = FunctionBuffer(functionAddress);
     CdfBuffer cdfBuffer = CdfBuffer(cdfAddress);
 
     // Find interval
-    uint size = cdfSize - 2;
+    uint size = functionSize - 1; // cdfSize - 2
     uint first = 1;
     while (size > 0) {
         uint halfsize = size >> 1;
@@ -74,7 +74,7 @@ float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, u
     }
 
     pdf = integral > 0.0 ? funcBuffer.func[offset] / integral : 0.0;
-    return mix(0.0, 1.0, (offset + du) / (cdfSize - 1));
+    return mix(0.0, 1.0, (offset + du) / functionSize);
 }
 
 /**
@@ -83,15 +83,15 @@ float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, u
  * Piecewise Constant 2D
  */
 vec2 samplePiecewiseConstant2D(uint64_t marginalFunctionAddress, uint64_t marginalCdfAddress, float marginalIntegral, uint64_t conditionalFunctionAddress, uint64_t conditionalCdfAddress, uint64_t conditionalIntegralAddress,
-uint cdfSize, vec2 random, inout float pdf, inout uvec2 offset) {
+uvec2 functionSize, vec2 random, inout float pdf, inout uvec2 offset) {
     float pdfy;
     float pdfx;
     uint uvy;
     uint uvx;
-    float d1 = samplePiecewiseConstant1D(marginalFunctionAddress, marginalCdfAddress, cdfSize, marginalIntegral, random.y, pdfy, uvy);
+    float d1 = samplePiecewiseConstant1D(marginalFunctionAddress, marginalCdfAddress, functionSize.y, marginalIntegral, random.y, pdfy, uvy);
     float conditionalIntegral = ConditionalIntegralBuffer(conditionalIntegralAddress).integrals[uvy];
     uint64_t byteOffset = 4 * uvy;
-    float d0 = samplePiecewiseConstant1D(conditionalFunctionAddress + (byteOffset * uint64_t(cdfSize - 1)), conditionalCdfAddress + (byteOffset * uint64_t(cdfSize)), cdfSize, conditionalIntegral, random.x, pdfx, uvx);
+    float d0 = samplePiecewiseConstant1D(conditionalFunctionAddress + (byteOffset * uint64_t(functionSize.x)), conditionalCdfAddress + (byteOffset * uint64_t(functionSize.x + 1)), functionSize.x, conditionalIntegral, random.x, pdfx, uvx);
 
     pdf = pdfx * pdfy;
     offset = uvec2(uvx, uvy);

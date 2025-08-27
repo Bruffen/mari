@@ -5,12 +5,13 @@
 layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding = 0) uniform sampler2D inputImage;
 layout (binding = 1, rgba32f) uniform image2D resultImage;
+layout (binding = 2) uniform Texture { uvec2 size; } tex;
 
 #include "common/constants.glsl"
 #include "common/math.glsl"
 
 void main() {
-    vec2 uv = vec2(gl_GlobalInvocationID.x / 4096.0, gl_GlobalInvocationID.y / 4096.0); // TODO input texture size
+    vec2 uv = vec2(gl_GlobalInvocationID.x / float(tex.size.x), gl_GlobalInvocationID.y / float(tex.size.y));
 
     vec3 direction = equalAreaSquareToSphere(uv);
 

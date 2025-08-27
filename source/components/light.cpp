@@ -31,7 +31,7 @@ namespace mari {
 
         equalAreaTransformation(image);
 
-        imageBuffer = std::make_shared<Buffer>(
+        auto imageBuffer = std::make_shared<Buffer>(
             device,
             sizeof(float) * 4 * textureSize * textureSize, 
             1, 
@@ -45,9 +45,8 @@ namespace mari {
 
         // Get the image data in host memory
         std::span<glm::vec4> data((glm::vec4*)imageBuffer->getMappedMemory(), textureSize * textureSize);
-        //data[2048 * textureSize + 2048] = glm::vec4(10000000, 10000000, 10000000, 1); 
 
-        // Convert rgb values to floats
+        // Convert rgb values to single floats
         std::vector<float> values{};
         values.reserve(data.size());
         for (const glm::vec4& d : data) {
@@ -60,13 +59,15 @@ namespace mari {
 
     void InfiniteAreaLight::equalAreaTransformation(std::shared_ptr<Image> image) {
         std::unique_ptr<DescriptorPool> pool = DescriptorPool::Builder(device)
-            .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
-            .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER      , 1)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE               , 1)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER              , 1)
             .build();
 
         DescriptorSetLayout descriptorSetLayout = DescriptorSetLayout::Builder(device)
             .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_COMPUTE_BIT)
             .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_COMPUTE_BIT)
+            .addBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_COMPUTE_BIT)
             .build();
             
         std::vector<VkDescriptorSetLayout> descriptorSetLayouts{descriptorSetLayout.handle()};
@@ -75,10 +76,16 @@ namespace mari {
         Pipeline pipeline{device};
         pipeline.createComputePipeline("../../shaders/spv/infinite_area_light.comp.spv", pipelineLayout);
 
+        Buffer textureSizeUniform = Buffer{device, sizeof(glm::uvec2), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT};
+        textureSizeUniform.map();
+        glm::uvec2 textureSize2D{textureSize, textureSize};
+        textureSizeUniform.writeToBuffer(&textureSize2D);
+
         VkDescriptorSet descriptorSet;
         DescriptorWriter(descriptorSetLayout, *pool)
-            .writeImage(0, image->descriptorInfo())
-            .writeImage(1, equalAreaImage->descriptorInfo())
+            .writeImage( 0, image->descriptorInfo())
+            .writeImage( 1, equalAreaImage->descriptorInfo())
+            .writeBuffer(2, textureSizeUniform.descriptorInfo())
             .build(descriptorSet);
 
         VkCommandBuffer commandBuffer = device.beginSingleTimeCommands();

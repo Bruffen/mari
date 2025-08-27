@@ -18,7 +18,8 @@ void main() {
     Materials materials = Materials(primMeshInfo.materialBufferDeviceAddress);
     MaterialData material = materials.m[0];
 
-    if (material.indices.albedo < 0) { // TODO get material color alpha
+    float alpha = material.constants.albedo.a;
+    if (material.indices.albedo < 0 && alpha >= 1.0) {
         return;
     }
 
@@ -31,7 +32,7 @@ void main() {
     vec3 barycentricCoords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
     vec2 uv  = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
-    float alpha = texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
+    alpha *= texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
 
     //if (alpha < 0.9) {
         if(random(prd.seed) > alpha) {
