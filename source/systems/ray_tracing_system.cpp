@@ -73,6 +73,7 @@ namespace mari {
         pPrimMeshesInfosBuffer->stageToBuffer((void*) pPrimMeshesAdresses.data());
 
         buildTLAS();
+        createAreaLights(scene);
     }
 
     void RayTracingSystem::buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress) {
@@ -192,6 +193,44 @@ namespace mari {
         pipelineLayout = std::make_unique<PipelineLayout>(device, &descriptorSetLayouts);
         pipeline = std::make_unique<Pipeline>(device);
         pipeline->createRayTracingPipeline(*pipelineLayout);
+    }
+
+    // TODO handle case where no lights are found, specially on gpu side
+    void RayTracingSystem::createAreaLights(const Scene &scene) {
+        for (const auto& [id, node] : scene.nodes) {
+            if (node->mesh) {
+                for (const auto& p : node->mesh->primMeshes) {
+                    bool isEmissive = glm::length(p.material->data.constants.emission.a * glm::vec3(p.material->data.constants.emission)) > 0.0f;
+                    if (isEmissive) {
+                        assert(p.count % 3 == 0 && "PrimMesh count is not a multiple of 3 so it can't make an AreaLight!");
+                        for (uint32_t i = 0; i < p.count; i += 3) {
+                            auto light = std::make_unique<AreaLight>(device, *node, p, i);
+                            lights.push_back(light->info);
+                        }
+                    }
+                }
+            }
+        }
+        const int lightID = scene.environmentID - static_cast<int>(scene.images.size()); // TODO getting infinite light this is way is pretty ugly
+        lights.push_back(scene.lightObjects[lightID]->light->info);
+
+        std::vector<float> powers{};
+        powers.reserve(lights.size());
+        for (const auto& light : lights) {
+            powers.push_back(light.power);
+        }
+
+        lightsSampler = PiecewiseConstant1D(powers, 0.0f, 1.0f, &device);
+
+        lightsBuffer = std::make_unique<Buffer>(
+            device,
+            sizeof(LightInfo),
+            static_cast<uint32_t>(lights.size()),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+
+        lightsBuffer->stageToBuffer(lights.data());
     }
 
     void RayTracingSystem::render(FrameInfo &frameInfo, Swapchain &swapchain) {

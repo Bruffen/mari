@@ -1,3 +1,6 @@
+#ifndef _SAMPLING_GLSL_
+#define _SAMPLING_GLSL_
+
 /*
  * Random generation taken from nvpro-samples/vk_raytracing_tutorial_KHR jitter camera
  * https://github.com/nvpro-samples/vk_raytracing_tutorial_KHR
@@ -47,7 +50,6 @@ float random(inout uint prev) {
 
 layout(buffer_reference, scalar) readonly buffer FunctionBuffer { float func[]; };
 layout(buffer_reference, scalar) readonly buffer CdfBuffer      { float cdf[];  };
-layout(buffer_reference, scalar) readonly buffer ConditionalIntegralBuffer      { float integrals[];  };
 
 float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, uint functionSize, float integral, float random, inout float pdf, inout uint offset) {
     FunctionBuffer funcBuffer = FunctionBuffer(functionAddress);
@@ -82,6 +84,8 @@ float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, u
  *
  * Piecewise Constant 2D
  */
+layout(buffer_reference, scalar) readonly buffer ConditionalIntegralBuffer { float integrals[]; };
+
 vec2 samplePiecewiseConstant2D(uint64_t marginalFunctionAddress, uint64_t marginalCdfAddress, float marginalIntegral, uint64_t conditionalFunctionAddress, uint64_t conditionalCdfAddress, uint64_t conditionalIntegralAddress,
 uvec2 functionSize, vec2 random, inout float pdf, inout uvec2 offset) {
     float pdfy;
@@ -171,6 +175,22 @@ vec3 sampleUniformSphere(float r1, float r2) {
 float pdfUniformSphere() { return M_1_4PI; }
 
 /**
+ * Uniform triangle
+ */
+vec3 sampleUniformTriangle(vec2 random) {
+    vec3 b;
+    if (random.x < random.y) {
+        b.x = random.x / 2.0;
+        b.y = random.y - b.x;
+    } else {
+        b.y = random.y / 2.0;
+        b.x = random.x - b.y;
+    }
+    b.z = 1.0 - b.x - b.y;
+    return b;
+}
+
+/**
  * Samples a new diffuse direction with just a normal with no shading frame only for testing purposes
  */
 vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
@@ -179,3 +199,5 @@ vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
     const float r     = sqrt(1.0 - u * u);
     return normalize(worldNormal + vec3(r * cos(theta), u, r * sin(theta)));
 }
+
+#endif // _SAMPLING_GLSL_

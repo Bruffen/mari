@@ -31,9 +31,31 @@ namespace mari {
         int maxDepth;
         float exposure;
         int tonemapper;
+        int frameAccumulation;
         int russianRoulette;
         int nextEventEstimation;
         int samplesPerPixel;
+    };
+
+    struct InfiniteLightUbo {
+        int environmentID;
+        glm::vec2 environmentRotation;
+        float marginalIntegral;
+        glm::uvec2 functionSize;
+        uint64_t marginalFunctionBufferAddress;
+        uint64_t marginalCdfBufferAddress;
+        uint64_t conditionalIntegralBufferAddress;
+        uint64_t conditionalFunctionBufferAddress;
+        uint64_t conditionalCdfBufferAddress;
+    }; // TODO is it possible to fit all of this data contiguously within a single object and then pass a buffer device address of that single object with all we need?
+       // TODO is it possible to pass a device adress to the equal area image here instead of using descriptors? probably also need the device address to the sampler?
+
+    struct LightUbo {
+        uint64_t lightsBufferAddress;
+        uint64_t functionBufferAddress;
+        uint64_t cdfBufferAddress;
+        float    integral;
+        int      size;
     };
 
     struct FrameInfo {

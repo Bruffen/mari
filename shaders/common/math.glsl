@@ -2,6 +2,9 @@
  * Helper functions
  */
 
+#ifndef _MATH_GLSL_
+#define _MATH_GLSL_
+
 float sqr(float v) {
     return v * v;
 }
@@ -50,6 +53,13 @@ float cosPhi(vec3 w) {
 float sinPhi(vec3 w) {
     float sint = sinTheta(w);
     return sint == 0 ? 0 : clamp(w.y / sint, -1.0, 1.0);
+}
+
+vec3 rotateAroundAxis(vec3 v, vec3 axis, float theta) {
+    float cosTheta = cos(theta);
+    float sinTheta = sin(theta);
+
+    return (v * cosTheta) + (cross(axis, v) * sinTheta) + (axis * dot(axis, v)) * (1.0f - cosTheta);
 }
 
 /* 
@@ -148,3 +158,5 @@ vec2 equalAreaWrapSquare(vec2 uv) {
     }
     return uv;
 }
+
+#endif // _MATH_GLSL

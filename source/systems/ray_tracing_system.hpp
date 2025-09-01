@@ -16,15 +16,22 @@ namespace mari {
             void                                    render(FrameInfo &frameInfo, Swapchain &swapchain);
             void                                    buildScene(const Scene &scene);
             void                                    buildPipeline(VkDescriptorSetLayout descriptorSetLayout);
-
+            void                                    createAreaLights(const Scene &scene);
+            
             // TODO get around having these be public
             std::unique_ptr<AccelerationStructure>  tlas;
             std::unique_ptr<Image>                  accumImage;
             std::unique_ptr<Image>                  presentImage;
             std::unique_ptr<Buffer>                 primMeshesInfosBuffer;
             std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
+            std::vector<LightInfo>                  lights;
+            std::unique_ptr<Buffer>                 lightsBuffer;
+            PiecewiseConstant1D                     lightsSampler;
+            glm::vec2                               environmentRotation{};
+
             
             int                                     maxDepth            = 10;
+            bool                                    frameAccumulation   = true;
             bool                                    russianRoulette     = true;
             bool                                    nextEventEstimation = true;
             float                                   exposure            = 1.0f;

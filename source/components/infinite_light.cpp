@@ -1,22 +1,18 @@
 #pragma once
 
+#include "infinite_light.hpp"
 #include "descriptors.hpp"
-#include "light.hpp"
 #include "pipeline.hpp"
 #include "default_objects.hpp"
 
 #include <span>
 #include <stdexcept>
+#include <numbers>
 
 namespace mari {
-    Light::Light(Device &device) : device{device} {
-        
-    }
-
-    InfiniteAreaLight::InfiniteAreaLight(Device &device, std::shared_ptr<Image> image) : Light(device) {
+    InfiniteAreaLight::InfiniteAreaLight(Device &device, std::shared_ptr<Image> image, uint32_t textureSize) : Light(device), textureSize(textureSize) {
         assert(image && "Need to pass a valid Image into InfiniteAreaLight");
         assert(image->format == VK_FORMAT_R32G32B32A32_SFLOAT && "Environment image for infinite area light needs to be rgba32f." );
-
         
         VkExtent3D extent{ textureSize, textureSize, 1 };
         equalAreaImage = std::make_shared<Image>(
@@ -46,15 +42,22 @@ namespace mari {
         // Get the image data in host memory
         std::span<glm::vec4> data((glm::vec4*)imageBuffer->getMappedMemory(), textureSize * textureSize);
 
-        // Convert rgb values to single floats
+        // Convert rgb values to single floats and add up the power
         std::vector<float> values{};
         values.reserve(data.size());
+        float power = 0.0f;
         for (const glm::vec4& d : data) {
-            values.push_back(glm::length(glm::vec3(d.r, d.g, d.b)));
+            float v = glm::length(glm::vec3(d.r, d.g, d.b));
+            values.push_back(v);
+            power += v;
         }
-
-        // Create PiecewiseConstant
+        // Create necessary data for importance sampling
         sampler = PiecewiseConstant2D(device, values, textureSize, textureSize);
+
+        float pi = static_cast<float>(std::numbers::pi);
+        info.type = LightType::INFINITE;
+        info.power = power * 4 * pi * pi / (textureSize * textureSize); // TODO multiply by the scene radius squared 
+        info.area = 4 * pi;
     }
 
     void InfiniteAreaLight::equalAreaTransformation(std::shared_ptr<Image> image) {

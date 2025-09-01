@@ -68,19 +68,21 @@ void main() {
     if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = vec4(1000.0, 0.0, 1000.0, 1.0);
     if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = vec4(1000.0, 0.0, 1000.0, 1.0);
 
-    // Load existing accumulated color
-    vec4 imageColor = vec4(0.0);
-    if (properties.frameCount > 0) {
-        imageColor = imageLoad(image, ivec2(gl_LaunchIDEXT.xy));
+    if (properties.frameAccumulation == 1) {
+        // Load existing accumulated color
+        vec4 imageColor = vec4(0.0);
+        if (properties.frameCount > 0) {
+            imageColor = imageLoad(image, ivec2(gl_LaunchIDEXT.xy));
+        }
+
+        // Calculate new average color
+        float avg = 1.0 / (properties.frameCount + 1.0);
+        result = (result + imageColor * properties.frameCount) * avg;
+        imageStore(image, ivec2(gl_LaunchIDEXT.xy), result);
     }
 
-    // Calculate new average color
-    float avg = 1.0 / (properties.frameCount + 1.0);
-    vec4 averageColor = (result + imageColor * properties.frameCount) * avg;
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), averageColor);
-
     // Apply tone mapping
-    vec3 tonemappedColor = averageColor.rgb;
+    vec3 tonemappedColor = result.rgb;
     switch (properties.tonemapper) {
         case 1:
             tonemappedColor = toneACES(tonemappedColor, properties.exposure);

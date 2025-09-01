@@ -398,6 +398,10 @@ namespace mari {
             ImGui::SliderInt("Samples per pixel", &system.samplesPerPixel, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
             if (oldSamplesPerPixel != system.samplesPerPixel) inputChanged = true;
 
+            bool oldFrameAccumulation = system.frameAccumulation;
+            ImGui::Checkbox("Frame Accumulation", &system.frameAccumulation);
+            if (oldFrameAccumulation != system.frameAccumulation) inputChanged = true;
+            
             bool oldRussianRoulette = system.russianRoulette;
             ImGui::Checkbox("Russian Roulette", &system.russianRoulette);
             if (oldRussianRoulette != system.russianRoulette) inputChanged = true;
@@ -407,7 +411,7 @@ namespace mari {
             if (oldNextEventEstimation != system.nextEventEstimation) inputChanged = true;
 
             // Tonemapping
-            ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
+            ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 10000.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
             const char* tonemappers[] = { "None", "ACES", "AgX" };
             const char* selectedTonemapper = tonemappers[system.tonemapper];
     
@@ -480,6 +484,14 @@ namespace mari {
                 ImGui::EndCombo();
             }
 
+            ImGui::Text("Rotation:");
+            ImGui::SameLine();
+            glm::vec2 oldEnvRotation = system.environmentRotation;
+            glm::vec2 newEnvRotation = glm::degrees(system.environmentRotation);
+            ImGui::DragFloat2("##envrot", &newEnvRotation.x, 0.1f, 0.0f, 360.0f, "%.1f", ImGuiSliderFlags_WrapAround);
+            system.environmentRotation = glm::radians(newEnvRotation);
+            if (system.environmentRotation != oldEnvRotation) inputChanged = true;
+            
             if (ImGui::Button("Save render")) {
                 saveImage(*system.presentImage);
             }

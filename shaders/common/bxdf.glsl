@@ -45,7 +45,7 @@ float fresnelComplex(float cosTheta_i, Complex eta) {
 
 
 /****************************************************************
- * Shading frame to world frame transformations
+ * Shading frame to and from world frame transformations
  ****************************************************************
  */
  

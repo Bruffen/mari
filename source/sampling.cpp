@@ -3,7 +3,8 @@
 #include "sampling.hpp"
 
 namespace mari {
-    PiecewiseConstant1D::PiecewiseConstant1D(const std::span<float> values, float min, float max) : min(min), max(max) {
+    // Don't pass device to avoid needlessly creating buffers on the device
+    PiecewiseConstant1D::PiecewiseConstant1D(const std::span<float> values, float min, float max, const Device *device) : min(min), max(max) {
         cdf = std::vector<float>(values.size() + 1, 0.0f);
         
         func.reserve(values.size());
@@ -20,13 +21,36 @@ namespace mari {
         integral = cdf[n];
         if (integral == 0) {
             for (int i = 1; i < n + 1; i++) {
-                cdf[i] = float(i) / float(n);   // Create linear cdf
+                cdf[i] = float(i) / float(n);   // Create linear cdf if not valid
             }
         }
         else {
             for (int i = 1; i < n + 1; i++) {
                 cdf[i] /= integral;             // Normalize our valid cdf
             }
+        }
+
+        if (device) {
+        // Create buffers to send data to device
+            functionBuffer = std::make_unique<Buffer>(
+                *device, 
+                sizeof(float), 
+                static_cast<int>(func.size()),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            );
+
+            functionBuffer->stageToBuffer((void*)func.data());
+
+            cdfBuffer = std::make_unique<Buffer>(
+                *device, 
+                sizeof(float), 
+                static_cast<int>(cdf.size()),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            );
+
+            cdfBuffer->stageToBuffer((void*)cdf.data());
         }
     }
 
@@ -41,29 +65,9 @@ namespace mari {
         for (int v = 0; v < nHeight; v++) {
             marginal.push_back(pConditional[v].getIntegral());
         }
-        pMarginal = PiecewiseConstant1D(marginal, 0.0f, 1.0f);
+        pMarginal = PiecewiseConstant1D(marginal, 0.0f, 1.0f, &device);
 
-        // Create buffers in device memory
-        marginalFunctionBuffer = std::make_unique<Buffer>(
-            device, 
-            sizeof(float), 
-            static_cast<int>(pMarginal.getFunction().size()),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        );
-
-        marginalFunctionBuffer->stageToBuffer((void*)pMarginal.getFunction().data());
-
-        marginalCdfBuffer = std::make_unique<Buffer>(
-            device, 
-            sizeof(float), 
-            static_cast<int>(pMarginal.getCdf().size()),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        );
-
-        marginalCdfBuffer->stageToBuffer((void*)pMarginal.getCdf().data());
-
+        // Prepare data and create buffers in device memory
         std::vector<float> conditionalCdfData;
         std::vector<float> conditionalFunctionData;
         std::vector<float> conditionalIntegrals;
@@ -81,7 +85,7 @@ namespace mari {
             conditionalIntegrals.push_back(p.getIntegral());
         }
 
-        conditionalFunctionBuffer = std::make_unique<Buffer>(
+        conditionalFunctionsBuffer = std::make_unique<Buffer>(
             device, 
             sizeof(float), 
             static_cast<int>(conditionalFunctionData.size()),
@@ -89,9 +93,9 @@ namespace mari {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
-        conditionalFunctionBuffer->stageToBuffer(conditionalFunctionData.data());
+        conditionalFunctionsBuffer->stageToBuffer(conditionalFunctionData.data());
 
-        conditionalCdfBuffer = std::make_unique<Buffer>(
+        conditionalCdfsBuffer = std::make_unique<Buffer>(
             device, 
             sizeof(float), 
             static_cast<int>(conditionalCdfData.size()),
@@ -99,9 +103,9 @@ namespace mari {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
-        conditionalCdfBuffer->stageToBuffer(conditionalCdfData.data());
+        conditionalCdfsBuffer->stageToBuffer(conditionalCdfData.data());
 
-        conditionalIntegralBuffer = std::make_unique<Buffer>(
+        conditionalIntegralsBuffer = std::make_unique<Buffer>(
             device, 
             sizeof(float), 
             static_cast<int>(conditionalIntegrals.size()),
@@ -109,6 +113,6 @@ namespace mari {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
-        conditionalIntegralBuffer->stageToBuffer(conditionalIntegrals.data());
+        conditionalIntegralsBuffer->stageToBuffer(conditionalIntegrals.data());
     }
 }

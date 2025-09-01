@@ -403,7 +403,7 @@ namespace mari {
             materials.emplace_back(m);
         }
 
-        // TODO if there are no materials in scene, add a default one to avoid problems
+        // If there are no materials in scene, add a default one to avoid problems
         if (materials.empty()) {
             std::shared_ptr<Material> m = std::make_shared<Material>();
             m->name = "mari_default";

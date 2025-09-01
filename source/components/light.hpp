@@ -1,50 +1,44 @@
 #pragma once
 
-#include "../image.hpp"
-#include "../sampling.hpp"
+#include "../device.hpp"
 
 #include <glm/glm.hpp>
-#include <memory>
 
 namespace mari {
 
     enum LightType {
-        POINT,
-        DIRECTIONAL,
-        AREA,
-        MESH
+        POINT           = 0,
+        DIRECTIONAL     = 1,
+        AREA            = 2,
+        INFINITE        = 3
     };
 
-    struct InfiniteLightUbo {
-        int environmentID;
-        float marginalIntegral;
-        glm::uvec2 functionSize;
-        uint64_t marginalFunctionBufferAddress;
-        uint64_t marginalCdfBufferAddress;
-        uint64_t conditionalIntegralBufferAddress;
-        uint64_t conditionalFunctionBufferAddress;
-        uint64_t conditionalCdfBufferAddress;
-    }; // TODO is it possible to fit all of this data contiguously within a single object and then pass a buffer device address of that single object with all we need?
-       // TODO is it possible to pass a device adress to the equal area image here instead of using descriptors? probably also need the device address to the sampler?
+    /** 
+     * Information to be sent to the GPU for any kind of light
+     * One emissive triangle is one area light
+     * By passing vertex positions, we have the advantage of 
+     * transforming them by the worldMatrix beforehand
+     */
+    struct LightInfo {
+        LightType type;
+        glm::vec3 positions[3];
+        // TODO normals so we calculate the light's shading normal on the gpu
+        // TODO uvs for sampling emissive texture
+        // TODO texture id for emissive texture, potentially also usable with envmap?
+        glm::vec3 emission;
+        float power;
+        float area;
+        int doubleSided;
+    };
+
     class Light {
         public:
-            Light(Device &device);
+            Light(Device &device) : device{device} {}
 
             virtual ~Light() {};
-
+            
+            LightInfo info{};
         protected:
             Device &device;
-            glm::vec3 color;
-    };
-
-    class InfiniteAreaLight : public Light {
-        public:
-            InfiniteAreaLight(Device &device, std::shared_ptr<Image> image);
-        
-            std::shared_ptr<Image> equalAreaImage;
-            PiecewiseConstant2D sampler;
-            static const uint32_t textureSize = 4096;
-        private:
-            void equalAreaTransformation(std::shared_ptr<Image> image);
     };
 }

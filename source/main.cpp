@@ -35,14 +35,15 @@ int main() {
 
         //s = bsdfDiffuseF(wo, wi);
         //s = bsdfDielectricF(wo, wi, m);
-        //s = bsdfConductorF(wo, wi, m);
+        s = bsdfConductorF(wo, wi, m);
+        printMessage(s);
 
-        s = bsdfDiffusePDF(wo, wi);
-        printMessage(s);
-        s = bsdfDielectricPDF(wo, wi, m);
-        printMessage(s);
-        s = bsdfConductorPDF(wo, wi, m);
-        printMessage(s);
+        //s = bsdfDiffusePDF(wo, wi);
+        //printMessage(s);
+        //s = bsdfDielectricPDF(wo, wi, m);
+        //printMessage(s);
+        //s = bsdfConductorPDF(wo, wi, m);
+        //printMessage(s);
     }
     return 0;
 */
