@@ -394,9 +394,7 @@ namespace mari {
             ImGui::SliderInt("Depth", &system.maxDepth, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
             if (oldMaxDepth != system.maxDepth) inputChanged = true; 
 
-            int oldSamplesPerPixel = system.samplesPerPixel;
             ImGui::SliderInt("Samples per pixel", &system.samplesPerPixel, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
-            if (oldSamplesPerPixel != system.samplesPerPixel) inputChanged = true;
 
             bool oldFrameAccumulation = system.frameAccumulation;
             ImGui::Checkbox("Frame Accumulation", &system.frameAccumulation);

@@ -135,11 +135,12 @@ struct BxdfSample {
     vec3  wi;
     float f;
     float pdf;
+    bool  dirac;
     bool  failed;
 };
 
 BxdfSample sampleFail() {
-    return BxdfSample(vec3(0), 0, 0, true);
+    return BxdfSample(vec3(0), 0, 0, false, true);
 }
 
 /****************************************************************
@@ -153,7 +154,7 @@ BxdfSample brdfDiffuseSample(vec3 wo, vec2 random) {
     float pdf = pdfCosineHemisphere(absCosTheta(wi));
     float f =  M_1_PI;
 
-    return BxdfSample(wi, f, pdf, false);
+    return BxdfSample(wi, f, pdf, false, false);
 }
 
 float brdfDiffuseF(vec3 wo, vec3 wi) {
@@ -178,7 +179,7 @@ BxdfSample brdfConductorSample(vec3 wo, vec2 random) {
         vec3 wi = vec3(-wo.x, -wo.y, wo.z);
         float act = absCosTheta(wi);
         float f = fresnelComplex(act, Complex(eta, 3.0)/* TODO conductors have a spectrally varying absorption coefficient k */) / act;
-        return BxdfSample(wi, f, 1.0, false);
+        return BxdfSample(wi, f, 1.0, true, false);
     }
 
     vec3 wm = TR_Sample(wo, random);
@@ -191,7 +192,7 @@ BxdfSample brdfConductorSample(vec3 wo, vec2 random) {
     float fresnel = fresnelComplex(abs(dot(wo, wm)), Complex(eta, 3.0)/* TODO conductors have a spectrally varying absorption coefficient k */);
     float f = TR_D(wm) * fresnel * TR_G(wo, wi) / (4.0 * cosTheta_i * cosTheta_o);
 
-    return BxdfSample(wi, f, pdf, false);
+    return BxdfSample(wi, f, pdf, false, false);
 }
 
 float brdfConductorF(vec3 wo, vec3 wi) {
@@ -241,7 +242,7 @@ BxdfSample bsdfDielectricSample(vec3 wo, vec3 random, const uint mode) {
         if (random.z < probability_reflection) { 
             vec3 wi = vec3(-wo.x, -wo.y, wo.z);
             float f = r / absCosTheta(wi);
-            return BxdfSample(wi, f, probability_reflection, false);
+            return BxdfSample(wi, f, probability_reflection, true, false);
 
         // Sample btdf 
         } else {
@@ -256,7 +257,7 @@ BxdfSample bsdfDielectricSample(vec3 wo, vec3 random, const uint mode) {
                 ft /= sqr(etap);
             }
 
-            return BxdfSample(wt, ft, probability_transmission, false);
+            return BxdfSample(wt, ft, probability_transmission, true, false);
         }
     }
 
@@ -273,7 +274,7 @@ BxdfSample bsdfDielectricSample(vec3 wo, vec3 random, const uint mode) {
         if (!sameHemisphere(wo, wi)) return sampleFail();
         pdf = TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm))) * probability_reflection;
         float f = TR_D(wm) * TR_G(wo, wi) * r / (4.0 * cosTheta(wi) * cosTheta(wo));
-        return BxdfSample(wi, f, pdf, false);
+        return BxdfSample(wi, f, pdf, false, false);
 
     // Sample btdf
     } else {
@@ -291,7 +292,7 @@ BxdfSample bsdfDielectricSample(vec3 wo, vec3 random, const uint mode) {
             ft /= sqr(etap);
         }
 
-        return BxdfSample(wt, ft, pdf, false);
+        return BxdfSample(wt, ft, pdf, false, false);
     }
 }
 
@@ -389,57 +390,44 @@ float bsdfDielectricPDF(vec3 wo, vec3 wi) {
 
 // TODO thin dielectric bsdf
 
-
 BxdfSample bxdfSampleMaterial(int materialId, vec3 wo, inout uint seed) {
-    switch(materialId) {
-        case 0:         // Diffuse
-            return brdfDiffuseSample(wo, vec2(random(seed), random(seed)));
+    switch(materialId) { 
+        case 0: return brdfDiffuseSample(wo, vec2(random(seed), random(seed))); // Diffuse
+        break;          
+        case 1: return bsdfDielectricSample(wo, vec3(random(seed), random(seed), random(seed)), TransportMode_Radiance); // Dielectric
         break;
-        case 1:         // Dielectric
-            return bsdfDielectricSample(wo, vec3(random(seed), random(seed), random(seed)), TransportMode_Radiance);
-        break;
-        case 2:         // Conductor
-            if (random(seed) < material.metallic) {
+        case 2:                                         // Conductor
+            if (random(seed) < material.metallic)
                 return brdfConductorSample(wo, vec2(random(seed), random(seed)));
-            } else {
-                return brdfDiffuseSample(wo, vec2(random(seed), random(seed)));
-            }
+            return brdfDiffuseSample(wo, vec2(random(seed), random(seed)));
         break;
     }
 }
 
 float bxdfF(int materialId, vec3 wo, vec3 wi, inout uint seed) {
     switch(materialId) {
-        case 0:         // Diffuse
-            return brdfDiffuseF(wo, wi);
+        case 0: return brdfDiffuseF(wo, wi);            // Diffuse
         break;
-        case 1:         // Dielectric
-            return bsdfDielectricF(wo, wi, TransportMode_Radiance);
+        case 1: return bsdfDielectricF(wo, wi, TransportMode_Radiance); // Dielectric
         break;
-        case 2:         // Conductor
-            if (random(seed) < material.metallic) {
+        case 2:                                         // Conductor
+            if (random(seed) < material.metallic) 
                 return brdfConductorF(wo, wi);
-            } else {
-                return brdfDiffuseF(wo, wi);
-            }
+            return brdfDiffuseF(wo, wi);
         break;
     }
 }
 
 float bxdfPDF(int materialId, vec3 wo, vec3 wi, inout uint seed) {
     switch(materialId) {
-        case 0:         // Diffuse
-            return brdfDiffusePDF(wo, wi);
+        case 0: return brdfDiffusePDF(wo, wi);          // Diffuse
         break;
-        case 1:         // Dielectric
-            return bsdfDielectricPDF(wo, wi);
+        case 1: return bsdfDielectricPDF(wo, wi);       // Dielectric
         break;
-        case 2:         // Conductor
-            if (random(seed) < material.metallic) {
+        case 2:                                         // Conductor
+            if (random(seed) < material.metallic)
                 return brdfConductorPDF(wo, wi);
-            } else {
-                return brdfDiffusePDF(wo, wi);
-            }
+            return brdfDiffusePDF(wo, wi);
         break;
     }
 }

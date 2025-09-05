@@ -31,7 +31,7 @@ void main() {
 
         // tmin is 0 because position is offset along geometric normal instead. 
         // Check offsetPositionAlongNormal() for more.
-        float tmin = 0.0;     
+        float tmin = 0.0;
         float tmax = 10000.0;
 
         prd.radiance    = vec3(0.0);
@@ -40,6 +40,8 @@ void main() {
         prd.direction   = direction.xyz;
         prd.eta         = 1.0;
         prd.done        = 0;
+        prd.dirac       = false;
+        prd.pdf         = 1.0;
 
         for (prd.depth = 0; prd.done == 0 && prd.depth < properties.maxDepth; prd.depth++) {
             if (isnan(prd.direction.r) || isnan(prd.direction.g) || isnan(prd.direction.b)) {
@@ -84,14 +86,8 @@ void main() {
     // Apply tone mapping
     vec3 tonemappedColor = result.rgb;
     switch (properties.tonemapper) {
-        case 1:
-            tonemappedColor = toneACES(tonemappedColor, properties.exposure);
-            break;
-        case 2:
-            tonemappedColor = toneAgX(tonemappedColor, properties.exposure);
-            break;
-        default:
-            break;
+        case 1: tonemappedColor = toneACES(tonemappedColor, properties.exposure); break;
+        case 2: tonemappedColor = toneAgX(tonemappedColor, properties.exposure); break;
     }
     imageStore(presentImage, ivec2(gl_LaunchIDEXT.xy), vec4(tonemappedColor, 1.0));
 }

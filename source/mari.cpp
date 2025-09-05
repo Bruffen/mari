@@ -219,7 +219,7 @@ namespace mari {
                         rayTracingSystem.lightsSampler.getFunctionBuffer()->deviceAddress(),
                         rayTracingSystem.lightsSampler.getCdfBuffer()->deviceAddress(),
                         rayTracingSystem.lightsSampler.getIntegral(),
-                        static_cast<int>(rayTracingSystem.lights.size())
+                        static_cast<int>(rayTracingSystem.lights.size()),
                     };
 
                     lightUboBuffers[frameIndex]->writeToBuffer(&lightUbo);
@@ -286,7 +286,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  11  ) {
+        switch (  3  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -332,8 +332,8 @@ namespace mari {
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
@@ -348,10 +348,10 @@ namespace mari {
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/zhengyang_gate_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "zhengyang_gate")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/meadow_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "meadow_8k")));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));

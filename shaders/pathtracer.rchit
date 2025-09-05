@@ -29,6 +29,20 @@ void main() {
     vec3 normal_s = normalize(vec3(tri.normalS * gl_WorldToObjectEXT));
     vec3 tangent  = normalize(vec3(tri.tangent.xyz * gl_WorldToObjectEXT));
     vec3 btangent = cross(normal_s, tangent.xyz) * tri.tangent.w;
+    
+    if (length(material.emission.rgb) > 0.0) {
+        if (prd.depth == 0 || prd.dirac || properties.nextEventEstimation == 0) {
+            // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
+            prd.radiance += prd.throughput * material.emission.rgb;
+        }
+        else {
+            float light_mis = pdfLightArea(tri.vertices[0].position, tri.vertices[1].position, tri.vertices[2].position, 
+                prd.direction, length(position - prd.origin), material.emission.rgb, true); // TODO no double sided parameter in material
+            float bxdf_mis = prd.pdf;
+            prd.radiance += prd.throughput * material.emission.rgb * powerHeuristic(bxdf_mis, light_mis);
+        }
+    }
+    prd.throughput *= material.albedo.rgb;
 
     vec3 wo = toLocal(tangent, btangent, normal_s, -prd.direction);
 
@@ -45,21 +59,15 @@ void main() {
         }
     }
 
-    if ((prd.depth == 0 || properties.nextEventEstimation == 0)) {
-        // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
-        prd.radiance += prd.throughput * material.emission.rgb;
-    }
-    prd.throughput *= material.albedo.rgb;
-
+    prd.dirac = bxdfSample.dirac;
+    prd.pdf   = bxdfSample.pdf;
     prd.direction = fromLocal(tangent.xyz, btangent, normal_s, bxdfSample.wi);
     bool isTransmission = dot(normal_s, prd.direction) < 0.0;
     prd.origin = offsetPositionAlongNormal(position, isTransmission ? -normal_g : normal_g);
 
     // TODO check with geometric normal that new direction doesn't go inside object
 
-    // TODO sample bxdf for indirect light if light direction points away from normal
-
-    if (properties.nextEventEstimation == 1) {
+    if (!prd.dirac && properties.nextEventEstimation == 1) {
         float tmin = 0.0;
         float piecewise_pdf = 1.0;
 
@@ -71,22 +79,21 @@ void main() {
 
         LiSample li_sample;
         vec2 r = vec2(random(prd.seed), random(prd.seed));
+        float mis_weight = 1.0;
         switch(light.type) {
-            case LightType_Area:
-                li_sample = sampleLiArea(prd.origin, r, light);
-                break;
-            case LightType_Infinite:
-                li_sample = sampleLiInfinite(piecewise_pdf, r, light);
-                break;
+            case LightType_Area :     li_sample = sampleLiArea(prd.origin, r, light); break;
+            case LightType_Infinite : li_sample = sampleLiInfinite(piecewise_pdf, r, light); break;
         }
 
-        if (li_sample.pdf > 0.0) {
-            piecewise_pdf /= lights.size;
+        li_sample.pdf *= piecewise_pdf;
 
+        if (li_sample.pdf > 0.0) {
             vec3 wi = toLocal(tangent, btangent, normal_s, li_sample.wi);
 
             float bxdf_f = bxdfF(materialId, wo, wi, prd.seed);
             float bxdf_pdf = bxdfPDF(materialId, wo, wi, prd.seed);
+
+            mis_weight = powerHeuristic(li_sample.pdf, bxdf_pdf);
 
             shadowPrd.visibility = false;
             if (bxdf_f > 0.0 && bxdf_pdf > 0.0 && piecewise_pdf > 0.0) {
@@ -97,12 +104,12 @@ void main() {
                     prd.origin, 
                     tmin, 
                     li_sample.wi, 
-                    li_sample.distance * 0.999,
+                    li_sample.distance * 0.999999,
                     1
                 );
 
                 if (shadowPrd.visibility) {
-                    prd.radiance += prd.throughput * li_sample.radiance * bxdf_f * absCosTheta(wi) / (li_sample.pdf * piecewise_pdf); // TODO what about bxdf_pdf?
+                    prd.radiance += prd.throughput * li_sample.radiance * mis_weight * bxdf_f * absCosTheta(wi) / (li_sample.pdf); // TODO what about bxdf_pdf?
                 }
             }
         }

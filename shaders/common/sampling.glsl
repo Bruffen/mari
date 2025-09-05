@@ -38,6 +38,7 @@ float random(inout uint prev) {
 }
 
 #include "constants.glsl"
+#include "math.glsl"
 
 /**
  * 1 Dimensional Sampling
@@ -90,15 +91,15 @@ vec2 samplePiecewiseConstant2D(uint64_t marginalFunctionAddress, uint64_t margin
 uvec2 functionSize, vec2 random, inout float pdf, inout uvec2 offset) {
     float pdfy;
     float pdfx;
-    uint uvy;
-    uint uvx;
-    float d1 = samplePiecewiseConstant1D(marginalFunctionAddress, marginalCdfAddress, functionSize.y, marginalIntegral, random.y, pdfy, uvy);
-    float conditionalIntegral = ConditionalIntegralBuffer(conditionalIntegralAddress).integrals[uvy];
-    uint64_t byteOffset = 4 * uvy;
-    float d0 = samplePiecewiseConstant1D(conditionalFunctionAddress + (byteOffset * uint64_t(functionSize.x)), conditionalCdfAddress + (byteOffset * uint64_t(functionSize.x + 1)), functionSize.x, conditionalIntegral, random.x, pdfx, uvx);
+    uint offsety;
+    uint offsetx;
+    float d1 = samplePiecewiseConstant1D(marginalFunctionAddress, marginalCdfAddress, functionSize.y, marginalIntegral, random.y, pdfy, offsety);
+    float conditionalIntegral = ConditionalIntegralBuffer(conditionalIntegralAddress).integrals[offsety];
+    uint64_t byteOffset = 4 * offsety;
+    float d0 = samplePiecewiseConstant1D(conditionalFunctionAddress + (byteOffset * uint64_t(functionSize.x)), conditionalCdfAddress + (byteOffset * uint64_t(functionSize.x + 1)), functionSize.x, conditionalIntegral, random.x, pdfx, offsetx);
 
     pdf = pdfx * pdfy;
-    offset = uvec2(uvx, uvy);
+    offset = uvec2(offsetx, offsety);
     return vec2(d0, d1);
 }
 
@@ -198,6 +199,17 @@ vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
     const float u     = 2.0 * r2 - 1.0;  // Random in [-1, 1]
     const float r     = sqrt(1.0 - u * u);
     return normalize(worldNormal + vec3(r * cos(theta), u, r * sin(theta)));
+}
+
+/**
+ * Multiple Importance Sampling
+ */
+float balanceHeuristic(float pdf1, float pdf2) {
+    return pdf1 / (pdf1 + pdf2);
+}
+
+float powerHeuristic(float pdf1, float pdf2) {
+    return balanceHeuristic(sqr(pdf1), sqr(pdf2));
 }
 
 #endif // _SAMPLING_GLSL_

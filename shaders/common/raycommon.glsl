@@ -10,6 +10,8 @@ struct Payload {
     vec3    radiance;
     vec3    throughput;
     float   eta;
+    bool    dirac;
+    float   pdf;
     uint    seed;
     uint    done;
 };
