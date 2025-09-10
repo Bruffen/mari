@@ -30,14 +30,14 @@ void main() {
     vec3 tangent  = normalize(vec3(tri.tangent.xyz * gl_WorldToObjectEXT));
     vec3 btangent = cross(normal_s, tangent.xyz) * tri.tangent.w;
     
-    if (length(material.emission.rgb) > 0.0) {
+    if (lengthSquared(material.emission.rgb) > 0.0) {
         if (prd.depth == 0 || prd.dirac || properties.nextEventEstimation == 0) {
             // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
             prd.radiance += prd.throughput * material.emission.rgb;
         }
         else {
-            float light_mis = pdfLightArea(tri.vertices[0].position, tri.vertices[1].position, tri.vertices[2].position, 
-                prd.direction, length(position - prd.origin), material.emission.rgb, true); // TODO no double sided parameter in material
+            vec3 positions[] = { tri.vertices[0].position, tri.vertices[1].position, tri.vertices[2].position };
+            float light_mis = pdfLightArea(positions, prd.direction, length(position - prd.origin), material.emission.rgb, true); // TODO no double sided parameter in material
             float bxdf_mis = prd.pdf;
             prd.radiance += prd.throughput * material.emission.rgb * powerHeuristic(bxdf_mis, light_mis);
         }
@@ -46,18 +46,11 @@ void main() {
 
     vec3 wo = toLocal(tangent, btangent, normal_s, -prd.direction);
 
-    BxdfSample bxdfSample;
-    for (int i = 0; bxdfSample.failed; i++) {
-        vec2 r = vec2(random(prd.seed), random(prd.seed));
-
-        bxdfSample = bxdfSampleMaterial(materialId, wo, prd.seed);
-        
-        if (i >= 100) {
-            prd.done = 1;
-            prd.radiance = vec3(10, 0, 10);
-            return;
-        }
-    }
+    BxdfSample bxdfSample = bxdfSampleMaterial(materialId, wo, prd.seed);
+    if (bxdfSample.failed) {
+        prd.done = 1;
+        return; 
+    }  
 
     prd.dirac = bxdfSample.dirac;
     prd.pdf   = bxdfSample.pdf;
@@ -93,10 +86,8 @@ void main() {
             float bxdf_f = bxdfF(materialId, wo, wi, prd.seed);
             float bxdf_pdf = bxdfPDF(materialId, wo, wi, prd.seed);
 
-            mis_weight = powerHeuristic(li_sample.pdf, bxdf_pdf);
-
-            shadowPrd.visibility = false;
-            if (bxdf_f > 0.0 && bxdf_pdf > 0.0 && piecewise_pdf > 0.0) {
+            if (bxdf_f > 0.0 && bxdf_pdf > 0.0) {
+                shadowPrd.visibility = false;
                 traceRayEXT(
                     tlas, 
                     gl_RayFlagsTerminateOnFirstHitEXT /*| gl_RayFlagsOpaqueEXT*/ | gl_RayFlagsSkipClosestHitShaderEXT, 
@@ -104,16 +95,21 @@ void main() {
                     prd.origin, 
                     tmin, 
                     li_sample.wi, 
-                    li_sample.distance * 0.999999,
+                    li_sample.distance * 0.99999,
                     1
                 );
 
                 if (shadowPrd.visibility) {
-                    prd.radiance += prd.throughput * li_sample.radiance * mis_weight * bxdf_f * absCosTheta(wi) / (li_sample.pdf); // TODO what about bxdf_pdf?
+                    mis_weight = powerHeuristic(li_sample.pdf, bxdf_pdf);
+                    prd.radiance += prd.throughput * li_sample.radiance * mis_weight * bxdf_f * absCosTheta(wi) / li_sample.pdf;
                 }
             }
         }
     }
 
-    //prd.throughput *= bxdfSample.f * absCosTheta(bxdfSample.wi) / bxdfSample.pdf; // TODO conductors look a little darker
+    if (bxdfSample.pdf == 0.0) {
+        prd.throughput *= 0.0;
+    } else {
+        prd.throughput *= bxdfSample.f * absCosTheta(bxdfSample.wi) / bxdfSample.pdf; // TODO conductors look a little darker
+    }
 }

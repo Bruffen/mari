@@ -93,15 +93,15 @@ LiSample sampleLiArea(vec3 origin, vec2 random, LightInfo light) {
     }
 
     liSample.radiance = light.emission;
-    liSample.pdf      = liSample.distance * liSample.distance / (light.area * abs(ndotl)) * correctSide;
+    liSample.pdf      = sqr(liSample.distance) / (light.area * abs(ndotl)) * correctSide;
 
     return liSample;
 }
 
 // It would be nice to be able to index into the array of lights so as not to recalculate values.
 // Would potentially have to pass light id in the primitive info, however.
-float pdfLightArea(vec3 p0, vec3 p1, vec3 p2, vec3 wi, float distance, vec3 emission, bool doubleSided) {
-    vec3  normal_g = cross(p1 - p0, p2 - p0);
+float pdfLightArea(vec3 positions[3], vec3 wi, float distance, vec3 emission, bool doubleSided) {
+    vec3  normal_g = cross(positions[1] - positions[0], positions[2] - positions[0]);
     float normal_gLength = length(normal_g); 
     float area = normal_gLength * 0.5f;
     normal_g /= normal_gLength;

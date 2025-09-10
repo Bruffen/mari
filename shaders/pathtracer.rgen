@@ -53,12 +53,13 @@ void main() {
             traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
 
             if (properties.russianRoulette == 1 && prd.depth > 3) { // TODO implement a minimum rr depth variable
-                float probability = (prd.throughput.r + prd.throughput.g + prd.throughput.b) / 3.0;
+                //float probability = (prd.throughput.r + prd.throughput.g + prd.throughput.b) / 3.0;
+                float probability = max(max(prd.throughput.r, prd.throughput.g), prd.throughput.b);
                 
                 if (random(prd.seed) > probability) {
-                    break; // TODO don't terminate on dielectric/transmission rays?
+                    break;
                 }
-                prd.throughput /= probability;
+                prd.throughput /= probability; // TODO pbrt etaScale for transmission
             }
         }
 
@@ -67,8 +68,8 @@ void main() {
 
     result /= properties.samplesPerPixel;
 
-    if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = vec4(1000.0, 0.0, 1000.0, 1.0);
-    if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = vec4(1000.0, 0.0, 1000.0, 1.0);
+    if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = vec4(5000.0, 0.0, 5000.0, 1.0);
+    if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = vec4(5000.0, 0.0, 5000.0, 1.0);
 
     if (properties.frameAccumulation == 1) {
         // Load existing accumulated color

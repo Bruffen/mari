@@ -14,6 +14,7 @@ namespace mari {
         assert(image && "Need to pass a valid Image into InfiniteAreaLight");
         assert(image->format == VK_FORMAT_R32G32B32A32_SFLOAT && "Environment image for infinite area light needs to be rgba32f." );
         
+        // Create image to hold the environment map in equal area format and call compute shader to transform it
         VkExtent3D extent{ textureSize, textureSize, 1 };
         equalAreaImage = std::make_shared<Image>(
             device, 
@@ -27,6 +28,7 @@ namespace mari {
 
         equalAreaTransformation(image);
 
+        // Get the new equal area image data in host memory for processing importance sampling
         auto imageBuffer = std::make_shared<Buffer>(
             device,
             sizeof(float) * 4 * textureSize * textureSize, 
@@ -34,12 +36,8 @@ namespace mari {
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         );
-
         device.copyImageToBuffer(equalAreaImage->handle, extent, equalAreaImage->layout, imageBuffer->handle());
-
         vkDeviceWaitIdle(device.handle()); // TODO synchronization
-
-        // Get the image data in host memory
         std::span<glm::vec4> data((glm::vec4*)imageBuffer->getMappedMemory(), textureSize * textureSize);
 
         // Convert rgb values to single floats and add up the power
@@ -51,9 +49,8 @@ namespace mari {
             values.push_back(v);
             power += v;
         }
-        // Create necessary data for importance sampling
+        // Create structure for importance sampling
         sampler = PiecewiseConstant2D(device, values, textureSize, textureSize);
-
         float pi = static_cast<float>(std::numbers::pi);
         info.type = LightType::INFINITE;
         info.power = power * 4 * pi * pi / (textureSize * textureSize); // TODO multiply by the scene radius squared 

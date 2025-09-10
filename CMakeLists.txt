@@ -163,7 +163,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
     set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/spv/${FILE_NAME}.spv")
     add_custom_command(
         OUTPUT ${SPIRV}
-        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}  --target-env vulkan1.4 -gVS # TODO -gVS is debug only
+        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}  --target-env vulkan1.4 -g # TODO -g is debug only
         DEPENDS ${GLSL} ${GLSL_COMMON_FILES})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)

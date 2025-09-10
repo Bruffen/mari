@@ -29,6 +29,6 @@ void main() {
         color *= texture(textures[nonuniformEXT(infiniteLight.environmentID)], uv).rgb;
     }
 
-    prd.radiance += prd.throughput * color * mis_weight;
+    if (!isnan(mis_weight)) prd.radiance += prd.throughput * color * mis_weight;
     prd.done = 1;
 }

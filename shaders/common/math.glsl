@@ -5,6 +5,8 @@
 #ifndef _MATH_GLSL_
 #define _MATH_GLSL_
 
+#include "constants.glsl"
+
 float sqr(float v) {
     return v * v;
 }

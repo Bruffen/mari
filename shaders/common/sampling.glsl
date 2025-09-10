@@ -192,10 +192,10 @@ vec3 sampleUniformTriangle(vec2 random) {
 }
 
 /**
- * Samples a new diffuse direction with just a normal with no shading frame only for testing purposes
+ * Samples a new diffuse direction with just a normal with no shading frame. Only for testing purposes
  */
 vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
-    const float theta = 6.2831853 * r1;  // Random in [0, 2pi]
+    const float theta = 2 * M_PI * r1;  // Random in [0, 2pi]
     const float u     = 2.0 * r2 - 1.0;  // Random in [-1, 1]
     const float r     = sqrt(1.0 - u * u);
     return normalize(worldNormal + vec3(r * cos(theta), u, r * sin(theta)));
