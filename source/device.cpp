@@ -12,16 +12,15 @@ namespace mari {
         VkDebugUtilsMessageTypeFlagsEXT messageType,
         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
         void *pUserData) {
-    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+        std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
 
-    return VK_FALSE;
+        return VK_FALSE;
     }
 
-    VkResult CreateDebugUtilsMessengerEXT(
-        VkInstance instance,
-        const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-        const VkAllocationCallbacks *pAllocator,
-        VkDebugUtilsMessengerEXT *pDebugMessenger) {
+    VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
+                                          const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                          const VkAllocationCallbacks *pAllocator,
+                                          VkDebugUtilsMessengerEXT *pDebugMessenger) {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             instance,
             "vkCreateDebugUtilsMessengerEXT");
@@ -32,10 +31,9 @@ namespace mari {
         }
     }
 
-    void DestroyDebugUtilsMessengerEXT(
-        VkInstance instance,
-        VkDebugUtilsMessengerEXT debugMessenger,
-        const VkAllocationCallbacks *pAllocator) {
+    void DestroyDebugUtilsMessengerEXT(VkInstance instance, 
+                                       VkDebugUtilsMessengerEXT debugMessenger, 
+                                       const VkAllocationCallbacks *pAllocator) {
         auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
         if (func != nullptr) {
             func(instance, debugMessenger, pAllocator);
@@ -88,7 +86,8 @@ namespace mari {
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         createInfo.ppEnabledExtensionNames = extensions.data();
 
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+        VkValidationFeaturesEXT validationFeatures{};
         if (enableValidationLayers) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
@@ -96,7 +95,6 @@ namespace mari {
             populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
 
-            VkValidationFeaturesEXT validationFeatures{};
             validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
             validationFeatures.enabledValidationFeatureCount = static_cast<uint32_t>(validationFeaturesEnable.size());
             validationFeatures.pEnabledValidationFeatures = validationFeaturesEnable.data();
@@ -215,8 +213,8 @@ namespace mari {
         featuresSBL.scalarBlockLayout = VK_TRUE;
         featuresSBL.pNext = &featuresSDHIF;
 
+        VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR featuresSREI{};
         if (enableShaderRelaxed) {
-            VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR featuresSREI{};
             featuresSREI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR;
             featuresSREI.shaderRelaxedExtendedInstruction = VK_TRUE;
             featuresBDA.pNext = &featuresSREI;
@@ -357,10 +355,11 @@ namespace mari {
         }
     }
 
-    void Device::addShaderDebugPrintf() {  // TODO debug mode only
+    void Device::addShaderDebugPrintf() {
+#ifdef MARI_DEBUG
         deviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-
         validationFeaturesEnable.push_back(VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT);
+#endif
     }
 
     void Device::addRayTracingExtensions() {
@@ -379,8 +378,9 @@ namespace mari {
             // Required by VK_KHR_spirv_1_4
             VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
 
-            // Optional useful ray tracing validation layer // TODO use it only in debug mode
+#ifdef MARI_DEBUG
             VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
+#endif
         };
 
         deviceExtensions.insert(deviceExtensions.end(), rtExtensions.begin(), rtExtensions.end());
@@ -403,7 +403,7 @@ namespace mari {
     }
 
     QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device) {
-        QueueFamilyIndices indices;
+        QueueFamilyIndices indices{};
 
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -440,7 +440,7 @@ namespace mari {
     }
 
     SwapchainSupportDetails Device::querySwapchainSupport(VkPhysicalDevice device) const {
-        SwapchainSupportDetails details;
+        SwapchainSupportDetails details{};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
 
         uint32_t formatCount;
@@ -467,7 +467,7 @@ namespace mari {
 
     VkFormat Device::findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
         for (VkFormat format : candidates) {
-            VkFormatProperties props;
+            VkFormatProperties props{};
             vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
 
             if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
@@ -482,12 +482,11 @@ namespace mari {
     }
 
     uint32_t Device::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
-        VkPhysicalDeviceMemoryProperties memProperties;
+        VkPhysicalDeviceMemoryProperties memProperties{};
         vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-            if ((typeFilter & (1 << i)) &&
-                (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
+            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
             }
         }
 
@@ -505,7 +504,7 @@ namespace mari {
             throw std::runtime_error("Failed to create buffer!");
         }
 
-        VkMemoryRequirements memRequirements;
+        VkMemoryRequirements memRequirements{};
         vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
@@ -513,9 +512,9 @@ namespace mari {
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-        // Set flag for exposing device address for the buffer
+        // Set flag for exposing the device address for the buffer
+        VkMemoryAllocateFlagsInfo flagsInfo{};
         if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
-            VkMemoryAllocateFlagsInfo flagsInfo{};
             flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
             flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
             allocInfo.pNext = &flagsInfo;

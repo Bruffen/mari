@@ -257,7 +257,6 @@ namespace mari {
             shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rahit.spv", VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
             hitGroupCreateInfo.anyHitShader                 = static_cast<uint32_t>(shaderStages.size() - 1);
             shaderGroups.push_back(hitGroupCreateInfo);
-            // TODO any hit shadow
         }
 
         VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
@@ -268,10 +267,10 @@ namespace mari {
         rayTracingPipelineCreateInfo.pGroups                = shaderGroups.data();
         rayTracingPipelineCreateInfo.layout                 = pipelineLayout.handle();
 
-        if (device.propertiesRT.maxRayRecursionDepth <= 1)  {
-            throw std::runtime_error("Device only supports maximum ray recursion depth of 1 or less."); // TODO check if shadow rays count as depth 1 or more
+        if (device.propertiesRT.maxRayRecursionDepth < 1)  {
+            throw std::runtime_error("Device does not support maximum ray recursion depth of atleast 1.");
         }
-        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = 2;
+        rayTracingPipelineCreateInfo.maxPipelineRayRecursionDepth = 1;
         if (vkCreateRayTracingPipelinesKHR(device.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCreateInfo, nullptr, &handle)) {
             throw std::runtime_error("Failed to create ray tracing pipeline");
         }

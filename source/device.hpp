@@ -24,13 +24,13 @@ namespace mari {
 
     class Device {
         public:
-        #ifdef NDEBUG
-        const bool enableValidationLayers = false;
-        const bool enableShaderRelaxed = false;
-        #else
+#ifdef MARI_DEBUG
         const bool enableValidationLayers = true;
         const bool enableShaderRelaxed = true;
-        #endif
+#else
+        const bool enableValidationLayers = false;
+        const bool enableShaderRelaxed = false;
+#endif
 
         Device(Window &window);
         ~Device();

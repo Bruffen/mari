@@ -17,7 +17,7 @@ endif()
 
 project(${NAME} VERSION 0.1.0)
  
-# 1. Set VULKAN_SDK_PATH in .env.cmake to target specific vulkan version
+# Set VULKAN_SDK_PATH in .env.cmake to target specific vulkan version
 if (DEFINED VULKAN_SDK_PATH)
     set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK_PATH}/Include") # 1.1 Make sure this include path is correct
     set(Vulkan_LIBRARIES "${VULKAN_SDK_PATH}/Lib") # 1.2 Make sure lib path is correct
@@ -33,7 +33,7 @@ else()
 endif()
  
  
-# 2. Set GLFW_PATH in .env.cmake to target specific glfw
+# Set GLFW_PATH in .env.cmake to target specific glfw
 if (DEFINED GLFW_PATH)
     message(STATUS "Using GLFW path specified in .env")
     set(GLFW_INCLUDE_DIRS "${GLFW_PATH}/include")
@@ -56,7 +56,7 @@ endif()
 
 include_directories(include)
  
-# 3. Set FASTGLTF_PATH in .env.cmake
+# Set FASTGLTF_PATH in .env.cmake
 if (DEFINED FASTGLTF_PATH)
     message(STATUS "Using fastgltf path specified in .env")
     set(FASTGLTF_INCLUDE_DIRS "${FASTGLTF_PATH}/include")
@@ -72,27 +72,32 @@ endif()
 
 # Get Dear ImGui source files plus what we need for GLFW and Vulkan 
 file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp ${IMGUI_PATH}/backends/imgui_impl_glfw.cpp ${IMGUI_PATH}/backends/imgui_impl_vulkan.cpp)
-
 # Get MikkTSpace source files
 file (GLOB MIKKTSPACE_SOURCES ${MIKKTSPACE_PATH}/*.c)
-
 # Our project's source files
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
 
- 
 add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES} ${MIKKTSPACE_SOURCES})
- 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
-set(OPTIONS "/Zi") 
-set(OPTIONS "/DEBUG")
-set(OPTIONS "/W3") 
-#set(OPTIONS "/openmp")
-#TODO set "/O2" in release mode
-target_compile_options(${PROJECT_NAME} PUBLIC "${OPTIONS}")
+if(CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Generator is multi-config: ${CMAKE_GENERATOR}")
+    message(STATUS "Available configs: ${CMAKE_CONFIGURATION_TYPES}")
+else()
+    message(STATUS "Generator is single-config: ${CMAKE_GENERATOR}")
+    message(STATUS "Current build type: ${CMAKE_BUILD_TYPE}")
+endif()
+
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+target_compile_options(${PROJECT_NAME} PUBLIC
+    $<$<CONFIG:Debug>: /Zi /DEBUG /W3>
+    $<$<CONFIG:Release>: /O3>
+)
+add_compile_definitions("$<$<CONFIG:DEBUG>:MARI_DEBUG>")
+#set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG") # use for release mode debugging
+
+#/openmp
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
-
 
 if (WIN32)
   message(STATUS "CREATING BUILD FOR WINDOWS")
@@ -124,8 +129,8 @@ if (WIN32)
  
     target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf)
 endif()
- 
- 
+
+
 ############## Build SHADERS #######################
  
 # Find all sources within shaders directory
@@ -158,19 +163,23 @@ file(GLOB_RECURSE GLSL_COMMON_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.glsl"
 )
 
+if (CMAKE_BUILD_TYPE STREQUAL Debug) # TODO this does not work in multi-config
+    set(GLSLANG_FLAGS -gV)
+endif()
+
 foreach(GLSL ${GLSL_SOURCE_FILES})
     get_filename_component(FILE_NAME ${GLSL} NAME)
     set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/spv/${FILE_NAME}.spv")
     add_custom_command(
         OUTPUT ${SPIRV}
-        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}  --target-env vulkan1.4 -g # TODO -g is debug only
+        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV} --target-env vulkan1.4 ${GLSLANG_FLAGS}
         DEPENDS ${GLSL} ${GLSL_COMMON_FILES})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)
 
 add_custom_target(
-    Shaders
+    shaders
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 
-add_dependencies(mari Shaders)
+add_dependencies(mari shaders)

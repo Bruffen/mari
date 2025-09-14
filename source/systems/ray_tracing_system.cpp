@@ -195,7 +195,7 @@ namespace mari {
         pipeline->createRayTracingPipeline(*pipelineLayout);
     }
 
-    // TODO handle case where no lights are found, specially on gpu side
+    // TODO handle case where no lights exist, specially on gpu side
     void RayTracingSystem::createAreaLights(const Scene &scene) {
         for (const auto& [id, node] : scene.nodes) {
             if (node->mesh) {
@@ -239,6 +239,7 @@ namespace mari {
         pipeline->bind(frameInfo.commandBuffer);
 
         vkCmdBindDescriptorSets(frameInfo.commandBuffer, pipeline->bindPoint(), pipelineLayout->handle(), 0, 1, &frameInfo.globalDescriptorSet, 0, 0);
+        // TODO release build crashes here only some of the times
         vkCmdTraceRaysKHR(frameInfo.commandBuffer, &pipeline->raygenSBTEntry, &pipeline->missSBTEntry, &pipeline->hitSBTEntry, &pipeline->callableSBTEntry, width, height, 1);
 
         device.copyImageToImage(frameInfo.commandBuffer, presentImage->handle, swapchain.getImage(frameInfo.frameIndex), presentImage->size);

@@ -117,7 +117,11 @@ namespace mari {
         //ImGui::ShowDemoWindow();
         {
             ImGui::Begin("Mari");
-
+#ifdef MARI_DEBUG
+            ImGui::Text("========================");
+            ImGui::Text("DEBUG BUILD");
+            ImGui::Text("========================");
+#endif
             imGuiFramerate(frameInfo.deltaTime);
             ImGui::Text("Samples: %i", frameInfo.frameCounter);
             ImGui::Text("Triangle count: %i", triangleCount);

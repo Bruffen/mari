@@ -90,12 +90,12 @@ namespace mari {
         // TODO there's a gltf.scenes
 
         // load all nodes and their meshes
-        int nodeEmptyId = 0;
+        int nodeEmptyNameId = 0;
         for (fastgltf::Node& node : gltf.nodes) {
             std::shared_ptr<Node> newNode = std::make_shared<Node>();
             newNode->name = node.name.c_str();
             if (newNode->name == "") {
-                newNode->name = "Node_" + std::to_string(nodeEmptyId++);
+                newNode->name = "Node_" + std::to_string(nodeEmptyNameId++);
             }
 
             if (node.meshIndex.has_value()) {
