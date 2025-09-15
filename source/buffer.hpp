@@ -59,7 +59,7 @@ namespace mari {
             void*                   mapped = nullptr;
             VkBuffer                buffer = VK_NULL_HANDLE;
             VkDeviceMemory          memory = VK_NULL_HANDLE;
-            uint64_t                address;
+            uint64_t                address{};
             
             VkDeviceSize            bufferSize;
             uint32_t                instanceCount;

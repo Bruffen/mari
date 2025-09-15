@@ -91,7 +91,7 @@ namespace mari {
         VkCommandBuffer commandBuffer = device.beginSingleTimeCommands();
         pipeline.bind(commandBuffer);
         vkCmdBindDescriptorSets(commandBuffer, pipeline.bindPoint(), pipelineLayout.handle(), 0, 1, &descriptorSet, 0, nullptr);
-        vkCmdDispatch(commandBuffer, equalAreaImage->size.width / 16, equalAreaImage->size.height / 16, 1);
+        vkCmdDispatch(commandBuffer, std::max(equalAreaImage->size.width / 16, 1u), std::max(equalAreaImage->size.height / 16, 1u), 1);
         vkEndCommandBuffer(commandBuffer);
 
         VkSubmitInfo submitInfo{};
