@@ -33,8 +33,16 @@ uint lcg(inout uint prev) {
 }
 
 // Generate a random float in [0, 1) given the previous RNG state
-float random(inout uint prev) {
+float random1D(inout uint prev) {
     return (float(lcg(prev)) / float(0x01000000));
+}
+
+vec2 random2D(inout uint prev) {
+    return vec2(random1D(prev), random1D(prev));
+}
+
+vec3 random3D(inout uint prev) {
+    return vec3(random1D(prev), random1D(prev), random1D(prev));
 }
 
 #include "constants.glsl"
@@ -52,7 +60,7 @@ float random(inout uint prev) {
 layout(buffer_reference, scalar) readonly buffer FunctionBuffer { float func[]; };
 layout(buffer_reference, scalar) readonly buffer CdfBuffer      { float cdf[];  };
 
-float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, uint functionSize, float integral, float random, inout float pdf, inout uint offset) {
+float sample_piecewise_constant_1D(uint64_t functionAddress, uint64_t cdfAddress, uint functionSize, float integral, float random, inout float pdf, inout uint offset) {
     FunctionBuffer funcBuffer = FunctionBuffer(functionAddress);
     CdfBuffer cdfBuffer = CdfBuffer(cdfAddress);
 
@@ -87,16 +95,16 @@ float samplePiecewiseConstant1D(uint64_t functionAddress, uint64_t cdfAddress, u
  */
 layout(buffer_reference, scalar) readonly buffer ConditionalIntegralBuffer { float integrals[]; };
 
-vec2 samplePiecewiseConstant2D(uint64_t marginalFunctionAddress, uint64_t marginalCdfAddress, float marginalIntegral, uint64_t conditionalFunctionAddress, uint64_t conditionalCdfAddress, uint64_t conditionalIntegralAddress,
+vec2 sample_piecewise_constant_2D(uint64_t marginalFunctionAddress, uint64_t marginalCdfAddress, float marginalIntegral, uint64_t conditionalFunctionAddress, uint64_t conditionalCdfAddress, uint64_t conditionalIntegralAddress,
 uvec2 functionSize, vec2 random, inout float pdf, inout uvec2 offset) {
     float pdfy;
     float pdfx;
     uint offsety;
     uint offsetx;
-    float d1 = samplePiecewiseConstant1D(marginalFunctionAddress, marginalCdfAddress, functionSize.y, marginalIntegral, random.y, pdfy, offsety);
+    float d1 = sample_piecewise_constant_1D(marginalFunctionAddress, marginalCdfAddress, functionSize.y, marginalIntegral, random.y, pdfy, offsety);
     float conditionalIntegral = ConditionalIntegralBuffer(conditionalIntegralAddress).integrals[offsety];
     uint64_t byteOffset = 4 * offsety;
-    float d0 = samplePiecewiseConstant1D(conditionalFunctionAddress + (byteOffset * uint64_t(functionSize.x)), conditionalCdfAddress + (byteOffset * uint64_t(functionSize.x + 1)), functionSize.x, conditionalIntegral, random.x, pdfx, offsetx);
+    float d0 = sample_piecewise_constant_1D(conditionalFunctionAddress + (byteOffset * uint64_t(functionSize.x)), conditionalCdfAddress + (byteOffset * uint64_t(functionSize.x + 1)), functionSize.x, conditionalIntegral, random.x, pdfx, offsetx);
 
     pdf = pdfx * pdfy;
     offset = uvec2(offsetx, offsety);
@@ -106,7 +114,7 @@ uvec2 functionSize, vec2 random, inout float pdf, inout uvec2 offset) {
 /**
  * Uniform disk polar
  */
-vec2 sampleUniformDiskPolar(float r1, float r2) {
+vec2 sample_uniform_disk_polar(float r1, float r2) {
     float radius = sqrt(r1);
     float theta  = 2.0 * M_PI * r2;
     return vec2(radius * cos(theta), radius * sin(theta));
@@ -115,7 +123,7 @@ vec2 sampleUniformDiskPolar(float r1, float r2) {
 /**
  * Uniform disk concentric
  */
-vec2 sampleUniformDiskConcentric(float r1, float r2) {
+vec2 sample_uniform_disk_concentric(float r1, float r2) {
     vec2 offset = 2.0 * vec2(r1, r2) - vec2(1, 1);
     if (offset.x == 0.0 && offset.y == 0.0) {
         return vec2(0, 0);
@@ -141,44 +149,44 @@ vec2 sampleUniformDiskConcentric(float r1, float r2) {
  *
  * Uniform hemisphere
  */
-vec3 sampleUniformHemisphere(float r1, float r2) {
+vec3 sample_uniform_hemisphere(float r1, float r2) {
     float z = r1;
-    float radius = sqrt(1.0 - z*z);             // pbrt uses a safesqrt method here
+    float radius = sqrt(1.0 - z*z);
     float phi = 2 * M_PI * r2;
     return vec3(radius * cos(phi), radius * sin(phi), z);
 }
 
-float pdfUniformHemisphere() { return M_1_2PI; }
+float pdf_uniform_hemisphere() { return M_1_2PI; }
 
 /**
  * Cosine weighted hemisphere
  */
-vec3 sampleCosineHemisphere(float r1, float r2) {
-    vec2 d  = sampleUniformDiskConcentric(r1, r2);
+vec3 sample_cosine_hemisphere(float r1, float r2) {
+    vec2 d  = sample_uniform_disk_concentric(r1, r2);
     float z = sqrt(max(0.0, 1.0 - d.x*d.x - d.y*d.y));
     return vec3(d.x, d.y, z);
 }
 
-float pdfCosineHemisphere(float cosTheta) { 
-    return cosTheta * M_1_PI; 
+float pdf_cosine_hemisphere(float cos_theta) { 
+    return cos_theta * M_1_PI; 
 }
 
 /**
  * Uniform sphere
  */
-vec3 sampleUniformSphere(float r1, float r2) {
+vec3 sample_uniform_sphere(float r1, float r2) {
     float z = 1.0 - 2.0 * r1;
-    float radius = sqrt(1.0 - z*z);             // pbrt uses a safesqrt method here
+    float radius = sqrt(1.0 - z*z);
     float phi = 2 * M_PI * r2;
     return vec3(radius * cos(phi), radius * sin(phi), z);
 }
 
-float pdfUniformSphere() { return M_1_4PI; }
+float pdf_uniform_sphere() { return M_1_4PI; }
 
 /**
  * Uniform triangle
  */
-vec3 sampleUniformTriangle(vec2 random) {
+vec3 sample_uniform_triangle(vec2 random) {
     vec3 b;
     if (random.x < random.y) {
         b.x = random.x / 2.0;
@@ -194,7 +202,7 @@ vec3 sampleUniformTriangle(vec2 random) {
 /**
  * Samples a new diffuse direction with just a normal with no shading frame. Only for testing purposes
  */
-vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
+vec3 sample_diffuse_test(float r1, float r2, vec3 worldNormal) {
     const float theta = 2 * M_PI * r1;  // Random in [0, 2pi]
     const float u     = 2.0 * r2 - 1.0;  // Random in [-1, 1]
     const float r     = sqrt(1.0 - u * u);
@@ -204,12 +212,12 @@ vec3 sampleDiffuseTest(float r1, float r2, vec3 worldNormal) {
 /**
  * Multiple Importance Sampling
  */
-float balanceHeuristic(float pdf1, float pdf2) {
+float balance_heuristic(float pdf1, float pdf2) {
     return pdf1 / (pdf1 + pdf2);
 }
 
-float powerHeuristic(float pdf1, float pdf2) {
-    return balanceHeuristic(sqr(pdf1), sqr(pdf2));
+float power_heuristic(float pdf1, float pdf2) {
+    return balance_heuristic(sqr(pdf1), sqr(pdf2));
 }
 
 #endif // _SAMPLING_GLSL_

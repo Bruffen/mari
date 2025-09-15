@@ -1,21 +1,22 @@
 #version 460
-#extension GL_GOOGLE_include_directive : require
-#extension GL_EXT_buffer_reference2 : require
-#extension GL_EXT_scalar_block_layout : require
-#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_GOOGLE_include_directive  : require
+#extension GL_EXT_buffer_reference2     : require
+#extension GL_EXT_scalar_block_layout   : require
+#extension GL_EXT_nonuniform_qualifier  : require
 
 #include "common/material.glsl"
 #include "common/raycommon.glsl"
 #include "common/hitcommon.glsl"
 #include "common/sampling.glsl"
 
+layout(location = 0) rayPayloadInEXT Payload prd;
+hitAttributeEXT vec2 attribs;
+
 void main() {
-    uint64_t meshDeviceAddress = pPrimMeshInfos.addresses[gl_InstanceID];
+    uint64_t prim_mesh_bda = pPrimMeshInfos.addresses[gl_InstanceID];
+    PrimMeshInfo primMeshInfo = PrimMeshInfos(prim_mesh_bda).p[gl_GeometryIndexEXT];
 
-    PrimMeshInfos primMeshInfos = PrimMeshInfos(meshDeviceAddress);
-    PrimMeshInfo primMeshInfo = primMeshInfos.p[gl_GeometryIndexEXT];
-
-    Materials materials = Materials(primMeshInfo.materialBufferDeviceAddress);
+    Materials materials = Materials(primMeshInfo.material_bda);
     MaterialData material = materials.m[0];
 
     float alpha = material.constants.albedo.a;
@@ -23,20 +24,18 @@ void main() {
         return;
     }
 
-    Indices indices   = Indices(primMeshInfo.indexBufferDeviceAddress);
-    Vertices vertices = Vertices(primMeshInfo.vertexBufferDeviceAddress);
+    Indices indices   = Indices(primMeshInfo.indices_bda);
+    Vertices vertices = Vertices(primMeshInfo.vertices_bda);
 
     vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
     vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
     vec2 uv2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].uv;
-    vec3 barycentricCoords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+    vec3 barycentric_coords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-    vec2 uv  = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
+    vec2 uv  = uv0 * barycentric_coords.x + uv1 * barycentric_coords.y + uv2 * barycentric_coords.z;
     alpha *= texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
 
-    //if (alpha < 0.9) {
-        if(random(prd.seed) > alpha) {
-            ignoreIntersectionEXT;
-        }
-    //}
+    if(random1D(prd.seed) > alpha) {
+        ignoreIntersectionEXT;
+    }
 }

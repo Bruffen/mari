@@ -1,115 +1,18 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive  : require
-#extension GL_EXT_buffer_reference2     : require
-#extension GL_EXT_nonuniform_qualifier  : require
-#extension GL_EXT_debug_printf          : enable
-#extension GL_EXT_ray_query             : require
 
-#include "common/material.glsl"
-MaterialConstants material;
-
-#include "common/bxdf.glsl"
 #include "common/raycommon.glsl"
 #include "common/hitcommon.glsl"
-#include "common/light.glsl"
 
-layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
-
-layout(location = 1) rayPayloadEXT ShadowPayload shadowPrd;
+layout(location = 0) rayPayloadInEXT Payload prd;
+hitAttributeEXT vec2 attribs;
 
 void main() {
-    Triangle tri = unpackTriangle(gl_PrimitiveID);
-
-    material = getMaterial(tri);
-    int materialId = getMaterialId(material);
-
-    vec3 position = vec3(gl_ObjectToWorldEXT * vec4(tri.hit, 1.0));
-    vec3 normal_g = normalize(vec3(tri.normalG * gl_WorldToObjectEXT));
-    vec3 normal_s = normalize(vec3(tri.normalS * gl_WorldToObjectEXT));
-    vec3 tangent  = normalize(vec3(tri.tangent.xyz * gl_WorldToObjectEXT));
-    vec3 btangent = cross(normal_s, tangent.xyz) * tri.tangent.w;
-    
-    if (lengthSquared(material.emission.rgb) > 0.0) {
-        if (prd.depth == 0 || prd.dirac || properties.nextEventEstimation == 0) {
-            // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
-            prd.radiance += prd.throughput * material.emission.rgb;
-        }
-        else {
-            vec3 positions[] = { tri.vertices[0].position, tri.vertices[1].position, tri.vertices[2].position };
-            float light_mis = pdfLightArea(positions, prd.direction, length(position - prd.origin), material.emission.rgb, true); // TODO no double sided parameter in material
-            float bxdf_mis = prd.pdf;
-            prd.radiance += prd.throughput * material.emission.rgb * powerHeuristic(bxdf_mis, light_mis);
-        }
-    }
-    prd.throughput *= material.albedo.rgb;
-
-    vec3 wo = toLocal(tangent, btangent, normal_s, -prd.direction);
-
-    BxdfSample bxdfSample = bxdfSampleMaterial(materialId, wo, prd.seed);
-    if (bxdfSample.failed) {
-        prd.done = 1;
-        return; 
-    }  
-
-    prd.dirac = bxdfSample.dirac;
-    prd.pdf   = bxdfSample.pdf;
-    prd.direction = fromLocal(tangent.xyz, btangent, normal_s, bxdfSample.wi);
-    bool isTransmission = dot(normal_s, prd.direction) < 0.0;
-    prd.origin = offsetPositionAlongNormal(position, isTransmission ? -normal_g : normal_g);
-
-    // TODO check with geometric normal that new direction doesn't go inside object
-
-    if (!prd.dirac && properties.nextEventEstimation == 1) {
-        float tmin = 0.0;
-        float piecewise_pdf = 1.0;
-
-        LightInfo light = sampleLight(random(prd.seed), piecewise_pdf);
-
-        /*if (prd.thread.x == 500 && prd.thread.y == 500 && properties.frameCount % 100 == 0 && prd.depth == 0) {
-            debugPrintfEXT("pdf = %f", piecewise_pdf);
-        }*/
-
-        LiSample li_sample;
-        vec2 r = vec2(random(prd.seed), random(prd.seed));
-        float mis_weight = 1.0;
-        switch(light.type) {
-            case LightType_Area :     li_sample = sampleLiArea(prd.origin, r, light); break;
-            case LightType_Infinite : li_sample = sampleLiInfinite(piecewise_pdf, r, light); break;
-        }
-
-        li_sample.pdf *= piecewise_pdf;
-
-        if (li_sample.pdf > 0.0) {
-            vec3 wi = toLocal(tangent, btangent, normal_s, li_sample.wi);
-
-            float bxdf_f = bxdfF(materialId, wo, wi, prd.seed);
-            float bxdf_pdf = bxdfPDF(materialId, wo, wi, prd.seed);
-
-            if (bxdf_f > 0.0 && bxdf_pdf > 0.0) {
-                shadowPrd.visibility = false;
-                traceRayEXT(
-                    tlas, 
-                    gl_RayFlagsTerminateOnFirstHitEXT /*| gl_RayFlagsOpaqueEXT*/ | gl_RayFlagsSkipClosestHitShaderEXT, 
-                    0xff, 0, 0, 1, 
-                    prd.origin, 
-                    tmin, 
-                    li_sample.wi, 
-                    li_sample.distance * 0.99999,
-                    1
-                );
-
-                if (shadowPrd.visibility) {
-                    mis_weight = powerHeuristic(li_sample.pdf, bxdf_pdf);
-                    prd.radiance += prd.throughput * li_sample.radiance * mis_weight * bxdf_f * absCosTheta(wi) / li_sample.pdf;
-                }
-            }
-        }
-    }
-
-    if (bxdfSample.pdf == 0.0) {
-        prd.throughput *= 0.0;
-    } else {
-        prd.throughput *= bxdfSample.f * absCosTheta(bxdfSample.wi) / bxdfSample.pdf; // TODO conductors look a little darker
-    }
+    prd.instance_index  = gl_InstanceID;
+    prd.geometry_index  = gl_GeometryIndexEXT;
+    prd.primitive_index = gl_PrimitiveID;
+    prd.barycentrics    = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+    prd.world_to_object = gl_WorldToObjectEXT;
+    prd.object_to_world = gl_ObjectToWorldEXT;
 }

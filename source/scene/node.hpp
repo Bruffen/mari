@@ -32,7 +32,7 @@ namespace mari {
             static Node                                 makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
 
             std::string                                 name        = "";
-            glm::vec3                                   color       {};         // TODO move to light component
+            glm::vec3                                   color       {};         // TODO delete
             glm::mat4                                   worldMatrix {1.0f};     // World values
             Transform                                   transform   {};         // local values
             bool                                        isStatic    {true};

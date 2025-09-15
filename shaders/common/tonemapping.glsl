@@ -1,17 +1,17 @@
 /**
  * ACESFilm tone mapping apr
  */
-vec3 toneACES(vec3 linearColor, float exposure) {
-    linearColor *= exposure;
+vec3 tone_ACES(vec3 linear_color, float exposure) {
+    linear_color *= exposure;
 
     float a = 2.51;
     float b = 0.03;
     float c = 2.43;
     float d = 0.59;
     float e = 0.14;
-    linearColor = clamp((linearColor*(a*linearColor+b))/(linearColor*(c*linearColor+d)+e), 0.0, 1.0);
-    vec3 gammaColor = pow(linearColor, vec3(1.0/2.2));
-    return gammaColor;
+    linear_color = clamp((linear_color*(a*linear_color+b))/(linear_color*(c*linear_color+d)+e), 0.0, 1.0);
+    vec3 gamma_color = pow(linear_color, vec3(1.0/2.2));
+    return gamma_color;
 }
 
 /**
@@ -23,7 +23,7 @@ vec3 toneACES(vec3 linearColor, float exposure) {
 #define AGX_LOOK 0
 
 // Mean error^2: 3.6705141e-06
-vec3 agxDefaultContrastApprox(vec3 x) {
+vec3 agx_default_contrast_approx(vec3 x) {
 vec3 x2 = x * x;
 vec3 x4 = x2 * x2;
 
@@ -54,12 +54,12 @@ vec3 agx(vec3 val) {
     val = (val - min_ev) / (max_ev - min_ev);
 
     // Apply sigmoid function approximation
-    val = agxDefaultContrastApprox(val);
+    val = agx_default_contrast_approx(val);
 
     return val;
 }
 
-    vec3 agxEotf(vec3 val) {
+    vec3 agx_eotf(vec3 val) {
     const mat3 agx_mat_inv = mat3(
         1.19687900512017, -0.0528968517574562, -0.0529716355144438,
         -0.0980208811401368, 1.15190312990417, -0.0980434501171241,
@@ -77,7 +77,7 @@ vec3 agx(vec3 val) {
     return val;
 }
 
-vec3 agxLook(vec3 val) {
+vec3 agx_look(vec3 val) {
     const vec3 lw = vec3(0.2126, 0.7152, 0.0722);
     float luma = dot(val, lw);
 
@@ -104,10 +104,18 @@ vec3 agxLook(vec3 val) {
     return luma + sat * (val - luma);
 }
 
-vec3 toneAgX(vec3 linearColor, float exposure) {
-    vec3 gammaColor = agx(linearColor * exposure);
-    gammaColor = agxLook(gammaColor); // Optional
-    gammaColor = agxEotf(gammaColor);
-    return gammaColor;
+vec3 tone_AgX(vec3 linear_color, float exposure) {
+    vec3 gamma_color = agx(linear_color * exposure);
+    gamma_color = agx_look(gamma_color); // Optional
+    gamma_color = agx_eotf(gamma_color);
+    return gamma_color;
 }
 
+vec3 apply_tonemapping(int tonemapper, vec3 color, float exposure) {
+    vec3 tonemapped_color = color;
+    switch (tonemapper) {
+        case 1: tonemapped_color = tone_ACES(tonemapped_color, exposure); break;
+        case 2: tonemapped_color = tone_AgX(tonemapped_color, exposure); break;
+    }
+    return tonemapped_color;
+}

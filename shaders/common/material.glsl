@@ -1,3 +1,6 @@
+#ifndef _MATERIAL_GLSL_
+#define _MATERIAL_GLSL_
+
 struct MaterialConstants {
     vec4  albedo;
     float metallic;
@@ -9,7 +12,7 @@ struct MaterialConstants {
 
 struct TextureIndices {
     int albedo;
-    int metallicRoughness;
+    int metallic_roughness;
     int normal;
     int emissive;
     int anisotropy;
@@ -22,7 +25,7 @@ struct MaterialData {
     TextureIndices    indices;
 };
 
-int getMaterialId(MaterialConstants m) {
+int get_material_type(MaterialConstants m) {
     // Dielectric
     if (m.thickness > 0.0) {
         return 1;
@@ -38,3 +41,5 @@ int getMaterialId(MaterialConstants m) {
         return 0;
     }
 }
+
+#endif // MATERIAL_GLSL_

@@ -1,10 +1,18 @@
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-#extension GL_EXT_scalar_block_layout   : require
+#ifndef _HIT_COMMON_GLSL_
+#define _HIT_COMMON_GLSL_
+
+#extension GL_EXT_buffer_reference2                         : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64    : require
+#extension GL_EXT_scalar_block_layout                       : require
+#extension GL_EXT_nonuniform_qualifier                      : require
+
+#include "common/raycommon.glsl"
+#include "common/material.glsl"
 
 struct PrimMeshInfo {
-    uint64_t vertexBufferDeviceAddress;
-    uint64_t indexBufferDeviceAddress;
-    uint64_t materialBufferDeviceAddress;
+    uint64_t vertices_bda;
+    uint64_t indices_bda;
+    uint64_t material_bda;
 };
 
 struct Vertex {
@@ -15,15 +23,14 @@ struct Vertex {
     vec2 uv;
 };
 
-struct Triangle {
-    Vertex vertices[3];
-    vec4 color;
-    vec3 hit;
-    vec3 normalS;       // Shading normal from interpolated vertex normals and normal map
-    vec3 normalG;       // Geometric normal indicating where triangle is facing
-    vec4 tangent;
-    vec2 uv;
-    MaterialData material;
+struct Hit {
+    vec3 vertices[3];
+    vec3 position;
+    vec3 normal_s;       // Shading normal from interpolated vertex normals and normal map
+    vec3 normal_g;       // Geometric normal indicating where triangle is facing
+    vec3 tangent;
+    vec3 bitangent;
+    MaterialConstants material;
 };
 
 layout(buffer_reference, scalar) readonly buffer PrimMeshInfos { PrimMeshInfo p[]; };
@@ -34,13 +41,10 @@ layout(buffer_reference, scalar) readonly buffer Materials     { MaterialData m[
 layout(binding = 6, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
 layout(binding = 7, set = 0) uniform sampler2D textures[];
 
-layout(location = 0) rayPayloadInEXT Payload prd;
-hitAttributeEXT vec2 attribs;
-
 // Technique by Carsten Wächter and Nikolaus Binder 
 // "A Fast and Robust Method for Avoiding Self-Intersection"
 // The normal can be negated if one wants the ray to pass through the surface instead.
-vec3 offsetPositionAlongNormal(vec3 position, vec3 normal)
+vec3 offset_position(vec3 position, vec3 normal)
 {
     // Convert the normal to an integer offset.
     const float int_scale = 256.0;
@@ -48,7 +52,7 @@ vec3 offsetPositionAlongNormal(vec3 position, vec3 normal)
 
     // Offset each component of worldPosition using its binary representation.
     // Handle the sign bits correctly.
-    const vec3 p_i = vec3(  //
+    const vec3 p_i = vec3(
         intBitsToFloat(floatBitsToInt(position.x) + ((position.x < 0) ? -of_i.x : of_i.x)),
         intBitsToFloat(floatBitsToInt(position.y) + ((position.y < 0) ? -of_i.y : of_i.y)),
         intBitsToFloat(floatBitsToInt(position.z) + ((position.z < 0) ? -of_i.z : of_i.z))
@@ -64,68 +68,74 @@ vec3 offsetPositionAlongNormal(vec3 position, vec3 normal)
     );
 }
 
-Triangle unpackTriangle(uint index) {
-    Triangle tri;
+MaterialConstants process_material(MaterialData data, vec4 color, vec2 uv) {
+    MaterialConstants mc = data.constants;
+    mc.albedo     *= color;
+    mc.emission   *= mc.emission.a;
 
-    uint64_t meshDeviceAddress  = pPrimMeshInfos.addresses[gl_InstanceID];
+    if (data.indices.albedo > -1) {
+        mc.albedo *= pow(texture(textures[nonuniformEXT(data.indices.albedo)], uv), vec4(2.2));
+    }
 
-    PrimMeshInfos primMeshInfos = PrimMeshInfos(meshDeviceAddress);
-    PrimMeshInfo  primMeshInfo  = primMeshInfos.p[gl_GeometryIndexEXT];
+    if (data.indices.metallic_roughness > -1) {
+        vec2 rm = texture(textures[nonuniformEXT(data.indices.metallic_roughness)], uv).gb;
+        mc.roughness *= rm.x;
+        mc.metallic  *= rm.y;
+    }
+    mc.roughness = mc.roughness * mc.roughness;
 
-    Indices indices     = Indices(primMeshInfo.indexBufferDeviceAddress);
-    Vertices vertices   = Vertices(primMeshInfo.vertexBufferDeviceAddress);
-    Materials materials = Materials(primMeshInfo.materialBufferDeviceAddress);
+    if (data.indices.emissive > -1) {
+        mc.emission *= texture(textures[nonuniformEXT(data.indices.emissive)], uv);
+    }
 
+    return mc;
+}
+
+Hit process_hit(Payload payload) {
+    Hit hit;
+
+    // Get necessary buffers to get triangle information 
+    uint64_t mesh_bda  = pPrimMeshInfos.addresses[payload.instance_index];
+    PrimMeshInfo prim_mesh = PrimMeshInfos(mesh_bda).p[payload.geometry_index];
+
+    Indices indices_buffer   = Indices(prim_mesh.indices_bda);
+    Vertices vertices_buffer = Vertices(prim_mesh.vertices_bda);
+
+    Vertex vertices[3];
     for (uint i = 0; i < 3; i++) {
-        tri.vertices[i] = vertices.v[indices.i[index * 3 + i]];
+        vertices[i] = vertices_buffer.v[indices_buffer.i[payload.primitive_index * 3 + i]];
+        hit.vertices[i] = vertices[i].position;
     }
     
-    vec3 barycentricCoords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-    tri.color   = tri.vertices[0].color    * barycentricCoords.x + tri.vertices[1].color    * barycentricCoords.y + tri.vertices[2].color    * barycentricCoords.z;
-    tri.hit     = tri.vertices[0].position * barycentricCoords.x + tri.vertices[1].position * barycentricCoords.y + tri.vertices[2].position * barycentricCoords.z;
-    tri.uv      = tri.vertices[0].uv       * barycentricCoords.x + tri.vertices[1].uv       * barycentricCoords.y + tri.vertices[2].uv       * barycentricCoords.z;
-    tri.normalS = tri.vertices[0].normal   * barycentricCoords.x + tri.vertices[1].normal   * barycentricCoords.y + tri.vertices[2].normal   * barycentricCoords.z;
-    tri.normalS = normalize(tri.normalS);
-    tri.normalG = normalize(cross(tri.vertices[1].position - tri.vertices[0].position, tri.vertices[2].position - tri.vertices[0].position));
-
-    //tri.tangent.xyz = tri.vertices[0].tangent.xyz * barycentricCoords.x + tri.vertices[1].tangent.xyz * barycentricCoords.y + tri.vertices[2].tangent.xyz * barycentricCoords.z;
-    //tri.tangent.xyz = normalize(tri.tangent.xyz);
-    //tri.tangent.w   = tri.vertices[0].tangent.w;
+    // Interpolate information according to barycentric coordinates
+    // TODO T interpolate_barycentric(T data[3], vec3 coords)
+    hit.position = vertices[0].position * payload.barycentrics.x + vertices[1].position * payload.barycentrics.y + vertices[2].position * payload.barycentrics.z;
+    hit.normal_s = vertices[0].normal   * payload.barycentrics.x + vertices[1].normal   * payload.barycentrics.y + vertices[2].normal   * payload.barycentrics.z;
+    hit.normal_s = normalize(hit.normal_s);
+    hit.normal_g = normalize(cross(vertices[1].position - vertices[0].position, vertices[2].position - vertices[0].position));
+    //hit.tangent = vertices[0].tangent.xyz * payload.barycentrics.x + vertices[1].tangent.xyz * payload.barycentrics.y + vertices[2].tangent.xyz * payload.barycentrics.z;
+    //hit.tangent = normalize(tri.tangent.xyz);
+    //float fsign = tri.vertices[0].tangent.w;
+    vec4 hit_color = vertices[0].color * payload.barycentrics.x + vertices[1].color * payload.barycentrics.y + vertices[2].color * payload.barycentrics.z;
+    vec2 hit_uv    = vertices[0].uv * payload.barycentrics.x + vertices[1].uv * payload.barycentrics.y + vertices[2].uv * payload.barycentrics.z;
 
     // TODO fix mikktspace tangents so we don't have to calculate them here
-    vec3 up = abs(tri.normalS.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
-    tri.tangent.xyz = normalize(cross(up, tri.normalS));
-    tri.tangent.w = 1.0;
-    
-    //tri.tangent.xyz = abs(tri.normalS.z) < 0.99999 ? normalize(cross(vec3(0, 0, 1), tri.normalS)) : vec3(1, 0, 0);
-    //tri.tangent.xyz = cross(tri.normalS, tri.tangent.xyz);
-    //tri.tangent.w = 1.0;
+    vec3 up = abs(hit.normal_s.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    hit.tangent = normalize(cross(up, hit.normal_s));
+    float fsign = 1.0;
 
-    tri.material = materials.m[0];
+    // Transform information into world space
+    hit.position  = vec3(payload.object_to_world * vec4(hit.position, 1.0));
+    hit.normal_s  = normalize((hit.normal_s * payload.world_to_object).xyz);
+    hit.normal_g  = normalize((hit.normal_g * payload.world_to_object).xyz);
+    hit.tangent   = normalize((hit.tangent  * payload.world_to_object).xyz);
+    hit.bitangent = cross(hit.normal_s, hit.tangent) * fsign;
 
-    return tri;
+    // Process material
+    MaterialData material_data = Materials(prim_mesh.material_bda).m[0];
+    hit.material = process_material(material_data, hit_color, hit_uv);
+
+    return hit;
 }
 
-
-MaterialConstants getMaterial(Triangle tri) {
-    MaterialConstants m = tri.material.constants;
-    m.albedo     *= tri.color;
-    m.emission   *= tri.material.constants.emission.a;
-
-    if (tri.material.indices.albedo > -1) {
-        m.albedo *= pow(texture(textures[nonuniformEXT(tri.material.indices.albedo)], tri.uv), vec4(2.2));
-    }
-
-    if (tri.material.indices.metallicRoughness > -1) {
-        vec2 rm = texture(textures[nonuniformEXT(tri.material.indices.metallicRoughness)], tri.uv).gb;
-        m.roughness *= rm.x;
-        m.metallic  *= rm.y;
-    }
-    m.roughness = m.roughness * m.roughness;
-
-    if (tri.material.indices.emissive > -1) {
-        m.emission *= texture(textures[nonuniformEXT(tri.material.indices.emissive)], tri.uv);
-    }
-
-    return m;
-}
+#endif // _HIT_COMMON_GLSL_

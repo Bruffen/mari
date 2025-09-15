@@ -4,8 +4,8 @@
 
 #include "common/raycommon.glsl"
 
-layout(location = 1) rayPayloadInEXT ShadowPayload shadowPrd;
+layout(location = 1) rayPayloadInEXT ShadowPayload shadow_prd;
 
 void main() {
-    shadowPrd.visibility = true;
+    shadow_prd.visibility = true;
 }
