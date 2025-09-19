@@ -77,12 +77,14 @@ struct BxdfSample {
     vec3  wi;
     float f;
     float pdf;
-    bool  dirac;
+    float eta;
+    bool  is_dirac_delta;
+    bool  is_transmission;
     bool  failed;
 };
 
 BxdfSample sample_fail() {
-    return BxdfSample(vec3(0), 0, 0, false, true);
+    return BxdfSample(vec3(0), 0, 0, 0, false, false, true);
 }
 
 /****************************************************************
@@ -96,7 +98,7 @@ BxdfSample brdf_diffuse_sample(vec3 wo, vec2 random) {
     float pdf = pdf_cosine_hemisphere(abs_cos_theta(wi));
     float f =  M_1_PI;
 
-    return BxdfSample(wi, f, pdf, false, false);
+    return BxdfSample(wi, f, pdf, 1.0, false, false, false);
 }
 
 float brdf_diffuse_f(vec3 wo, vec3 wi) {
@@ -121,7 +123,7 @@ BxdfSample brdf_conductor_sample(vec3 wo, vec2 random) {
         vec3 wi = vec3(-wo.x, -wo.y, wo.z);
         float act = abs_cos_theta(wi);
         float f = fresnel_complex(act, Complex(eta, 3.0)/* TODO conductors have a spectrally varying absorption coefficient k */) / act;
-        return BxdfSample(wi, f, 1.0, true, false);
+        return BxdfSample(wi, f, 1.0, 1.0, true, false, false);
     }
 
     vec3 wm = TR_Sample(wo, random);
@@ -136,7 +138,7 @@ BxdfSample brdf_conductor_sample(vec3 wo, vec2 random) {
     float fresnel = fresnel_complex(abs(dot(wo, wm)), Complex(eta, 3.0)/* TODO conductors have a spectrally varying absorption coefficient k */);
     float f = TR_D(wm) * fresnel * TR_G(wo, wi) / (4.0 * cos_theta_i * cos_theta_o);
 
-    return BxdfSample(wi, f, pdf, false, false);
+    return BxdfSample(wi, f, pdf, 1.0, false, false, false);
 }
 
 float brdf_conductor_f(vec3 wo, vec3 wi) {
@@ -186,22 +188,20 @@ BxdfSample bsdf_dielectric_sample(vec3 wo, vec3 random, const uint mode) {
         if (random.z < probability_reflection) { 
             vec3 wi = vec3(-wo.x, -wo.y, wo.z);
             float f = r / abs_cos_theta(wi);
-            return BxdfSample(wi, f, probability_reflection, true, false);
+            return BxdfSample(wi, f, probability_reflection, 1.0, true, false, false);
 
         // Sample btdf 
         } else {
-            float etap = -1.0;
-            vec3 wt = m_refract(wo, vec3(0, 0, 1), eta, etap);
-            if (etap == -1.0) return sample_fail();
+            vec3 wt = m_refract(wo, vec3(0, 0, 1), eta);
             float probability_transmission = t / (r + t);
             float ft = t / abs_cos_theta(wt);
 
             // Account for non symmetry between camera paths and light paths
             if (mode == Transport_Mode_Radiance) {
-                ft /= sqr(etap);
+                ft /= sqr(eta);
             }
 
-            return BxdfSample(wt, ft, probability_transmission, true, false);
+            return BxdfSample(wt, ft, probability_transmission, eta, true, true, false);
         }
     }
 
@@ -218,25 +218,24 @@ BxdfSample bsdf_dielectric_sample(vec3 wo, vec3 random, const uint mode) {
         if (!same_hemisphere(wo, wi)) return sample_fail();
         pdf = TR_PDF(wo, wm) / (4.0 * abs(dot(wo, wm))) * probability_reflection;
         float f = TR_D(wm) * TR_G(wo, wi) * r / (4.0 * cos_theta(wi) * cos_theta(wo));
-        return BxdfSample(wi, f, pdf, false, false);
+        return BxdfSample(wi, f, pdf, 1.0, false, false, false);
 
     // Sample btdf
     } else {
-        float etap = -1.0;
-        vec3 wt = m_refract(wo, wm, eta, etap);
-        if (same_hemisphere(wo, wt) || wt.z == 0 || etap == -1.0) return sample_fail();
+        vec3 wt = m_refract(wo, wm, eta);
+        if (same_hemisphere(wo, wt) || wt.z == 0) return sample_fail();
         float probability_transmission = t / (r + t);
-        float denom = sqr(dot(wt, wm) + dot(wo, wm) / etap);
+        float denom = sqr(dot(wt, wm) + dot(wo, wm) / eta);
         float dwm_dwt = abs(dot(wt, wm)) / denom;
         pdf = TR_PDF(wo, wm) * dwm_dwt * probability_transmission;
         float ft = t * TR_D(wm) * TR_G(wo, wt) * abs(dot(wt, wm) * dot(wo, wm) / (cos_theta(wt) * cos_theta(wo) * denom));
 
         // Account for non symmetry between camera paths and light paths
         if (mode == Transport_Mode_Radiance) {
-            ft /= sqr(etap);
+            ft /= sqr(eta);
         }
 
-        return BxdfSample(wt, ft, pdf, false, false);
+        return BxdfSample(wt, ft, pdf, eta, false, true, false);
     }
 }
 
@@ -336,11 +335,13 @@ float bsdf_dielectric_pdf(vec3 wo, vec3 wi) {
 
 BxdfSample bxdf_sample_material(int material_type, vec3 wo, inout uint seed) {
     switch(material_type) { 
-        case 0: return brdf_diffuse_sample(wo, random2D(seed)); // Diffuse
+        case MaterialType_Diffuse:    
+            return brdf_diffuse_sample(wo, random2D(seed)); 
         break;          
-        case 1: return bsdf_dielectric_sample(wo, random3D(seed), Transport_Mode_Radiance); // Dielectric
+        case MaterialType_Dielectric: 
+            return bsdf_dielectric_sample(wo, random3D(seed), Transport_Mode_Radiance); 
         break;
-        case 2:                                         // Conductor
+        case MaterialType_Conductor:
             if (random1D(seed) < material.metallic)
                 return brdf_conductor_sample(wo, random2D(seed));
             return brdf_diffuse_sample(wo, random2D(seed));
@@ -350,11 +351,13 @@ BxdfSample bxdf_sample_material(int material_type, vec3 wo, inout uint seed) {
 
 float bxdf_f(int material_type, vec3 wo, vec3 wi, inout uint seed) {
     switch(material_type) {
-        case 0: return brdf_diffuse_f(wo, wi);            // Diffuse
+        case MaterialType_Diffuse:    
+            return brdf_diffuse_f(wo, wi); 
         break;
-        case 1: return bsdf_dielectric_f(wo, wi, Transport_Mode_Radiance); // Dielectric
+        case MaterialType_Dielectric: 
+            return bsdf_dielectric_f(wo, wi, Transport_Mode_Radiance); 
         break;
-        case 2:                                         // Conductor
+        case MaterialType_Conductor:
             if (random1D(seed) < material.metallic) 
                 return brdf_conductor_f(wo, wi);
             return brdf_diffuse_f(wo, wi);
@@ -364,11 +367,13 @@ float bxdf_f(int material_type, vec3 wo, vec3 wi, inout uint seed) {
 
 float bxdf_pdf(int material_type, vec3 wo, vec3 wi, inout uint seed) {
     switch(material_type) {
-        case 0: return brdf_diffuse_pdf(wo, wi);          // Diffuse
+        case MaterialType_Diffuse:    
+            return brdf_diffuse_pdf(wo, wi); 
         break;
-        case 1: return bsdf_dielectric_pdf(wo, wi);       // Dielectric
+        case MaterialType_Dielectric: 
+            return bsdf_dielectric_pdf(wo, wi); 
         break;
-        case 2:                                         // Conductor
+        case MaterialType_Conductor:
             if (random1D(seed) < material.metallic)
                 return brdf_conductor_pdf(wo, wi);
             return brdf_diffuse_pdf(wo, wi);

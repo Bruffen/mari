@@ -212,51 +212,66 @@ namespace mari {
         }
     }
 
-    void Pipeline::createRayTracingPipeline(const PipelineLayout &pipelineLayout) {
+    void Pipeline::createRayTracingPipeline(const PipelineLayout &pipelineLayout,
+                                            const std::vector<std::string> &shadersRayGeneration,
+                                            const std::vector<std::string> &shadersMiss,
+                                            const std::vector<std::string> &shadersClosestHit,
+                                            const std::vector<std::string> &shadersAnyHit,
+                                            const std::vector<std::string> &shadersCallable) {
         assert(pipelineLayout.handle() != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
-
+        assert(shadersCallable.empty() && "TODO: Implement callable shader groups");
         pipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
         std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-        // TODO this function should be generic, therefore shader information should be passed here from ray_tracing_system
         {
-            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR));
             VkRayTracingShaderGroupCreateInfoKHR raygenGroupCreateInfo{};
             raygenGroupCreateInfo.sType                     = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
             raygenGroupCreateInfo.type                      = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-            raygenGroupCreateInfo.generalShader             = static_cast<uint32_t>(shaderStages.size() - 1);
             raygenGroupCreateInfo.closestHitShader          = VK_SHADER_UNUSED_KHR;
             raygenGroupCreateInfo.anyHitShader              = VK_SHADER_UNUSED_KHR;
             raygenGroupCreateInfo.intersectionShader        = VK_SHADER_UNUSED_KHR;
-            shaderGroups.push_back(raygenGroupCreateInfo);
+            for (auto &raygenFilePath : shadersRayGeneration) {
+                shaderStages.push_back(loadShader(raygenFilePath, VK_SHADER_STAGE_RAYGEN_BIT_KHR));
+                raygenGroupCreateInfo.generalShader         = static_cast<uint32_t>(shaderStages.size() - 1);
+                shaderGroups.push_back(raygenGroupCreateInfo);
+            }
         }
 
         {
-            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
             VkRayTracingShaderGroupCreateInfoKHR missGroupCreateInfo{};
             missGroupCreateInfo.sType                       = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
             missGroupCreateInfo.type                        = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-            missGroupCreateInfo.generalShader               = static_cast<uint32_t>(shaderStages.size() - 1);
             missGroupCreateInfo.closestHitShader            = VK_SHADER_UNUSED_KHR;
             missGroupCreateInfo.anyHitShader                = VK_SHADER_UNUSED_KHR;
             missGroupCreateInfo.intersectionShader          = VK_SHADER_UNUSED_KHR;
-            shaderGroups.push_back(missGroupCreateInfo);
-            shaderStages.push_back(loadShader("../../shaders/spv/shadow.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR));
-            missGroupCreateInfo.generalShader               = static_cast<uint32_t>(shaderStages.size() - 1);
-            shaderGroups.push_back(missGroupCreateInfo);
+            for (auto &missFilePath : shadersMiss) {
+                shaderStages.push_back(loadShader(missFilePath, VK_SHADER_STAGE_MISS_BIT_KHR));
+                missGroupCreateInfo.generalShader           = static_cast<uint32_t>(shaderStages.size() - 1);
+                shaderGroups.push_back(missGroupCreateInfo);
+            }
         }
 
         {
-            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
             VkRayTracingShaderGroupCreateInfoKHR hitGroupCreateInfo{};
             hitGroupCreateInfo.sType                        = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
             hitGroupCreateInfo.type                         = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
             hitGroupCreateInfo.generalShader                = VK_SHADER_UNUSED_KHR;
-            hitGroupCreateInfo.closestHitShader             = static_cast<uint32_t>(shaderStages.size() - 1);
             hitGroupCreateInfo.intersectionShader           = VK_SHADER_UNUSED_KHR;
-            shaderStages.push_back(loadShader("../../shaders/spv/pathtracer.rahit.spv", VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
-            hitGroupCreateInfo.anyHitShader                 = static_cast<uint32_t>(shaderStages.size() - 1);
-            shaderGroups.push_back(hitGroupCreateInfo);
+            for (int i = 0; i < std::max(shadersClosestHit.size(), shadersAnyHit.size()); i++) {
+                if (i < shadersClosestHit.size()) {
+                    shaderStages.push_back(loadShader(shadersClosestHit[i], VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
+                    hitGroupCreateInfo.closestHitShader     = static_cast<uint32_t>(shaderStages.size() - 1);
+                } else {
+                    hitGroupCreateInfo.closestHitShader     = VK_SHADER_UNUSED_KHR;
+                }
+                if (i < shadersAnyHit.size()) {
+                    shaderStages.push_back(loadShader(shadersAnyHit[i], VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
+                    hitGroupCreateInfo.anyHitShader         = static_cast<uint32_t>(shaderStages.size() - 1);
+                } else {
+                    hitGroupCreateInfo.anyHitShader         = VK_SHADER_UNUSED_KHR;
+                }
+                shaderGroups.push_back(hitGroupCreateInfo);
+            }
         }
 
         VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
@@ -275,7 +290,12 @@ namespace mari {
             throw std::runtime_error("Failed to create ray tracing pipeline");
         }
 
-        createShaderBindingTables();
+        createShaderBindingTables(
+            static_cast<uint32_t>(shadersRayGeneration.size()),
+            static_cast<uint32_t>(shadersMiss.size()),
+            static_cast<uint32_t>(std::max(shadersClosestHit.size(), shadersAnyHit.size())),
+            static_cast<uint32_t>(shadersCallable.size())
+        );
     }
 
     void Pipeline::bind(VkCommandBuffer commandBuffer) {
@@ -286,27 +306,26 @@ namespace mari {
         return (value + alignment - 1) & ~(alignment - 1);
     }
 
-    void Pipeline::createShaderBindingTables() {
+    void Pipeline::createShaderBindingTables(uint32_t countRaygen, uint32_t countMiss, uint32_t countHit, uint32_t countCallable) {
         const uint32_t              handleSize          = device.propertiesRT.shaderGroupHandleSize;
         const uint32_t              handleSizeAligned   = alignedSize(device.propertiesRT.shaderGroupHandleSize, device.propertiesRT.shaderGroupHandleAlignment);
         const uint32_t              handleAlignment     = device.propertiesRT.shaderGroupHandleAlignment;
         const uint32_t              groupCount          = static_cast<uint32_t>(shaderGroups.size());
         const uint32_t              sbtSize             = groupCount * handleSizeAligned;
         const VkBufferUsageFlags    sbtBufferUsageFlags = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        // TODO vma
 
-        raygenSBT = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        missSBT   = std::make_unique<Buffer>(device, handleSize, 2, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        hitSBT    = std::make_unique<Buffer>(device, handleSize, 1, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        raygenSBT = std::make_unique<Buffer>(device, handleSize, countRaygen, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        missSBT   = std::make_unique<Buffer>(device, handleSize, countMiss,   sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        hitSBT    = std::make_unique<Buffer>(device, handleSize, countHit,    sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
         std::vector<uint8_t> shaderHandleStorage(sbtSize);
         if (vkGetRayTracingShaderGroupHandlesKHR(device.handle(), handle, 0, groupCount, sbtSize, shaderHandleStorage.data())) {
             throw std::runtime_error("Failed to get ray tracing shader group handles");
         }
 
-        memcpy(raygenSBT->getMappedMemory(), shaderHandleStorage.data() + handleSizeAligned * 0, handleSize);
-        memcpy(missSBT->getMappedMemory()  , shaderHandleStorage.data() + handleSizeAligned * 1, handleSize * 2);
-        memcpy(hitSBT->getMappedMemory()   , shaderHandleStorage.data() + handleSizeAligned * 3, handleSize);
+        memcpy(raygenSBT->getMappedMemory(), shaderHandleStorage.data() + handleSizeAligned * 0, handleSize * countRaygen);
+        memcpy(missSBT->getMappedMemory()  , shaderHandleStorage.data() + handleSizeAligned * countRaygen, handleSize * countMiss);
+        memcpy(hitSBT->getMappedMemory()   , shaderHandleStorage.data() + handleSizeAligned * (countRaygen + countMiss), handleSize * countHit);
 
         raygenSBT->unmap();
         missSBT->unmap();
@@ -314,18 +333,18 @@ namespace mari {
 
         // Create sbt entries for the pipeline
         raygenSBTEntry.deviceAddress    = raygenSBT->deviceAddress();
-        raygenSBTEntry.size             = handleSizeAligned;
+        raygenSBTEntry.size             = handleSizeAligned * countRaygen;
         raygenSBTEntry.stride           = handleSizeAligned;
 
         missSBTEntry.deviceAddress      = missSBT->deviceAddress();
-        missSBTEntry.size               = handleSizeAligned * 2;
+        missSBTEntry.size               = handleSizeAligned * countMiss;
         missSBTEntry.stride             = handleSizeAligned;
 
         hitSBTEntry.deviceAddress       = hitSBT->deviceAddress();
-        hitSBTEntry.size                = handleSizeAligned;
+        hitSBTEntry.size                = handleSizeAligned * countHit;
         hitSBTEntry.stride              = handleSizeAligned;
 
-        callableSBTEntry.deviceAddress  = VkDeviceAddress(0);
+        callableSBTEntry.deviceAddress  = VkDeviceAddress(0); // TODO
         callableSBTEntry.size           = handleSizeAligned;
         callableSBTEntry.stride         = handleSizeAligned;
     }

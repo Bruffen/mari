@@ -188,11 +188,33 @@ namespace mari {
        tlas->build(&accelerationStructureGeometry, 1, &primitiveCount, pBuildRangeInfos.data());
     }
 
-    void RayTracingSystem::buildPipeline(VkDescriptorSetLayout descriptorSetLayout) {
+    void RayTracingSystem::buildPipeline(VkDescriptorSetLayout descriptorSetLayout, Integrator integrator) {
         auto descriptorSetLayouts = std::vector<VkDescriptorSetLayout>{descriptorSetLayout};
         pipelineLayout = std::make_unique<PipelineLayout>(device, &descriptorSetLayouts);
         pipeline = std::make_unique<Pipeline>(device);
-        pipeline->createRayTracingPipeline(*pipelineLayout);
+        
+        std::vector<std::string> shadersRayGeneration{};
+        std::vector<std::string> shadersClosestHit{};
+        std::vector<std::string> shadersAnyHit{};
+        std::vector<std::string> shadersMiss{};
+        std::vector<std::string> shadersCallable{};
+
+        switch (integrator) {
+            case Integrator::PATH_TRACING:
+                shadersRayGeneration.push_back("../../shaders/spv/pathtracer.rgen.spv");
+
+                shadersClosestHit.push_back("../../shaders/spv/pathtracer.rchit.spv");
+                shadersAnyHit.push_back("../../shaders/spv/pathtracer.rahit.spv");
+                
+                shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
+                shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");
+            break;
+            default:
+                throw std::runtime_error("No valid integrator selected!");
+            break;
+        }
+
+        pipeline->createRayTracingPipeline(*pipelineLayout, shadersRayGeneration, shadersMiss, shadersClosestHit, shadersAnyHit, shadersCallable);
     }
 
     // TODO handle case where no lights exist, specially on gpu side

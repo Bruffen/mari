@@ -330,16 +330,30 @@ namespace mari {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
         MaterialConstants mc = material.data.constants;
+        bool a = true;
+        bool *a_ptr = &a;
 
         ImGui::PushID(material.name.c_str());
-        ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
-        imGuiImage(*material.textures.albedo);
-        ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
-        ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
-        imGuiImage(*material.textures.metallicRoughness);
-        ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-        ImGui::SliderFloat("Thickness", (float*)&material.data.constants.thickness, 0.0f, 1.0f, "%.3f", silderFlags);
-        ImGui::SliderFloat("Refraction Index", (float*)&material.data.constants.ior, 1.0f, 3.0f, "%.3f", silderFlags);
+        ImGui::Indent(10.0f);
+        if (ImGui::CollapsingHeader("Base", a_ptr)) {
+            ImGui::Indent(10.0f);
+            ImGui::ColorEdit4("Albedo", (float*)&material.data.constants.albedo, ImGuiColorEditFlags_Float);
+            imGuiImage(*material.textures.albedo);
+            ImGui::SliderFloat("Metallic", (float*)&material.data.constants.metallic, 0.0f, 1.0f, "%.3f", silderFlags);
+            ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
+            imGuiImage(*material.textures.metallicRoughness);
+            ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+            ImGui::Indent(-10.0f);
+        }
+        if (ImGui::CollapsingHeader("Dielectric", a_ptr)) {
+            ImGui::Indent(10.0f);
+            ImGui::SliderFloat("Thickness", (float*)&material.data.constants.thickness, 0.0f, 1.0f, "%1.0f", silderFlags);
+            ImGui::SliderFloat("Refraction Index", (float*)&material.data.constants.ior, 1.0f, 3.0f, "%.3f", silderFlags);
+            ImGui::ColorEdit4("Absorption", (float*)&material.data.constants.absorption, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+            ImGui::SliderFloat("Scattering", (float*)&material.data.constants.scattering, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
+            ImGui::Indent(-10.0f);
+        }
+        ImGui::Indent(-10.0f);
         ImGui::PopID();
 
 
@@ -348,7 +362,9 @@ namespace mari {
             mc.roughness    != material.data.constants.roughness    ||
             mc.emission     != material.data.constants.emission     ||
             mc.thickness    != material.data.constants.thickness    ||
-            mc.ior          != material.data.constants.ior) {
+            mc.ior          != material.data.constants.ior          ||
+            mc.absorption   != material.data.constants.absorption   ||
+            mc.scattering   != material.data.constants.scattering) {
             inputChanged = true;
             scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
         }

@@ -31,7 +31,6 @@ namespace mari {
         }
 
         rayTracingSystem.buildScene(*scene);
-        rayTracingSystem.tonemapper = 2;
 
         gui->set(scene);
 
@@ -106,7 +105,7 @@ namespace mari {
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout.handle()};
         PointLightSystem pointLightSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout.handle()};
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle());
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -287,7 +286,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  11  ) {
+        switch (  6  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -315,8 +314,8 @@ namespace mari {
                 break;
             case 6:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
                 break;
             case 7:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
@@ -338,21 +337,21 @@ namespace mari {
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
         std::vector<std::shared_ptr<InfiniteAreaLight>> lights{};
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageWhite32f(), 1));
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageWhite32f(), 1));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/zhengyang_gate_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "zhengyang_gate")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/meadow_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "meadow_8k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_night_puresky_8k_darkened.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_night_puresky_8k_darkened")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));

@@ -73,7 +73,7 @@ vec3 m_reflect(vec3 wo, vec3 n) {
     return -wo + 2 * dot(wo, n) * n;
 }
 
-vec3 m_refract(vec3 wi, vec3 normal, float eta, inout float etap) {
+vec3 m_refract(vec3 wi, vec3 normal, inout float eta) {
     float cos_theta_i = dot(normal, wi);
 
     if (cos_theta_i < 0.0) {
@@ -87,8 +87,6 @@ vec3 m_refract(vec3 wi, vec3 normal, float eta, inout float etap) {
     float sin2_theta_t = sin2_theta_i / sqr(eta);
 
     float cos_theta_t = sqrt(1.0 - sin2_theta_t);
-
-    etap = eta;
     return -wi / eta + (cos_theta_i / eta - cos_theta_t) * normal;
 }
 

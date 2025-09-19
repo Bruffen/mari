@@ -64,15 +64,14 @@ namespace mari {
         // yet a material with transmission of 1 can be both thin walled and a volume
         // and thickness value is used to tell them apart, so we set it to 1 when it's a volume
         float                       thickness = 0.0f;
-        // TODO
-        //float                       attenuationDistance;
-        //glm::vec3                   attenuationColor;
+        glm::vec4                   absorption; // xyz color, w coefficient
+        float                       scattering;
 
         // KHR_materials_anisotropy // TODO convert from gltf anisotropy parameters to pbrt's
         //float                       anisotropyStrength = 0.0f;
         //float                       anisotropyRotation = 0.0f; 
 
-        glm::vec4                   emission;   // rgb for color, a for strength
+        glm::vec4                   emission;   // rgb color, a strength
     };
 
     struct TextureIndices {

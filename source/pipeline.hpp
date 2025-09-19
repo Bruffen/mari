@@ -48,21 +48,27 @@ namespace mari {
                                                 const std::string &vertFilepath, 
                                                 const std::string &fragFilepath, 
                                                 const PipelineConfigInfo &configInfo);
-            void                            createRayTracingPipeline(const PipelineLayout &pipelineLayout);
+            void                            createRayTracingPipeline(
+                                                const PipelineLayout &pipelineLayout,
+                                                const std::vector<std::string> &shadersRayGeneration,
+                                                const std::vector<std::string> &shadersMiss,
+                                                const std::vector<std::string> &shadersClosestHit,
+                                                const std::vector<std::string> &shadersAnyHit,
+                                                const std::vector<std::string> &shadersCallable);
             void                            createComputePipeline(const std::string &compFilepath, const PipelineLayout& pipelineLayout);
             VkStridedDeviceAddressRegionKHR raygenSBTEntry, missSBTEntry, hitSBTEntry, callableSBTEntry; // TODO private?
         private:
             VkPipelineShaderStageCreateInfo loadShader(const std::string &filepath, VkShaderStageFlagBits flag);
             std::vector<char>               readFile(const std::string &filepath);
             VkShaderModule                  createShaderModule(const std::vector<char> &code);
-            void                            createShaderBindingTables();
+            void                            createShaderBindingTables(uint32_t countRaygen, uint32_t countMiss, uint32_t countHit, uint32_t countCallable);
 
 
             Device &device;
             VkPipeline handle;
             VkPipelineBindPoint pipelineBindPoint;
             std::vector<VkShaderModule> shaderModules;
-            std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups; // TODO not sure if it's best in here. look into it
+            std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups;
             std::unique_ptr<Buffer> raygenSBT, missSBT, hitSBT; // TODO group sbt with sbtentries in a struct?
     };
 }

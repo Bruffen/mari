@@ -30,6 +30,7 @@ struct Hit {
     vec3 normal_g;       // Geometric normal indicating where triangle is facing
     vec3 tangent;
     vec3 bitangent;
+    int  material_type;
     MaterialConstants material;
 };
 
@@ -106,7 +107,17 @@ Hit process_hit(Payload payload) {
         vertices[i] = vertices_buffer.v[indices_buffer.i[payload.primitive_index * 3 + i]];
         hit.vertices[i] = vertices[i].position;
     }
-    
+
+    // Process material
+    vec4 hit_color = vertices[0].color * payload.barycentrics.x + vertices[1].color * payload.barycentrics.y + vertices[2].color * payload.barycentrics.z;
+    vec2 hit_uv    = vertices[0].uv * payload.barycentrics.x + vertices[1].uv * payload.barycentrics.y + vertices[2].uv * payload.barycentrics.z;
+    MaterialData material_data = Materials(prim_mesh.material_bda).m[0];
+    hit.material = process_material(material_data, hit_color, hit_uv);
+    hit.material_type = get_material_type(hit.material);
+
+    // If it's a volume boundary, return without calculating everything else
+    if (hit.material_type == MaterialType_Boundary) return hit;
+
     // Interpolate information according to barycentric coordinates
     // TODO T interpolate_barycentric(T data[3], vec3 coords)
     hit.position = vertices[0].position * payload.barycentrics.x + vertices[1].position * payload.barycentrics.y + vertices[2].position * payload.barycentrics.z;
@@ -116,8 +127,6 @@ Hit process_hit(Payload payload) {
     //hit.tangent = vertices[0].tangent.xyz * payload.barycentrics.x + vertices[1].tangent.xyz * payload.barycentrics.y + vertices[2].tangent.xyz * payload.barycentrics.z;
     //hit.tangent = normalize(tri.tangent.xyz);
     //float fsign = tri.vertices[0].tangent.w;
-    vec4 hit_color = vertices[0].color * payload.barycentrics.x + vertices[1].color * payload.barycentrics.y + vertices[2].color * payload.barycentrics.z;
-    vec2 hit_uv    = vertices[0].uv * payload.barycentrics.x + vertices[1].uv * payload.barycentrics.y + vertices[2].uv * payload.barycentrics.z;
 
     // TODO fix mikktspace tangents so we don't have to calculate them here
     vec3 up = abs(hit.normal_s.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
@@ -130,10 +139,6 @@ Hit process_hit(Payload payload) {
     hit.normal_g  = normalize((hit.normal_g * payload.world_to_object).xyz);
     hit.tangent   = normalize((hit.tangent  * payload.world_to_object).xyz);
     hit.bitangent = cross(hit.normal_s, hit.tangent) * fsign;
-
-    // Process material
-    MaterialData material_data = Materials(prim_mesh.material_bda).m[0];
-    hit.material = process_material(material_data, hit_color, hit_uv);
 
     return hit;
 }

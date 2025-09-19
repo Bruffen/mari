@@ -12,6 +12,7 @@ MaterialConstants material;
 #include "common/hitcommon.glsl"
 #include "common/tonemapping.glsl"
 #include "common/light.glsl"
+#include "common/volume.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
@@ -53,9 +54,10 @@ void main() {
         vec3 radiance   = vec3(0.0);
         vec3 throughput = vec3(1.0);
         
-        float eta          = 1.0;
-        float previous_pdf = 1.0;
-        bool  dirac        = false;
+        float eta_scale         = 1.0;
+        float previous_pdf      = 1.0;
+        bool  is_dirac_delta    = false;
+        bool  is_volume         = false;
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, tmax, 0);
@@ -66,7 +68,7 @@ void main() {
                 vec3 le = sample_Le_infinite(direction, uv);
 
                 float mis_weight = 1.0;
-                if (!dirac && depth != 0 && properties.next_event_estimation == 1) {
+                if (!is_dirac_delta && depth != 0 && properties.next_event_estimation == 1) {
                     mis_weight = power_heuristic(previous_pdf, pdf_light_infinite(uv));
                 }
 
@@ -76,46 +78,66 @@ void main() {
 
             Hit hit = process_hit(prd);
             material = hit.material; // TODO remove global material
-            const int material_type = get_material_type(hit.material);
+
+            // Hit a volume boundary. Keep going without interacting.
+            if (hit.material_type == MaterialType_Boundary) {
+                origin = hit.position + direction * 0.001;
+                medium_push(hit.material.absorption.rgb, hit.material.absorption.w, hit.material.scattering);
+                continue;
+            }
+
+            const float distance = length(hit.position - origin);
             const bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
 
             // Sample indirect light
             if (is_emissive) {
-                if (depth == 0 || dirac || properties.next_event_estimation == 0) {
+                if (depth == 0 || is_dirac_delta || properties.next_event_estimation == 0) {
                     // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
                     radiance += throughput * hit.material.emission.rgb;
                 }
                 else {
-                    float light_mis = pdf_light_area(hit.vertices, direction, length(hit.position - origin), hit.material.emission.rgb, true); // TODO no double sided parameter in material
+                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.rgb, true); // TODO no double sided parameter in material
                     float bxdf_mis = previous_pdf;
                     radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
                 }
             }
-            throughput *= hit.material.albedo.rgb;
 
             // Sample bxdf
             vec3 wo = to_local(hit.tangent, hit.bitangent, hit.normal_s, -direction);
-            BxdfSample bxdf_sample = bxdf_sample_material(material_type, wo, prd.seed);
+            BxdfSample bxdf_sample = bxdf_sample_material(hit.material_type, wo, prd.seed);
             if (bxdf_sample.failed) {
                 break;
             }
 
-            dirac        = bxdf_sample.dirac;
-            previous_pdf = bxdf_sample.pdf;
-            direction    = from_local(hit.tangent, hit.bitangent, hit.normal_s, bxdf_sample.wi);
-            
-            // If ray goes inside opaque object, consider it absorbed
-            // Probably best to also have a is_transmission from BxdfSample
-            // and use it instead of material.thickness == 0.0 
-            // because reflections which go inside the sphere is also invalid
-            if (material.thickness == 0.0 && dot(direction, hit.normal_g) < 0.0) break; 
+            // Set values for next ray
+            throughput    *= hit.material.albedo.rgb;
+            is_dirac_delta = bxdf_sample.is_dirac_delta;
+            previous_pdf   = bxdf_sample.pdf;
+            direction      = from_local(hit.tangent, hit.bitangent, hit.normal_s, bxdf_sample.wi);
+            // If next ray goes inside non dielectric object, consider it absorbed
+            bool going_inside = dot(direction, hit.normal_g) < 0.0;
+            if (hit.material_type != MaterialType_Dielectric && going_inside) break;
+            origin = offset_position(hit.position, going_inside ? -hit.normal_g : hit.normal_g);
 
-            bool is_transmission = dot(hit.normal_s, direction) < 0.0;
-            origin = offset_position(hit.position, is_transmission ? -hit.normal_g : hit.normal_g);
+            // Process transmission from existing medium
+            if (current_medium >= 0) {
+                throughput *= get_transmittance(media[current_medium], distance);
+            }
+
+            // Add or remove medium in stack when entering or exiting dielectric
+            if (bxdf_sample.is_transmission) {
+                if (going_inside) {
+                    medium_push(hit.material.absorption.rgb, hit.material.absorption.w, hit.material.scattering);
+                } else {
+                    medium_remove();
+                }
+                // Update eta_scale for russian roulette
+                eta_scale *= bxdf_sample.eta; 
+            }
 
             // Sample direct light
             LiSample li_sample;
-            if (!dirac && properties.next_event_estimation == 1) {
+            if (!is_dirac_delta && properties.next_event_estimation == 1) {
                 float piecewise_pdf = 1.0;
 
                 LightInfo light = sample_light(random1D(prd.seed), piecewise_pdf);
@@ -132,8 +154,8 @@ void main() {
                 if (li_sample.pdf > 0.0) {
                     vec3 wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
 
-                    float bxdf_f = bxdf_f(material_type, wo, wi, prd.seed);
-                    float bxdf_pdf = bxdf_pdf(material_type, wo, wi, prd.seed);
+                    float bxdf_f = bxdf_f(hit.material_type, wo, wi, prd.seed);
+                    float bxdf_pdf = bxdf_pdf(hit.material_type, wo, wi, prd.seed);
 
                     if (bxdf_f > 0.0 && bxdf_pdf > 0.0) {
                         shadow_prd.visibility = false;
@@ -141,8 +163,12 @@ void main() {
                         traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
 
                         if (shadow_prd.visibility) {
-                            mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf);
-                            radiance += throughput * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
+                            vec3 li_transmission = vec3(1.0);
+                            if (current_medium >= 0) {
+                                li_transmission = get_transmittance(media[current_medium], li_sample.distance);
+                            }
+                            float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf);
+                            radiance += throughput * li_transmission * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
                         }
                     }
                 }
@@ -160,23 +186,13 @@ void main() {
             if (isnan(direction.r)   || isnan(direction.g)  || isnan(direction.b) ||
                 isnan(radiance.r)    || isnan(radiance.g)   || isnan(radiance.b)  ||
                 isnan(throughput.r)  || isnan(throughput.g) || isnan(throughput.b)) {
-                debugPrintfEXT("Pixel [%v2i] with NaN value:", thread.xy);
-                debugPrintfEXT("Depth: %i", depth);
-                debugPrintfEXT("Sample Count: %i", properties.frame_count);
-
-                debugPrintfEXT("origin     = %v3f", origin);
-                debugPrintfEXT("direction  = %v3f", direction);
-                debugPrintfEXT("radiance   = %v3f", radiance);
-                debugPrintfEXT("throughput = %v3f", throughput);
-
-                debugPrintfEXT("material type   = %i", material_type);
-                debugPrintfEXT("bxdf_sample wi  = %v3f", bxdf_sample.wi);
-                debugPrintfEXT("bxdf_sample f   = %f", bxdf_sample.f);
-                debugPrintfEXT("bxdf_sample pdf = %f", bxdf_sample.pdf);
-
-                debugPrintfEXT("li_sample wi  = %v3f", li_sample.wi);
-                debugPrintfEXT("li_sample distance = %f", li_sample.distance);
-                debugPrintfEXT("li_sample pdf = %f", li_sample.pdf);
+                debugPrintfEXT(
+                    "Pixel [%v2i] with NaN value:\nDepth: %i\nSample Count: %i\norigin     = %v3f\ndirection  = %v3f\nradiance   = %v3f\nthroughput = %v3f\nmaterial type   = %i\nbxdf_sample wi  = %v3f\nbxdf_sample f   = %f\nbxdf_sample pdf = %f\nli_sample wi  = %v3f\nli_sample distance = %f\nli_sample pdf = %f\n", 
+                    thread.xy, depth, properties.frame_count, 
+                    origin, direction, radiance, throughput,
+                    hit.material_type, bxdf_sample.wi, bxdf_sample.f, bxdf_sample.pdf, 
+                    li_sample.wi, li_sample.distance, li_sample.pdf
+                );
 
                 radiance = color_error;
                 break;
@@ -184,13 +200,13 @@ void main() {
 //#endif
 
             // Apply russian roulette
-            if (properties.russian_roulette == 1 && depth > 3) {
-                float probability = max(max(throughput.r, throughput.g), throughput.b);
+            float probability = max(max(throughput.r, throughput.g), throughput.b) * eta_scale;
+            if (properties.russian_roulette == 1 && probability < 1.0 && depth > 3) {
                 
                 if (random1D(prd.seed) > probability) {
                     break;
                 }
-                throughput /= probability; // TODO pbrt eta_scale for transmission
+                throughput /= probability;
             }
         }
 
