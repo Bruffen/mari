@@ -314,33 +314,33 @@ namespace mari {
         const uint32_t              sbtSize             = groupCount * handleSizeAligned;
         const VkBufferUsageFlags    sbtBufferUsageFlags = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-        raygenSBT = std::make_unique<Buffer>(device, handleSize, countRaygen, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        missSBT   = std::make_unique<Buffer>(device, handleSize, countMiss,   sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        hitSBT    = std::make_unique<Buffer>(device, handleSize, countHit,    sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
         std::vector<uint8_t> shaderHandleStorage(sbtSize);
         if (vkGetRayTracingShaderGroupHandlesKHR(device.handle(), handle, 0, groupCount, sbtSize, shaderHandleStorage.data())) {
             throw std::runtime_error("Failed to get ray tracing shader group handles");
         }
 
+        raygenSBT = std::make_unique<Buffer>(device, handleSize, countRaygen, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        if (countMiss > 0) missSBT = std::make_unique<Buffer>(device, handleSize, countMiss, sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        if (countHit  > 0) hitSBT  = std::make_unique<Buffer>(device, handleSize, countHit,  sbtBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        
         memcpy(raygenSBT->getMappedMemory(), shaderHandleStorage.data() + handleSizeAligned * 0, handleSize * countRaygen);
-        memcpy(missSBT->getMappedMemory()  , shaderHandleStorage.data() + handleSizeAligned * countRaygen, handleSize * countMiss);
-        memcpy(hitSBT->getMappedMemory()   , shaderHandleStorage.data() + handleSizeAligned * (countRaygen + countMiss), handleSize * countHit);
+        if (countMiss > 0) memcpy(missSBT->getMappedMemory(), shaderHandleStorage.data() + handleSizeAligned * countRaygen, handleSize * countMiss);
+        if (countHit  > 0) memcpy(hitSBT->getMappedMemory() , shaderHandleStorage.data() + handleSizeAligned * (countRaygen + countMiss), handleSize * countHit);
 
         raygenSBT->unmap();
-        missSBT->unmap();
-        hitSBT->unmap();
+        if (countMiss > 0) missSBT->unmap();
+        if (countHit  > 0) hitSBT->unmap();
 
         // Create sbt entries for the pipeline
         raygenSBTEntry.deviceAddress    = raygenSBT->deviceAddress();
         raygenSBTEntry.size             = handleSizeAligned * countRaygen;
         raygenSBTEntry.stride           = handleSizeAligned;
 
-        missSBTEntry.deviceAddress      = missSBT->deviceAddress();
+        missSBTEntry.deviceAddress      = countMiss == 0 ? VkDeviceAddress(0) : missSBT->deviceAddress();
         missSBTEntry.size               = handleSizeAligned * countMiss;
         missSBTEntry.stride             = handleSizeAligned;
 
-        hitSBTEntry.deviceAddress       = hitSBT->deviceAddress();
+        hitSBTEntry.deviceAddress       = countHit == 0 ? VkDeviceAddress(0) : hitSBT->deviceAddress();
         hitSBTEntry.size                = handleSizeAligned * countHit;
         hitSBTEntry.stride              = handleSizeAligned;
 

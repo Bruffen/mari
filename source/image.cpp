@@ -34,7 +34,7 @@ namespace mari {
     void Image::createImage() {
         VkImageCreateInfo imageCreateInfo{};
         imageCreateInfo.sType           = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCreateInfo.imageType       = VK_IMAGE_TYPE_2D;
+        imageCreateInfo.imageType       = size.depth > 1 ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
         imageCreateInfo.format          = format;
         imageCreateInfo.extent          = size;
         imageCreateInfo.mipLevels       = 1;
@@ -65,7 +65,7 @@ namespace mari {
     void Image::createImageView() {
         VkImageViewCreateInfo imageViewCreateInfo{};
         imageViewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.viewType                        = size.depth > 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D;
         imageViewCreateInfo.format                          = format;
         imageViewCreateInfo.subresourceRange                = {};
         imageViewCreateInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;

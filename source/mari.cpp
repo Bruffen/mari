@@ -19,9 +19,20 @@
 #include <cassert>
 #include <stdexcept>
 
+#include <openvdb/openvdb.h>
+#include <nanovdb/NanoVDB.h>
+
 namespace mari {
     Mari::Mari() {
         DefaultObjects::initialize(device);
+
+        //openvdb::initialize();
+        //openvdb::io::File file("../../../../_Models/volumes/wdas_cloud/wdas_cloud_sixteenth.vdb");
+        //file.open();
+        //openvdb::GridBase::Ptr grid;
+        //openvdb::v12_1::GridPtrVecPtr grids = file.getGrids();
+        //file.close();
+        
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
         loadScene();
@@ -92,7 +103,8 @@ namespace mari {
             .addBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
             .addBinding(7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
-                        imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) // TODO if image count == 1, call VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER instead of variable descriptor
+                            // TODO if image count == 1, call VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER instead of variable descriptor
+                            imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
 
         std::vector<VkDescriptorSet> rasterizationDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
@@ -134,15 +146,15 @@ namespace mari {
         //glfwSetScrollCallback(window.getGLFWwindow(), camera.scrollCallback);
         glfwSetWindowUserPointer(window.getGLFWwindow(), &window);
 
-        std::shared_ptr<Node> cameraObject = std::make_shared<Node>();
-        cameraObject->name = "Free Camera";
-        cameraObject->camera = std::make_shared<Camera>();
-        cameraObject->transform.position.y = 0.7f;
-        cameraObject->transform.position.z = 1.5f;
-        cameraObject->isStatic = false;
-        scene->addNode(cameraObject);
-        scene->cameraObjects.emplace_back(cameraObject);
-        scene->currentCamera = cameraObject;
+        std::shared_ptr<Node> freeCamera = std::make_shared<Node>();
+        freeCamera->name = "Free Camera";
+        freeCamera->camera = std::make_shared<Camera>();
+        freeCamera->transform.position.y = 0.7f;
+        freeCamera->transform.position.z = 1.5f;
+        freeCamera->isStatic = false;
+        scene->addNode(freeCamera);
+        scene->cameraObjects.emplace_back(freeCamera);
+        scene->currentCamera = freeCamera;
         
         KeyboardController controller{*gui};
         
@@ -286,7 +298,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  6  ) {
+        switch (  7  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -318,11 +330,15 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
                 break;
             case 7:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf"); // TODO crashes with depth > 1
                 break;
             case 8:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/AttenuationTest/glTF-Binary/AttenuationTest.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb");
                 break;
             case 9:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/deccer-cubes/SM_Deccer_Cubes_Textured_Complex.gltf");
@@ -331,15 +347,18 @@ namespace mari {
                 break;
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
+                break;
+            case 12:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/lights_only.glb");
+                break;
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
@@ -351,12 +370,11 @@ namespace mari {
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/meadow_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "meadow_8k")));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_night_puresky_8k_darkened.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_night_puresky_8k_darkened")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
 
         //gui->saveImageFromData((void *)lights[0]->imageBuffer->getMappedMemory(), 4096, 4096, 4, true);

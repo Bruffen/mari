@@ -263,7 +263,7 @@ namespace mari {
 
         ImGui::Text("Rotation:");
         ImGui::SameLine();
-        ImGui::DragFloat3("##rot", &rd.x, 0.1f, 0.0f, 360.0f, "%.1f", ImGuiSliderFlags_WrapAround); // TODO degrees
+        ImGui::DragFloat3("##rot", &rd.x, 0.1f, 0.0f, 360.0f, "%.1f", ImGuiSliderFlags_WrapAround);
 
         ImGui::Text("Scale:   ");
         ImGui::SameLine();
@@ -411,7 +411,7 @@ namespace mari {
 
             // Path tracing parameters
             int oldMaxDepth = system.maxDepth;
-            ImGui::SliderInt("Depth", &system.maxDepth, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            ImGui::SliderInt("Depth", &system.maxDepth, 1, 50, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
             if (oldMaxDepth != system.maxDepth) inputChanged = true; 
 
             ImGui::SliderInt("Samples per pixel", &system.samplesPerPixel, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);

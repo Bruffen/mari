@@ -1,26 +1,15 @@
 include(./.env.cmake OPTIONAL RESULT_VARIABLE LOCAL_ENV)
 message(STATUS "Local .env.cmake: ${LOCAL_ENV}")
 
-cmake_minimum_required(VERSION 3.11.0)
+cmake_minimum_required(VERSION 3.14.0)
 
 set(NAME mari)
-
-message(STATUS "using ${CMAKE_GENERATOR}")
-if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
-    if (NOT MINGW_PATH)
-      message(FATAL_ERROR "MINGW_PATH not set in .env.cmake")
-    endif()
-    set(USE_MINGW "True")
-    set(CMAKE_C_COMPILER ${MINGW_PATH}/bin/gcc.exe)
-    set(CMAKE_CXX_COMPILER  ${MINGW_PATH}/bin/g++.exe)
-endif()
-
 project(${NAME} VERSION 0.1.0)
  
 # Set VULKAN_SDK_PATH in .env.cmake to target specific vulkan version
 if (DEFINED VULKAN_SDK_PATH)
-    set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK_PATH}/Include") # 1.1 Make sure this include path is correct
-    set(Vulkan_LIBRARIES "${VULKAN_SDK_PATH}/Lib") # 1.2 Make sure lib path is correct
+    set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK_PATH}/Include")
+    set(Vulkan_LIBRARIES "${VULKAN_SDK_PATH}/Lib")
     set(Vulkan_FOUND "True")
 else()
     find_package(Vulkan REQUIRED) # throws error if could not find Vulkan
@@ -39,9 +28,6 @@ if (DEFINED GLFW_PATH)
     set(GLFW_INCLUDE_DIRS "${GLFW_PATH}/include")
     if (MSVC)
         set(GLFW_LIB "${GLFW_PATH}/lib-vc2022")
-    elseif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
-        message(STATUS "USING MINGW")
-        set(GLFW_LIB "${GLFW_PATH}/lib-mingw-w64")
     endif()
 else()
     find_package(glfw3 3.4 REQUIRED)
@@ -70,10 +56,18 @@ if (NOT DEFINED STB_PATH)
     message(FATAL_ERROR "Could not find stb!")
 endif()
 
+# Find OpenVDB
+set(CMAKE_MODULE_PATH ${OPENVDB_INSTALL_PATH}/lib/cmake/OpenVDB/)
+find_package(OpenVDB REQUIRED)
+
+find_package(TBB REQUIRED)
+
 # Get Dear ImGui source files plus what we need for GLFW and Vulkan 
 file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp ${IMGUI_PATH}/backends/imgui_impl_glfw.cpp ${IMGUI_PATH}/backends/imgui_impl_vulkan.cpp)
+
 # Get MikkTSpace source files
-file (GLOB MIKKTSPACE_SOURCES ${MIKKTSPACE_PATH}/*.c)
+file(GLOB MIKKTSPACE_SOURCES ${MIKKTSPACE_PATH}/*.c)
+
 # Our project's source files
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
 
@@ -95,40 +89,28 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 add_compile_definitions("$<$<CONFIG:DEBUG>:MARI_DEBUG>")
 #set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG") # use for release mode debugging
 
-#/openmp
-
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
-if (WIN32)
-  message(STATUS "CREATING BUILD FOR WINDOWS")
- 
-    if (USE_MINGW)
-        target_include_directories(${PROJECT_NAME} PUBLIC
-            ${MINGW_PATH}/include
-        )
-        target_link_directories(${PROJECT_NAME} PUBLIC
-            ${MINGW_PATH}/lib
-        )
-    endif()
- 
-    target_include_directories(${PROJECT_NAME} PUBLIC
-        ${PROJECT_SOURCE_DIR}/source
-        ${Vulkan_INCLUDE_DIRS}
-        ${GLFW_INCLUDE_DIRS}
-        ${GLM_PATH}
-        ${FASTGLTF_INCLUDE_DIRS}
-        ${STB_PATH}
-        ${IMGUI_PATH}
-        ${IMGUI_PATH}/backends
-    )
+target_include_directories(${PROJECT_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/source
+    ${Vulkan_INCLUDE_DIRS}
+    ${GLFW_INCLUDE_DIRS}
+    ${GLM_PATH}
+    ${FASTGLTF_INCLUDE_DIRS}
+    ${STB_PATH}
+    ${IMGUI_PATH}
+    ${IMGUI_PATH}/backends
+    ${OpenVDB_INCLUDE_DIRS}
+)
 
-    target_link_directories(${PROJECT_NAME} PUBLIC
-        ${Vulkan_LIBRARIES}
-        ${GLFW_LIB}
-    )
- 
-    target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf)
-endif()
+target_link_directories(${PROJECT_NAME} PUBLIC
+    ${Vulkan_LIBRARIES}
+    ${GLFW_LIB}
+    ${OpenVDB_LIBRARIES}
+    ${Tbb_LIB_COMPONENTS}
+)
+
+target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf OpenVDB::openvdb TBB::tbb)
 
 
 ############## Build SHADERS #######################
@@ -142,7 +124,7 @@ find_program(GLSL_VALIDATOR glslangValidator HINTS
     /usr/local/bin 
     ${VULKAN_SDK_PATH}/Bin
     ${VULKAN_SDK_PATH}/Bin32
-    $ENV{VULKAN_SDK}/Bin/ 
+    $ENV{VULKAN_SDK}/Bin/
     $ENV{VULKAN_SDK}/Bin32/
 )
 

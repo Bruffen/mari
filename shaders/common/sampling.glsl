@@ -51,6 +51,13 @@ vec3 random3D(inout uint prev) {
 /**
  * 1 Dimensional Sampling
  * 
+ * Exponential
+ */
+float sample_exponential(float random, float a) {
+    return -log(1.0 - random) / a;
+}
+
+/**
  * Piecewise Constant 1D
  */ 
 #extension GL_EXT_buffer_reference2 : require

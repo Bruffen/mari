@@ -208,7 +208,12 @@ namespace mari {
                 
                 shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
                 shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");
-            break;
+                break;
+            case Integrator::PATH_TRACING_VOLUME_ONLY:
+                shadersRayGeneration.push_back("../../shaders/spv/pathtracer_volume_only.rgen.spv");
+                shadersClosestHit.push_back("../../shaders/spv/pathtracer.rchit.spv");
+                shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
+                break;
             default:
                 throw std::runtime_error("No valid integrator selected!");
             break;

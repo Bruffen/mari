@@ -65,6 +65,14 @@ vec3 rotate_around_axis(vec3 v, vec3 axis, float theta) {
     return (v * cos_theta) + (cross(axis, v) * sin_theta) + (axis * dot(axis, v)) * (1.0f - cos_theta);
 }
 
+vec3 spherical_direction(float sin_theta, float cos_theta, float phi) {
+    return vec3(
+        clamp(sin_theta, -1.0, 1.0) * cos(phi),
+        clamp(sin_theta, -1.0, 1.0) * sin(phi),
+        clamp(cos_theta, -1.0, 1.0)
+    );
+}
+
 /* 
  * GLSL reflect function expects the incident vector to point towards the surface
  * We do the opposite and so this method exists
@@ -146,6 +154,15 @@ vec3 from_local(vec4 tangent, vec3 normal, vec3 v) {
     vec3 bitangent = cross(normal, tangent.xyz) * tangent.w;
     return from_local(tangent.xyz, bitangent, normal, v);
 }
+
+mat3 frame_from_z(vec3 wo) {
+    float sign = sign(wo.z);
+    float _a = -1.0 / (sign + wo.z);
+    float _b = wo.x + wo.y * _a;
+    vec3 t = vec3(1.0 + sign * sqr(wo.x) * _a, sign * _b, -sign * wo.x);
+    vec3 b = vec3(_b, sign + sqr(wo.y) * _a, -wo.y);
+    return mat3(t, b, wo);
+} 
 
 
 vec3 equal_area_square_to_sphere(vec2 p) {
