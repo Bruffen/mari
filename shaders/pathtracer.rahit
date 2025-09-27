@@ -33,7 +33,9 @@ void main() {
     vec3 barycentric_coords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
     vec2 uv  = uv0 * barycentric_coords.x + uv1 * barycentric_coords.y + uv2 * barycentric_coords.z;
-    alpha *= texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
+    if (material.indices.albedo > 0) {
+        alpha *= texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
+    }
 
     if(random1D(prd.seed) > alpha) {
         ignoreIntersectionEXT;

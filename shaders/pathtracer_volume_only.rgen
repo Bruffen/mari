@@ -48,7 +48,7 @@ void main() {
     medium.absorption_color = vec3(0.7, 1.0, 0.9);
     medium.absorption = 5.0;
     medium.scattering = 3.0;
-    medium.absorption + medium.scattering;
+    medium.majorant = medium.absorption + medium.scattering;
     medium_push(medium);
 
     for (int sample_count = 0; sample_count < properties.samples_per_pixel; sample_count++) {

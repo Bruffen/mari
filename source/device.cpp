@@ -198,27 +198,27 @@ namespace mari {
         featuresDI.descriptorBindingVariableDescriptorCount = VK_TRUE;
         featuresDI.pNext = &featuresAS;
 
-        VkPhysicalDeviceRayTracingValidationFeaturesNV featuresRTV{};
-        featuresRTV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV;
-        featuresRTV.rayTracingValidation = VK_TRUE;
-        featuresRTV.pNext = &featuresDI;
-
         VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures featuresSDHIF{};
         featuresSDHIF.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
         featuresSDHIF.shaderDemoteToHelperInvocation = VK_TRUE;
-        featuresSDHIF.pNext = &featuresRTV;
+        featuresSDHIF.pNext = &featuresDI;
 
         VkPhysicalDeviceScalarBlockLayoutFeatures featuresSBL{};
         featuresSBL.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
         featuresSBL.scalarBlockLayout = VK_TRUE;
         featuresSBL.pNext = &featuresSDHIF;
 
+#ifdef MARI_DEBUG
         VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR featuresSREI{};
-        if (enableShaderRelaxed) {
-            featuresSREI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR;
-            featuresSREI.shaderRelaxedExtendedInstruction = VK_TRUE;
-            featuresBDA.pNext = &featuresSREI;
-        }
+        featuresSREI.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR;
+        featuresSREI.shaderRelaxedExtendedInstruction = VK_TRUE;
+        featuresBDA.pNext = &featuresSREI;
+
+        VkPhysicalDeviceRayTracingValidationFeaturesNV featuresRTV{};
+        featuresRTV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV;
+        featuresRTV.rayTracingValidation = VK_TRUE;
+        featuresSREI.pNext = &featuresRTV;
+#endif
 
         createInfo.pNext = &featuresSBL;
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());

@@ -118,10 +118,10 @@ MediumSample sample_medium_event(Medium medium, vec3 wo, float majorant, inout u
 
         vec2 r = random2D(seed);
 
-        medium_sample.pf = pf_henyey_greenstein_sample(wo, 0.0, r); // TODO fix phase function
-        //medium_sample.pf.wi = sample_uniform_sphere(r.x, r.y); 
-        //medium_sample.pf.p = pdf_uniform_sphere();
-        //medium_sample.pf.pdf = pdf_uniform_sphere();
+        //medium_sample.pf = pf_henyey_greenstein_sample(wo, 0.0, r); // TODO fix phase function
+        medium_sample.pf.wi = sample_uniform_sphere(r.x, r.y); 
+        medium_sample.pf.p = pdf_uniform_sphere();
+        medium_sample.pf.pdf = pdf_uniform_sphere();
         medium_sample.scattered = true;
     // Null
     } else {

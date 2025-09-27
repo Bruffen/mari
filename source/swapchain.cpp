@@ -102,8 +102,7 @@ namespace mari
         submitInfo.pSignalSemaphores    = signalSemaphores;
 
         vkResetFences(device.handle(), 1, &inFlightFences[currentFrame]);
-        VkResult r = vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]);
-        if (r != VK_SUCCESS) {
+        if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to submit draw command buffer!");
         }
 

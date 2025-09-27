@@ -145,16 +145,13 @@ file(GLOB_RECURSE GLSL_COMMON_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.glsl"
 )
 
-if (CMAKE_BUILD_TYPE STREQUAL Debug) # TODO this does not work in multi-config
-    set(GLSLANG_FLAGS -gV)
-endif()
 
 foreach(GLSL ${GLSL_SOURCE_FILES})
     get_filename_component(FILE_NAME ${GLSL} NAME)
     set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/spv/${FILE_NAME}.spv")
     add_custom_command(
         OUTPUT ${SPIRV}
-        COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV} --target-env vulkan1.4 ${GLSLANG_FLAGS}
+        COMMAND ${GLSL_VALIDATOR} -g -V ${GLSL} -o ${SPIRV} --target-env vulkan1.4 # TODO -g -V only in debug
         DEPENDS ${GLSL} ${GLSL_COMMON_FILES})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)
