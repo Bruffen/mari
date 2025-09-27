@@ -158,7 +158,7 @@ vec3 from_local(vec4 tangent, vec3 normal, vec3 v) {
 mat3 frame_from_z(vec3 wo) {
     float sign = sign(wo.z);
     float _a = -1.0 / (sign + wo.z);
-    float _b = wo.x + wo.y * _a;
+    float _b = wo.x * wo.y * _a;
     vec3 t = vec3(1.0 + sign * sqr(wo.x) * _a, sign * _b, -sign * wo.x);
     vec3 b = vec3(_b, sign + sqr(wo.y) * _a, -wo.y);
     return mat3(t, b, wo);

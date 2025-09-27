@@ -85,6 +85,14 @@ PhaseFunctionSample pf_henyey_greenstein_sample(vec3 wo, float g, vec2 random) {
     return PhaseFunctionSample(wi, pdf, pdf);
 }
 
+float pf_henyey_greenstein_p(vec3 wo, vec3 wi, float g) {
+    return pf_henyey_greenstein(dot(wo, wi), g);
+}
+
+float pf_henyey_greenstein_pdf(vec3 wo, vec3 wi, float g) {
+    return pf_henyey_greenstein_p(wo, wi, g);
+}
+
 struct MediumSample {
     PhaseFunctionSample pf;
     float t;
@@ -118,10 +126,10 @@ MediumSample sample_medium_event(Medium medium, vec3 wo, float majorant, inout u
 
         vec2 r = random2D(seed);
 
-        //medium_sample.pf = pf_henyey_greenstein_sample(wo, 0.0, r); // TODO fix phase function
-        medium_sample.pf.wi = sample_uniform_sphere(r.x, r.y); 
-        medium_sample.pf.p = pdf_uniform_sphere();
-        medium_sample.pf.pdf = pdf_uniform_sphere();
+        medium_sample.pf = pf_henyey_greenstein_sample(wo, 0.0, r);
+        //medium_sample.pf.wi = sample_uniform_sphere(r.x, r.y); 
+        //medium_sample.pf.p = pdf_uniform_sphere();
+        //medium_sample.pf.pdf = pdf_uniform_sphere();
         medium_sample.scattered = true;
     // Null
     } else {
@@ -155,13 +163,13 @@ MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, fl
                 if (length(origin + direction * t) < 1.0) {
                     medium = media[current_medium];
                 } else {
-                    medium.absorption = 0.01;
-                    medium.scattering = 0.01;
+                    medium.absorption = 0.0;
+                    medium.scattering = 0.0;
                     medium.majorant = majorant;
                 }
 
                 transmittance *= 1.0; // TODO get_transmittance(majorant, t - tmin);
-                medium_sample = sample_medium_event(medium, direction, majorant, seed);
+                medium_sample = sample_medium_event(medium, -direction, majorant, seed);
                 if (medium_sample.terminated || medium_sample.scattered) {
                     medium_sample.t = t;
                     done = true;

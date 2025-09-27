@@ -42,11 +42,11 @@ void main() {
     vec3 result = vec3(0.0);
 
     const float tmin = 0.0;
-    const float tmax = 20.0;
+    const float tmax = 40.0;
 
     Medium medium;
     medium.absorption_color = vec3(0.7, 1.0, 0.9);
-    medium.absorption = 5.0;
+    medium.absorption = 0.0;
     medium.scattering = 3.0;
     medium.majorant = medium.absorption + medium.scattering;
     medium_push(medium);
