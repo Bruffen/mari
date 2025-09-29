@@ -7,29 +7,24 @@ namespace mari {
     // Rotations correspond to Tait-bryan angles of Y(1), Z(2), X(3)
     // https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
     glm::mat4 Transform::mat4() const {
-        const float cy = glm::cos(rotation.x);
-        const float sy = glm::sin(rotation.x);
-        const float cb = glm::cos(rotation.z);
-        const float sb = glm::sin(rotation.z);
-        const float ca = glm::cos(rotation.y);
-        const float sa = glm::sin(rotation.y);
+        glm::mat3 rotation = matrixRotation();
         return glm::mat4{
             {
-                scale.x * (ca * cb),
-                scale.x * (sb),
-                scale.x * (-cb * sa),
+                scale.x * rotation[0][0],
+                scale.x * rotation[0][1],
+                scale.x * rotation[0][2],
                 0.0f,
             },
             {
-                scale.y * (sa * sy - ca * cy * sb),
-                scale.y * (cb * cy),
-                scale.y * (ca * sy + cy * sa * sb),
+                scale.y * rotation[1][0],
+                scale.y * rotation[1][1],
+                scale.y * rotation[1][2],
                 0.0f,
             },
             {
-                scale.z * (cy * sa + ca * sb * sy),
-                scale.z * (-cb * sy),
-                scale.z * (ca * cy - sa * sb * sy),
+                scale.z * rotation[2][0],
+                scale.z * rotation[2][1],
+                scale.z * rotation[2][2],
                 0.0f,
             },
             {
@@ -39,30 +34,12 @@ namespace mari {
     }
 
     glm::mat3 Transform::matrixNormal() const {
-        const float cy = glm::cos(rotation.x);
-        const float sy = glm::sin(rotation.x);
-        const float cb = glm::cos(rotation.z);
-        const float sb = glm::sin(rotation.z);
-        const float ca = glm::cos(rotation.y);
-        const float sa = glm::sin(rotation.y);
         const glm::vec3 invScale = 1.0f / scale;
-        return glm::mat3{
-            {
-                invScale.x * (ca * cb),
-                invScale.x * (sb),
-                invScale.x * (-cb * sa),
-            },
-            {
-                invScale.y * (sa * sy - ca * cy * sb),
-                invScale.y * (cb * cy),
-                invScale.y * (ca * sy + cy * sa * sb),
-            },
-            {
-                invScale.z * (cy * sa + ca * sb * sy),
-                invScale.z * (-cb * sy),
-                invScale.z * (ca * cy - sa * sb * sy),
-            }
-        };
+        glm::mat3 m = matrixRotation();
+        for (int i = 0; i < 3; i++)
+            m[i] *= invScale;
+
+        return m;
     }
 
     glm::mat3 Transform::matrixRotation() const {

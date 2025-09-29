@@ -7,8 +7,11 @@ namespace mari {
         id = ++currentId;
     }
 
-    void Node::start() {
-
+    void Node::start(const glm::mat4& parent) {
+        worldMatrix = parent * transform.localMatrix; // TODO fix and replace with transform.mat4();
+        for (auto &child : children) {
+            child->start(worldMatrix);
+        }
     }
 
     void Node::update(const glm::mat4& parent) {

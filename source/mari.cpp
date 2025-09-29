@@ -36,10 +36,7 @@ namespace mari {
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
         loadScene();
-
-        for (auto const &[id, node] : scene->nodes) {
-            node->start();
-        }
+        scene->start();
 
         rayTracingSystem.buildScene(*scene);
 
@@ -298,7 +295,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  7  ) {
+        switch (  6  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -332,7 +329,7 @@ namespace mari {
             case 7:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf"); // TODO crashes with depth > 1
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf");
                 break;
             case 8:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
@@ -352,8 +349,8 @@ namespace mari {
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                 break;
             case 12:
@@ -374,7 +371,7 @@ namespace mari {
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_night_puresky_8k_darkened.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_night_puresky_8k_darkened")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
 
         //gui->saveImageFromData((void *)lights[0]->imageBuffer->getMappedMemory(), 4096, 4096, 4, true);
@@ -397,6 +394,5 @@ namespace mari {
         }
 
         scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
-        scene->start();
     }
 }

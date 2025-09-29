@@ -123,6 +123,11 @@ namespace mari {
                     newNode->transform.position = tl;
                     newNode->transform.rotation = glm::eulerAngles(rot);
                     newNode->transform.scale    = sc;
+
+                    newNode->transform.localMatrix = 
+                        glm::translate(glm::mat4(1.0f), tl) *
+                        glm::mat4(rot) *
+                        glm::scale(glm::mat4(1.0f), sc);
                 } },
                 node.transform
             );
@@ -151,14 +156,7 @@ namespace mari {
     // Calculate matrices whether they're static nodes or not
     void Scene::start() {
         for (auto& g : topNodes) {
-            initializeWorldMatrix(*g, transform.mat4());
-        }
-    }
-
-    void Scene::initializeWorldMatrix(Node& g, const glm::mat4 &worldMatrix) {
-        g.worldMatrix = worldMatrix * g.transform.mat4();
-        for (auto& c : g.children) {
-            initializeWorldMatrix(*c, g.worldMatrix);
+            g->start(transform.mat4());
         }
     }
 

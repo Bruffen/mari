@@ -24,7 +24,7 @@ namespace mari {
             //Node(Node &&) = default;
             //Node &operator=(Node &&) = default;
 
-            void start();
+            void start(const glm::mat4& parent);
             void update(const glm::mat4& parent);
             void render();
 
@@ -42,7 +42,6 @@ namespace mari {
             std::vector<std::shared_ptr<Node>>          children;
             std::shared_ptr<Mesh>                       mesh;
             std::shared_ptr<Camera>                     camera;
-            // TODO skin component
             std::shared_ptr<Light>                      light;
             std::unique_ptr<PointLightComponent>        pointLight  = nullptr;
 

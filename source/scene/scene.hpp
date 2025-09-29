@@ -41,8 +41,6 @@ namespace mari {
             std::shared_ptr<Node>                                           currentCamera;
             int                                                             environmentID = 0;
         private:
-            void                    initializeWorldMatrix(Node& g, const glm::mat4 &worldMatrix);
-
             void                    loadSamplers(const std::vector<fastgltf::Sampler> &gltfSamplers);
             std::shared_ptr<Image>  loadImage(const std::string &folder, fastgltf::Asset& asset, fastgltf::Image& image);
             void                    loadImages(std::vector<fastgltf::Image> &gltfImages, fastgltf::Asset& asset, const std::string& folderPath);
