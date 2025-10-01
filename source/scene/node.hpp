@@ -4,6 +4,7 @@
 #include "components/mesh.hpp"
 #include "components/transform.hpp"
 #include "components/light.hpp"
+#include "components/volume.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -19,6 +20,7 @@ namespace mari {
     class Node {
         public:
             Node();
+            Node(std::string name);
             //Node(const Node &) = delete;
             //Node &operator=(const Node &) = delete;
             //Node(Node &&) = default;
@@ -43,7 +45,8 @@ namespace mari {
             std::shared_ptr<Mesh>                       mesh;
             std::shared_ptr<Camera>                     camera;
             std::shared_ptr<Light>                      light;
-            std::unique_ptr<PointLightComponent>        pointLight  = nullptr;
+            std::unique_ptr<Volume>                     volume;
+            std::unique_ptr<PointLightComponent>        pointLight = nullptr;
 
         private:
             uint32_t id;

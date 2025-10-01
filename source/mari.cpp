@@ -9,6 +9,8 @@
 #include "systems/point_light_system.hpp"
 #include "systems/ray_tracing_system.hpp"
 
+#include "components/volume.hpp"
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -19,20 +21,9 @@
 #include <cassert>
 #include <stdexcept>
 
-#include <openvdb/openvdb.h>
-#include <nanovdb/NanoVDB.h>
-
 namespace mari {
     Mari::Mari() {
-        DefaultObjects::initialize(device);
-
-        //openvdb::initialize();
-        //openvdb::io::File file("../../../../_Models/volumes/wdas_cloud/wdas_cloud_sixteenth.vdb");
-        //file.open();
-        //openvdb::GridBase::Ptr grid;
-        //openvdb::v12_1::GridPtrVecPtr grids = file.getGrids();
-        //file.close();
-        
+        DefaultObjects::initialize(device);        
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
         loadScene();
@@ -65,6 +56,7 @@ namespace mari {
         std::vector<std::unique_ptr<Buffer>> rayTracingUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         std::vector<std::unique_ptr<Buffer>> infiniteLightUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         std::vector<std::unique_ptr<Buffer>> lightUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
+        std::vector<std::unique_ptr<Buffer>> volumeUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         for (int i = 0; i < Swapchain::MAX_FRAMES_IN_FLIGHT; i++) {
             rasterizationUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(RasterizationUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             rasterizationUboBuffers[i]->map();
@@ -74,21 +66,24 @@ namespace mari {
             infiniteLightUboBuffers[i]->map();
             lightUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(LightUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             lightUboBuffers[i]->map();
+            volumeUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(LightUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+            volumeUboBuffers[i]->map();
         }
 
         DescriptorSetLayout rasterizationSetLayout = DescriptorSetLayout::Builder(device)
             .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS)
             .build();
 
-        /*
+        /* TODO create different descriptor set for stuff that doesn't change every frame
          * 0 -> Top-Level Acceleration Structure
          * 1 -> Accumulation image
          * 2 -> Present image
          * 3 -> Path tracing properties uniform
          * 4 -> Environment map data uniform
          * 5 -> Lights data uniform
-         * 6 -> Mesh information buffer
-         * 7 -> Textures buffer
+         * 6 -> Volume data uniform
+         * 7 -> Mesh information buffer
+         * 8 -> Textures buffer
          */
         const uint32_t imageCount = static_cast<uint32_t>(scene->images.size() + scene->lightObjects.size());
         DescriptorSetLayout rayTracingSetLayout = DescriptorSetLayout::Builder(device)
@@ -98,8 +93,9 @@ namespace mari {
             .addBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
-            .addBinding(7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
+            .addBinding(6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
+            .addBinding(8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
                             // TODO if image count == 1, call VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER instead of variable descriptor
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
@@ -114,7 +110,7 @@ namespace mari {
         SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout.handle()};
         PointLightSystem pointLightSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout.handle()};
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING);
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUME_ONLY);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -133,8 +129,9 @@ namespace mari {
                 .writeBuffer(               3, rayTracingUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               4, infiniteLightUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               5, lightUboBuffers[i]->descriptorInfo())
-                .writeBuffer(               6, rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
-                .writeImages(               7, &textureDescriptors)
+                .writeBuffer(               6, volumeUboBuffers[i]->descriptorInfo())
+                .writeBuffer(               7, rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
+                .writeImages(               8, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
 
@@ -217,7 +214,7 @@ namespace mari {
                         currentInfiniteLight->sampler.getMarginal()->getCdfBuffer()->deviceAddress(),
                         currentInfiniteLight->sampler.conditionalIntegralsBuffer->deviceAddress(),
                         currentInfiniteLight->sampler.conditionalFunctionsBuffer->deviceAddress(),
-                        currentInfiniteLight->sampler.conditionalCdfsBuffer->deviceAddress(),
+                        currentInfiniteLight->sampler.conditionalCdfsBuffer->deviceAddress()
                     };
 
                     infiniteLightUboBuffers[frameIndex]->writeToBuffer(&infiniteLight);
@@ -228,11 +225,20 @@ namespace mari {
                         rayTracingSystem.lightsSampler.getFunctionBuffer()->deviceAddress(),
                         rayTracingSystem.lightsSampler.getCdfBuffer()->deviceAddress(),
                         rayTracingSystem.lightsSampler.getIntegral(),
-                        static_cast<int>(rayTracingSystem.lights.size()),
+                        static_cast<int>(rayTracingSystem.lights.size())
                     };
 
                     lightUboBuffers[frameIndex]->writeToBuffer(&lightUbo);
                     lightUboBuffers[frameIndex]->flush();
+
+                    VolumeUbo volumeUbo = {
+                        scene->volumeObject->volume->getDeviceAddress(),
+                        scene->volumeObject->volume->g,
+                        scene->volumeObject->volume->sigma_a,
+                        scene->volumeObject->volume->sigma_s
+                    };
+                    volumeUboBuffers[frameIndex]->writeToBuffer(&volumeUbo);
+                    volumeUboBuffers[frameIndex]->flush();
 
                     // render
                     rayTracingSystem.render(frameInfo, renderer.getSwapchain());
@@ -295,7 +301,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  6  ) {
+        switch (  9  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -368,10 +374,11 @@ namespace mari {
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/meadow_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "meadow_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_night_puresky_8k_darkened.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_night_puresky_8k_darkened")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_dusk_2_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_dusk_2_puresky_4k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_night_puresky_8k_darkened.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_night_puresky_8k_darkened")));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
 
         //gui->saveImageFromData((void *)lights[0]->imageBuffer->getMappedMemory(), 4096, 4096, 4, true);
@@ -392,6 +399,10 @@ namespace mari {
             node->light = l;
             scene->lightObjects.emplace_back(node);
         }
+
+        scene->volumeObject = std::make_shared<Node>("volume");
+        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_half.vdb"); 
+        scene->addNode(scene->volumeObject);
 
         scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
     }

@@ -40,6 +40,8 @@ void main() {
     prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, properties.frame_count);
     vec3 result = vec3(0.0);
 
+    initialize_volume_nano();
+
     const float tmin = 0.0;
     const float tmax = 10000.0;
 
@@ -90,7 +92,8 @@ void main() {
                         hit.material.absorption.rgb,
                         hit.material.absorption.w,
                         hit.material.scattering,
-                        hit.material.absorption.w + hit.material.scattering
+                        hit.material.absorption.w + hit.material.scattering,
+                        0.0
                     );
                 } else {
                     // Process transmission from existing medium
@@ -147,7 +150,8 @@ void main() {
                         hit.material.absorption.rgb,
                         hit.material.absorption.w,
                         hit.material.scattering,
-                        hit.material.absorption.w + hit.material.scattering
+                        hit.material.absorption.w + hit.material.scattering,
+                        0.0
                     );
                 } else {
                     medium_remove();

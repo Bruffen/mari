@@ -58,6 +58,13 @@ namespace mari {
         int      size;
     };
 
+    struct VolumeUbo {
+        uint64_t volumeBufferBDA;
+        float g;
+        float sigma_a;
+        float sigma_s;
+    };
+
     struct FrameInfo {
         int frameIndex;
         int frameCounter;

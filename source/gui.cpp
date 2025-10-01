@@ -228,6 +228,9 @@ namespace mari {
         if (g.camera) {
             imGuiCamera(*g.camera);
         }
+        if (g.volume) {
+            imGuiVolume(*g.volume);
+        }
     }
 
     void Gui::imGuiObject(Node &g) {
@@ -326,7 +329,7 @@ namespace mari {
         ImGui::Indent(-20.0f);
     }
 
-    void Gui::imGuiMaterial(const Material &material) {
+    void Gui::imGuiMaterial(Material &material) {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
         MaterialConstants mc = material.data.constants;
@@ -394,6 +397,33 @@ namespace mari {
             inputChanged = true;
         }
         ImGui::Indent(-20.0f);
+    }
+
+    void Gui::imGuiVolume(Volume &volume) {
+        ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
+
+        float g = volume.g;
+        float sigma_a = volume.sigma_a;
+        float sigma_s = volume.sigma_s;
+
+        bool a = true;
+        bool *a_ptr = &a;
+
+        ImGui::PushID("##volume");
+        ImGui::Indent(20.0f);
+
+        ImGui::SliderFloat("Phase function g", (float*)&volume.g, -0.999f, 0.999f, "%.3f", silderFlags);
+        ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f);
+        ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f);
+
+        ImGui::Indent(-20.0f);
+        ImGui::PopID();
+
+        if (g       != volume.g       || 
+            sigma_a != volume.sigma_a || 
+            sigma_s != volume.sigma_s) {
+            inputChanged = true;
+        }
     }
 
     void Gui::imGuiRender(const FrameInfo &frameInfo) {

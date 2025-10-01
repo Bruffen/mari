@@ -4,18 +4,68 @@
 #include "math.glsl"
 #include "sampling.glsl"
 
+layout(binding = 6, set = 0, scalar) uniform Volume {
+    uint64_t device_address;
+    float g;
+    float sigma_a;
+    float sigma_s;
+} volume;
+
+layout(buffer_reference, scalar) readonly buffer PNanoVDBBuffer { uint p[]; };
+//uint pnanovdb_buf_data[] = PNanoVDBBuffer(volume.device_address).p;
+
+#define PNANOVDB_GLSL
+#include "PNanoVDB.h"
+
+struct VolumeNano {
+    pnanovdb_buf_t          buf;
+    pnanovdb_grid_handle_t  grid;
+	pnanovdb_grid_type_t    grid_type;
+	pnanovdb_readaccessor_t accessor;
+    vec3                    bbox_min;
+    vec3                    bbox_max;
+} volume_nano;
+
+
+void initialize_volume_nano() {
+    volume_nano.buf.unused = 0; // Unused because we create a buffer from device address
+    volume_nano.grid.address.byte_offset = 0;
+    volume_nano.grid_type = pnanovdb_buf_read_uint32(volume_nano.buf, PNANOVDB_GRID_OFF_GRID_TYPE);
+
+    pnanovdb_tree_handle_t tree = pnanovdb_grid_get_tree(volume_nano.buf, volume_nano.grid);
+	pnanovdb_root_handle_t root = pnanovdb_tree_get_root(volume_nano.buf, tree);
+    pnanovdb_readaccessor_init(volume_nano.accessor, root);
+
+    volume_nano.bbox_min = pnanovdb_root_get_bbox_min(volume_nano.buf, root);
+    volume_nano.bbox_max = pnanovdb_root_get_bbox_max(volume_nano.buf, root);
+}
+
+float sample_volume_nano(vec3 position) {
+    vec3 index_space_position = pnanovdb_grid_world_to_indexf(volume_nano.buf, volume_nano.grid, position);
+    pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(index_space_position);
+	pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(
+        volume_nano.grid_type,
+        volume_nano.buf, 
+        volume_nano.accessor, 
+        ijk
+    );
+
+    return pnanovdb_read_float(volume_nano.buf, address);
+}
+
 struct Medium {
     vec3 absorption_color;
     float absorption;
     float scattering;
     float majorant;
+    float g;
 };
 
 #define MAX_MEDIA 4
 Medium media[MAX_MEDIA];
 int current_medium = -1;
 
-void medium_push(vec3 absorption_color, float absorption, float scattering, float majorant) {
+void medium_push(vec3 absorption_color, float absorption, float scattering, float majorant, float g) {
     if (current_medium >= MAX_MEDIA - 1) return;
     
     current_medium++;
@@ -23,6 +73,7 @@ void medium_push(vec3 absorption_color, float absorption, float scattering, floa
     media[current_medium].absorption = absorption;
     media[current_medium].scattering = scattering;
     media[current_medium].majorant   = majorant;
+    media[current_medium].g          = g;
 }
 
 void medium_push(Medium medium) {
@@ -30,7 +81,8 @@ void medium_push(Medium medium) {
         medium.absorption_color,
         medium.absorption,
         medium.scattering,
-        medium.majorant
+        medium.majorant,
+        medium.g
     );
 }
 
@@ -102,7 +154,20 @@ struct MediumSample {
     bool  scattered;
 };
 
-MediumSample sample_medium_event(Medium medium, vec3 wo, float majorant, inout uint seed) { // TODO remove medium from arguments
+MediumSample sample_medium_event(vec3 position, vec3 wo, float majorant, inout uint seed) { // TODO remove medium from arguments
+    Medium medium;
+    //if (length(position) < 1.0) {
+        medium = media[current_medium];
+    //} else {
+    //    medium.absorption = 0.0;
+    //    medium.scattering = 0.0;
+    //    medium.majorant = majorant;
+    //}
+
+	float density = sample_volume_nano(position);
+    medium.absorption = clamp(medium.absorption * density, 0.0, medium.majorant);
+    medium.scattering = clamp(medium.scattering * density, 0.0, medium.majorant);
+    
     float absorb = medium.absorption / majorant;
     float scatter = medium.scattering / majorant;
     float null = max(0.0, 1.0 - absorb - scatter);
@@ -126,7 +191,7 @@ MediumSample sample_medium_event(Medium medium, vec3 wo, float majorant, inout u
 
         vec2 r = random2D(seed);
 
-        medium_sample.pf = pf_henyey_greenstein_sample(wo, 0.0, r);
+        medium_sample.pf = pf_henyey_greenstein_sample(wo, medium.g, r);
         //medium_sample.pf.wi = sample_uniform_sphere(r.x, r.y); 
         //medium_sample.pf.p = pdf_uniform_sphere();
         //medium_sample.pf.pdf = pdf_uniform_sphere();
@@ -141,35 +206,62 @@ MediumSample sample_medium_event(Medium medium, vec3 wo, float majorant, inout u
 
 MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, float majorant, inout uint seed) {
     vec3 transmittance = vec3(1.0);
-
     direction = normalize(direction);
 
     MediumSample medium_sample;
     medium_sample.terminated = false;
     medium_sample.scattered = false;
+    medium_sample.transmittance = transmittance;
+
+    // TODO flipping Y axis for now, but should implement matrix transformation instead
+    origin.y *= -1.0;
+    direction.y *= -1.0;
 
     float tmin = 0.0;
+    float t = 0.0;
+    float unused = 0.0;
     bool done = false;
+
+    pnanovdb_hdda_ray_clip(
+        volume_nano.bbox_min,
+        volume_nano.bbox_max,
+        origin,
+        tmin,
+        direction,
+        tmax
+    );
+
     // TODO separate into ray segments for tighter fitting majorants instead of a single broad one
     //while(!done) {
         //if (no more segments == 0) return transmittance;
         //if (majorant == 0) continue;
+/*
+        bool hit = pnanovdb_hdda_tree_marcher(
+            volume_nano.grid_type,
+            volume_nano.buf,
+            volume_nano.accessor,
+            origin,
+            tmin,
+            direction,
+            tmax,
+            t,
+            unused
+        );
+
+        if (!hit) break;
+        // Does pnanovdb_hdda_tree_marcher return t = 0.0 if it's inside a non zero grid or does it return the next one?
+        // if the first do tmin = t
+        tmin = t;
+*/
 
         while (true) {
         //for (int i = 0; i < 100; i++) {
-            float t = tmin + sample_exponential(random1D(seed), majorant);
-            if (t < tmax) {
-                Medium medium;
-                if (length(origin + direction * t) < 1.0) {
-                    medium = media[current_medium];
-                } else {
-                    medium.absorption = 0.0;
-                    medium.scattering = 0.0;
-                    medium.majorant = majorant;
-                }
 
+            t = tmin + sample_exponential(random1D(seed), majorant);
+            if (t < tmax) {
+                vec3 position = origin + direction * t;
                 transmittance *= 1.0; // TODO get_transmittance(majorant, t - tmin);
-                medium_sample = sample_medium_event(medium, -direction, majorant, seed);
+                medium_sample = sample_medium_event(position, -direction, majorant, seed);
                 if (medium_sample.terminated || medium_sample.scattered) {
                     medium_sample.t = t;
                     done = true;

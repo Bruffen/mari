@@ -1,28 +1,40 @@
 #pragma once
 
 #include "volume.hpp"
+#define NANOVDB_USE_OPENVDB
+#include <openvdb/openvdb.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
 
 namespace mari {
-    Volume::Volume(Device &device) {
-
-        VkExtent3D extent{10, 10, 10};
-
-        std::vector<float> data{};
-        for (uint32_t x = 0; x < extent.width; x++) {
-            for (uint32_t y = 0; y < extent.width; y++) {
-                for (uint32_t z = 0; z < extent.width; z++) {
-                    data.push_back(1.0f);
-                }
-            }
+    Volume::Volume(Device &device, std::string filepath) {
+        openvdb::initialize(); // TODO initialize and unitialize globally
+        openvdb::io::File file(filepath);
+        file.open();
+        openvdb::GridPtrVecPtr gridsPtr = file.getGrids();
+        
+        for (const openvdb::GridBase::Ptr grid : *gridsPtr.get()) {
+            grid->print();
         }
+        
+        const openvdb::GridBase::Ptr grid = file.readGrid("density");
+        file.close();
+        
+        const openvdb::FloatGrid::Ptr gridData = openvdb::gridPtrCast<openvdb::FloatGrid>(grid);
+        nanovdb::GridHandle<nanovdb::HostBuffer> gridHandle = nanovdb::tools::createNanoGrid(*gridData);
 
-        image = std::make_unique<Image>(
+        uint64_t byteSize = gridHandle.bufferSize();
+        uint64_t elementStride = sizeof(float); // because it's a FloatGrid
+        uint64_t elementCount = byteSize / elementStride; 
+
+        nanoBuffer = std::make_unique<Buffer>(
             device, 
-            extent, 
-            VK_FORMAT_R32_SFLOAT, 
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            data.data()
+            elementStride, 
+            static_cast<uint32_t>(elementCount), 
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
+
+        nanoBuffer->stageToBuffer(gridHandle.buffer().data());
+        openvdb::uninitialize();
     }
 }

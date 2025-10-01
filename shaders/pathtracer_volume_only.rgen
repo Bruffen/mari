@@ -17,10 +17,9 @@ MaterialConstants material;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 layout(binding = 2, set = 0, rgba8) uniform image2D present_image;
-layout(binding = 7, set = 0) uniform sampler2D textures[];
+layout(binding = 8, set = 0) uniform sampler2D textures[];
 
 layout(location = 0) rayPayloadEXT Payload prd;
-
 
 layout(binding = 3, set = 0, scalar) uniform Properties {
     mat4  view_inverse;
@@ -35,6 +34,7 @@ layout(binding = 3, set = 0, scalar) uniform Properties {
     int   samples_per_pixel;
 } properties;
 
+
 #define ERROR_COLOR vec3(5000.0, 0.0, 5000.0)
 
 void main() {
@@ -42,12 +42,14 @@ void main() {
     vec3 result = vec3(0.0);
 
     const float tmin = 0.0;
-    const float tmax = 40.0;
+    const float tmax = 10000.0;
 
+    initialize_volume_nano();
     Medium medium;
     medium.absorption_color = vec3(0.7, 1.0, 0.9);
-    medium.absorption = 0.0;
-    medium.scattering = 3.0;
+    medium.absorption = volume.sigma_a;
+    medium.scattering = volume.sigma_s;
+    medium.g = volume.g;
     medium.majorant = medium.absorption + medium.scattering;
     medium_push(medium);
 

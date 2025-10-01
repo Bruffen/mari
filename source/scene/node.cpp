@@ -3,9 +3,11 @@
 namespace mari {
     static uint32_t currentId = 0;
     
-    Node::Node() {
+    Node::Node(std::string name) : name{name} {
         id = ++currentId;
     }
+
+    Node::Node() : Node("") {}
 
     void Node::start(const glm::mat4& parent) {
         worldMatrix = parent * transform.localMatrix; // TODO fix and replace with transform.mat4();

@@ -66,6 +66,7 @@ namespace mari {
         float                       thickness = 0.0f;
         glm::vec4                   absorption; // xyz color, w coefficient
         float                       scattering;
+        // TODO phase function params
 
         // KHR_materials_anisotropy // TODO convert from gltf anisotropy parameters to pbrt's
         //float                       anisotropyStrength = 0.0f;
