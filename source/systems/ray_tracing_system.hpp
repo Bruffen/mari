@@ -35,7 +35,7 @@ namespace mari {
             glm::vec2                               environmentRotation{};
 
             
-            int                                     maxDepth            = 20;
+            int                                     maxDepth            = 100;
             bool                                    frameAccumulation   = true;
             bool                                    russianRoulette     = true;
             bool                                    nextEventEstimation = true;

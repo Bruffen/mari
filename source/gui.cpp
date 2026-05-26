@@ -221,7 +221,10 @@ namespace mari {
 
     void Gui::imGuiInspector(Node &g) {
         ImGui::Text(("ID: " + std::to_string(g.getId())).c_str());
-        imGuiTransform(g.transform);
+        if (imGuiTransform(g.transform) && g.volume) {
+            g.transform.scale = glm::max(g.transform.scale, glm::vec3(0.01f, 0.01f, 0.01f));
+            g.setVolumeTransform();
+        }
         if (g.mesh) {
             imGuiMesh(*g.mesh);
         }
@@ -251,7 +254,7 @@ namespace mari {
         }
     }
 
-    void Gui::imGuiTransform(Transform &transform) {
+    bool Gui::imGuiTransform(Transform &transform) {
         // TODO if (static) {} else {
         glm::vec3 p = transform.position;
         glm::vec3 r = transform.rotation;
@@ -273,12 +276,14 @@ namespace mari {
         ImGui::DragFloat3("##sca", &transform.scale.x, 0.005f);
 
         transform.rotation = glm::radians(rd);
-
+        bool transformChanged = false;
         if (p != transform.position || r != transform.rotation || s != transform.scale) {
             inputChanged = true;
+            transformChanged = true;
         }
 
         ImGui::Indent(-20.0f);
+        return transformChanged;
     }
 
     void Gui::imGuiMesh(const Mesh &mesh) {
@@ -402,26 +407,37 @@ namespace mari {
     void Gui::imGuiVolume(Volume &volume) {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
+        glm::vec4 albedo = volume.albedo;
         float g = volume.g;
         float sigma_a = volume.sigma_a;
         float sigma_s = volume.sigma_s;
+        float temperature = volume.temperature_multiplier;
+        float emissiveness = volume.emissiveness_multiplier;
 
         bool a = true;
         bool *a_ptr = &a;
 
         ImGui::PushID("##volume");
         ImGui::Indent(20.0f);
-
+        
+        ImGui::ColorEdit4("Albedo", (float*)&volume.albedo, ImGuiColorEditFlags_Float);
         ImGui::SliderFloat("Phase function g", (float*)&volume.g, -0.999f, 0.999f, "%.3f", silderFlags);
-        ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f);
-        ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f);
+        ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f, 0.0f, 50.0f);
+        ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f, 0.0f, 50.0f);
+        if (volume.hasTemperature()) {
+            ImGui::DragFloat("Temperature multiplier", (float*)&volume.temperature_multiplier, 0.01f, 0.0f, 10000.0f);
+            ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.emissiveness_multiplier, 0.01f, 0.0f, 1000.0f);
+        }
 
         ImGui::Indent(-20.0f);
         ImGui::PopID();
 
-        if (g       != volume.g       || 
-            sigma_a != volume.sigma_a || 
-            sigma_s != volume.sigma_s) {
+        if (albedo       != volume.albedo                 || 
+            g            != volume.g                      || 
+            sigma_a      != volume.sigma_a                || 
+            sigma_s      != volume.sigma_s                ||
+            temperature  != volume.temperature_multiplier ||
+            emissiveness != volume.emissiveness_multiplier) {
             inputChanged = true;
         }
     }
@@ -441,7 +457,7 @@ namespace mari {
 
             // Path tracing parameters
             int oldMaxDepth = system.maxDepth;
-            ImGui::SliderInt("Depth", &system.maxDepth, 1, 50, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
+            ImGui::SliderInt("Depth", &system.maxDepth, 1, 100, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);
             if (oldMaxDepth != system.maxDepth) inputChanged = true; 
 
             ImGui::SliderInt("Samples per pixel", &system.samplesPerPixel, 1, 20, "%i", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange);

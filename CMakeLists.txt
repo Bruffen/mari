@@ -89,8 +89,6 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 add_compile_definitions("$<$<CONFIG:DEBUG>:MARI_DEBUG>")
 #set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG") # use for release mode debugging
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
-
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/source
     ${Vulkan_INCLUDE_DIRS}
@@ -161,4 +159,4 @@ add_custom_target(
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 
-add_dependencies(mari shaders)
+add_dependencies(${NAME} shaders)

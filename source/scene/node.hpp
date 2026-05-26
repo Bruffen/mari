@@ -32,6 +32,7 @@ namespace mari {
 
             const uint32_t                              getId() { return id; }
             static Node                                 makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
+            void                                        setVolumeTransform() { volume->setTransform(transform); }
 
             std::string                                 name        = "";
             glm::vec3                                   color       {};         // TODO delete

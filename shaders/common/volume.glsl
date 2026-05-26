@@ -5,10 +5,14 @@
 #include "sampling.glsl"
 
 layout(binding = 6, set = 0, scalar) uniform Volume {
-    uint64_t device_address;
+    uint64_t density_device_address;
+    uint64_t temperature_device_address;
+    vec4  albedo;
     float g;
     float sigma_a;
     float sigma_s;
+    float temperature_multiplier;
+    float emissiveness_multiplier;
 } volume;
 
 layout(buffer_reference, scalar) readonly buffer PNanoVDBBuffer { uint p[]; };
@@ -17,40 +21,71 @@ layout(buffer_reference, scalar) readonly buffer PNanoVDBBuffer { uint p[]; };
 #define PNANOVDB_GLSL
 #include "PNanoVDB.h"
 
-struct VolumeNano {
+struct VolumeNanoData {
     pnanovdb_buf_t          buf;
     pnanovdb_grid_handle_t  grid;
-	pnanovdb_grid_type_t    grid_type;
-	pnanovdb_readaccessor_t accessor;
+    pnanovdb_grid_type_t    grid_type;
+    pnanovdb_readaccessor_t accessor;
     vec3                    bbox_min;
     vec3                    bbox_max;
+};
+
+struct VolumeNano {
+    VolumeNanoData density;
+    VolumeNanoData temperature;
 } volume_nano;
 
 
-void initialize_volume_nano() {
-    volume_nano.buf.unused = 0; // Unused because we create a buffer from device address
-    volume_nano.grid.address.byte_offset = 0;
-    volume_nano.grid_type = pnanovdb_buf_read_uint32(volume_nano.buf, PNANOVDB_GRID_OFF_GRID_TYPE);
+VolumeNanoData initialize_volume_nano_data(uint64_t device_address) {
+    VolumeNanoData vnd;
+    vnd.buf.device_address = device_address;
+    vnd.grid.address.byte_offset = 0;
+    vnd.grid_type = pnanovdb_buf_read_uint32(vnd.buf, PNANOVDB_GRID_OFF_GRID_TYPE);
 
-    pnanovdb_tree_handle_t tree = pnanovdb_grid_get_tree(volume_nano.buf, volume_nano.grid);
-	pnanovdb_root_handle_t root = pnanovdb_tree_get_root(volume_nano.buf, tree);
-    pnanovdb_readaccessor_init(volume_nano.accessor, root);
+    pnanovdb_tree_handle_t tree = pnanovdb_grid_get_tree(vnd.buf, vnd.grid);
+	pnanovdb_root_handle_t root = pnanovdb_tree_get_root(vnd.buf, tree);
+    pnanovdb_readaccessor_init(vnd.accessor, root);
+    vnd.bbox_min = pnanovdb_coord_to_vec3(pnanovdb_root_get_bbox_min(vnd.buf, root));
+    vnd.bbox_max = pnanovdb_coord_to_vec3(pnanovdb_root_get_bbox_max(vnd.buf, root) + pnanovdb_coord_uniform(1));
 
-    volume_nano.bbox_min = pnanovdb_root_get_bbox_min(volume_nano.buf, root);
-    volume_nano.bbox_max = pnanovdb_root_get_bbox_max(volume_nano.buf, root);
+    return vnd;
 }
 
-float sample_volume_nano(vec3 position) {
-    vec3 index_space_position = pnanovdb_grid_world_to_indexf(volume_nano.buf, volume_nano.grid, position);
-    pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(index_space_position);
-	pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(
-        volume_nano.grid_type,
-        volume_nano.buf, 
-        volume_nano.accessor, 
-        ijk
-    );
+void initialize_volume_nano() {
+    volume_nano.density = initialize_volume_nano_data(volume.density_device_address);
+    if (volume.temperature_device_address > 0) {
+        volume_nano.temperature = initialize_volume_nano_data(volume.temperature_device_address);
+    }
+}
 
-    return pnanovdb_read_float(volume_nano.buf, address);
+vec2 sample_volume_nano(vec3 position) {
+    vec2 data = vec2(0.0);
+
+    if (volume.density_device_address > 0) {
+        vec3 index_space_position = pnanovdb_grid_world_to_indexf(volume_nano.density.buf, volume_nano.density.grid, position);
+        pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(index_space_position);
+        pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(
+            volume_nano.density.grid_type,
+            volume_nano.density.buf, 
+            volume_nano.density.accessor, 
+            ijk
+        );
+        data.x = pnanovdb_read_float(volume_nano.density.buf, address);
+    }
+
+    if (volume.temperature_device_address > 0) {
+        vec3 index_space_position = pnanovdb_grid_world_to_indexf(volume_nano.temperature.buf, volume_nano.temperature.grid, position);
+        pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(index_space_position);
+        pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(
+            volume_nano.temperature.grid_type,
+            volume_nano.temperature.buf, 
+            volume_nano.temperature.accessor, 
+            ijk
+        );
+        data.y = pnanovdb_read_float(volume_nano.temperature.buf, address);
+    }
+
+    return data;
 }
 
 struct Medium {
@@ -148,6 +183,7 @@ float pf_henyey_greenstein_pdf(vec3 wo, vec3 wi, float g) {
 struct MediumSample {
     PhaseFunctionSample pf;
     float t;
+    vec3  albedo; // TODO confirm this is correct usage
     vec3  emission;
     vec3  transmittance;
     bool  terminated;
@@ -155,16 +191,13 @@ struct MediumSample {
 };
 
 MediumSample sample_medium_event(vec3 position, vec3 wo, float majorant, inout uint seed) { // TODO remove medium from arguments
-    Medium medium;
-    //if (length(position) < 1.0) {
-        medium = media[current_medium];
-    //} else {
-    //    medium.absorption = 0.0;
-    //    medium.scattering = 0.0;
-    //    medium.majorant = majorant;
-    //}
+    Medium medium = media[current_medium];
 
-	float density = sample_volume_nano(position);
+    vec2 sample_data = sample_volume_nano(position);
+	float density = sample_data.x;
+	float temperature = max(sample_data.y * volume.temperature_multiplier, 0.0);
+    float intensity = M_stefan_boltzmann * pow(temperature, 4) * volume.emissiveness_multiplier;
+
     medium.absorption = clamp(medium.absorption * density, 0.0, medium.majorant);
     medium.scattering = clamp(medium.scattering * density, 0.0, medium.majorant);
     
@@ -175,6 +208,7 @@ MediumSample sample_medium_event(vec3 position, vec3 wo, float majorant, inout u
     MediumSample medium_sample;
     medium_sample.t             = 0.0;
     medium_sample.pf            = PhaseFunctionSample(vec3(0.0), 1, 1);
+    medium_sample.albedo        = medium.absorption_color;
     medium_sample.emission      = vec3(0.0);
     medium_sample.transmittance = vec3(0.0);
     medium_sample.terminated    = false;
@@ -183,10 +217,11 @@ MediumSample sample_medium_event(vec3 position, vec3 wo, float majorant, inout u
     float event = random1D(seed);
     // Absorption
     if (event < absorb) {
-        medium_sample.emission += vec3(0.0); // TODO medium emission
+        medium_sample.emission += blackbody(temperature) * intensity;
         medium_sample.terminated = true;
     // Scattering
     } else if (event < absorb + scatter) {
+        medium_sample.emission += blackbody(temperature) * intensity;
         //if (depth == properties.max_depth - 1) break;
 
         vec2 r = random2D(seed);
@@ -204,7 +239,7 @@ MediumSample sample_medium_event(vec3 position, vec3 wo, float majorant, inout u
     return medium_sample;
 }
 
-MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, float majorant, inout uint seed) {
+MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, inout uint seed) {
     vec3 transmittance = vec3(1.0);
     direction = normalize(direction);
 
@@ -222,14 +257,25 @@ MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, fl
     float unused = 0.0;
     bool done = false;
 
-    pnanovdb_hdda_ray_clip(
-        volume_nano.bbox_min,
-        volume_nano.bbox_max,
+    bool hit = pnanovdb_hdda_ray_clip(
+        volume_nano.density.bbox_min,
+        volume_nano.density.bbox_max,
         origin,
         tmin,
         direction,
         tmax
     );
+
+    if (!hit) return medium_sample; // TODO don't terminate since there can be a bigger non vdb medium, like fog, that needs to be sampled
+
+    // Push volume_nano data into array of media
+    Medium medium;
+    medium.absorption_color = volume.albedo.rgb;
+    medium.absorption = volume.sigma_a;
+    medium.scattering = volume.sigma_s;
+    medium.g = volume.g;
+    medium.majorant = medium.absorption + medium.scattering;
+    medium_push(medium);
 
     // TODO separate into ray segments for tighter fitting majorants instead of a single broad one
     //while(!done) {
@@ -237,9 +283,9 @@ MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, fl
         //if (majorant == 0) continue;
 /*
         bool hit = pnanovdb_hdda_tree_marcher(
-            volume_nano.grid_type,
-            volume_nano.buf,
-            volume_nano.accessor,
+            volume_nano.density.grid_type,
+            volume_nano.density.buf,
+            volume_nano.density.accessor,
             origin,
             tmin,
             direction,
@@ -257,11 +303,12 @@ MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, fl
         while (true) {
         //for (int i = 0; i < 100; i++) {
 
-            t = tmin + sample_exponential(random1D(seed), majorant);
+            t = tmin + sample_exponential(random1D(seed), medium.majorant);
             if (t < tmax) {
                 vec3 position = origin + direction * t;
-                transmittance *= 1.0; // TODO get_transmittance(majorant, t - tmin);
-                medium_sample = sample_medium_event(position, -direction, majorant, seed);
+                transmittance *= 1.0; // TODO get_transmittance(medium.majorant, t - tmin);
+                vec3 jitter = random3D(seed) * 0.4; // TODO option for enabling volumetric sampling interpolation
+                medium_sample = sample_medium_event(position + jitter, -direction, medium.majorant, seed);
                 if (medium_sample.terminated || medium_sample.scattered) {
                     medium_sample.t = t;
                     done = true;
@@ -273,12 +320,13 @@ MediumSample sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, fl
             }
             else {
                 float dt = tmax - tmin;
-                transmittance *= 1.0; // TODO get_transmittance(majorant, dt);
+                transmittance *= 1.0; // TODO get_transmittance(medium.majorant, dt);
                 break;
             }
         }
     //}
 
+    medium_remove();
     medium_sample.transmittance = transmittance;
     return medium_sample;
 }

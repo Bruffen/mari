@@ -29,7 +29,7 @@ namespace mari {
             void imGuiFramerate(float duration);
             void imGuiInspector(Node &g);
             void imGuiObject(Node &g);
-            void imGuiTransform(Transform &transform);
+            bool imGuiTransform(Transform &transform);
             void imGuiMesh(const Mesh &mesh);
             void imGuiSubMesh(const PrimMesh &submesh);
             void imGuiMaterial(Material &material);

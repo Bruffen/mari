@@ -136,6 +136,70 @@ float fresnel_complex(float cos_theta_i, Complex eta) {
 
 // TODO spectral fresnel complex with k function
 
+// Given a temperature (in Kelvin), estimate an RGB equivalent
+// https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html
+vec3 blackbody(float temperature) {
+    vec3 color;
+    float tmp;
+
+    // Temperature must fall between 1000 and 40000 degrees
+    if (temperature < 1000) temperature = 1000;
+    if (temperature > 40000) temperature = 40000;
+    
+    // All calculations require temperature / 100, so only do the conversion once
+    temperature = temperature / 100;
+    
+    // Calculate each color in turn
+    
+    // First: red
+    if (temperature <= 66) {
+        color.r = 255;
+    } else {
+        // Note: the R-squared value for this approximation is .988
+        tmp = temperature - 60;
+        tmp = 329.698727446 * pow(tmp, -0.1332047592);
+        color.r = tmp;
+        if (color.r < 0) color.r = 0;
+        if (color.r > 255) color.r = 255;
+    }
+    
+    //Second: green
+    if (temperature <= 66) {
+        // Note: the R-squared value for this approximation is .996
+        tmp = temperature;
+        tmp = 99.4708025861 * log(tmp) - 161.1195681661;
+        color.g = tmp;
+        if (color.g < 0) color.g = 0;
+        if (color.g > 255) color.g = 255;
+    }
+    else {
+        // Note: the R-squared value for this approximation is .987
+        tmp = temperature - 60;
+        tmp = 288.1221695283 * pow(tmp, -0.0755148492);
+        color.g = tmp;
+        if (color.g < 0) color.g = 0;
+        if (color.g > 255) color.g = 255;
+    }
+    
+    // 'Third: blue
+    if (temperature >= 66) {
+        color.b = 255;
+    }
+    else if (temperature <= 19) {
+        color.b = 0;
+    }
+    else {
+        //Note: the R-squared value for this approximation is .998
+        tmp = temperature - 10;
+        tmp = 138.5177312231 * log(tmp) - 305.0447927307;
+        
+        color.b = tmp;
+        if (color.b < 0) color.b = 0;
+        if (color.b > 255) color.b = 255;
+    }
+
+    return color;
+}
 
 /****************************************************************
  * Shading frame to and from world frame transformations

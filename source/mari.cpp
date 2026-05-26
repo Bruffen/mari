@@ -66,7 +66,7 @@ namespace mari {
             infiniteLightUboBuffers[i]->map();
             lightUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(LightUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             lightUboBuffers[i]->map();
-            volumeUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(LightUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+            volumeUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(VolumeUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             volumeUboBuffers[i]->map();
         }
 
@@ -232,11 +232,18 @@ namespace mari {
                     lightUboBuffers[frameIndex]->flush();
 
                     VolumeUbo volumeUbo = {
-                        scene->volumeObject->volume->getDeviceAddress(),
+                        scene->volumeObject->volume->getDensityDeviceAddress(),
+                        scene->volumeObject->volume->getTemperatureDeviceAddress(),
+                        scene->volumeObject->volume->albedo,
                         scene->volumeObject->volume->g,
                         scene->volumeObject->volume->sigma_a,
-                        scene->volumeObject->volume->sigma_s
+                        scene->volumeObject->volume->sigma_s,
+                        scene->volumeObject->volume->temperature_multiplier,
+                        scene->volumeObject->volume->emissiveness_multiplier
                     };
+
+                    float a = sizeof(volumeUbo);
+                    float b = sizeof(volumeUbo.albedo);
                     volumeUboBuffers[frameIndex]->writeToBuffer(&volumeUbo);
                     volumeUboBuffers[frameIndex]->flush();
 
@@ -335,7 +342,8 @@ namespace mari {
             case 7:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/UE4_SunTemple.glb");
                 break;
             case 8:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
@@ -366,8 +374,8 @@ namespace mari {
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
         std::vector<std::shared_ptr<InfiniteAreaLight>> lights{};
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageWhite32f(), 1));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/zhengyang_gate_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "zhengyang_gate")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/brown_photostudio_01_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "brown_photostudio")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
@@ -401,7 +409,9 @@ namespace mari {
         }
 
         scene->volumeObject = std::make_shared<Node>("volume");
-        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_half.vdb"); 
+        //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_half.vdb"); 
+        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/fire.vdb"); 
+        //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb"); 
         scene->addNode(scene->volumeObject);
 
         scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);

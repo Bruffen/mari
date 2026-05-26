@@ -45,13 +45,6 @@ void main() {
     const float tmax = 10000.0;
 
     initialize_volume_nano();
-    Medium medium;
-    medium.absorption_color = vec3(0.7, 1.0, 0.9);
-    medium.absorption = volume.sigma_a;
-    medium.scattering = volume.sigma_s;
-    medium.g = volume.g;
-    medium.majorant = medium.absorption + medium.scattering;
-    medium_push(medium);
 
     for (int sample_count = 0; sample_count < properties.samples_per_pixel; sample_count++) {
         const vec2 pixel_jitter = random2D(prd.seed);
@@ -67,53 +60,44 @@ void main() {
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             float t = tmax;
-            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
+            //traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
             
-            Hit hit;
-            if (prd.instance_index >= 0) {
-                hit = process_hit(prd);
-                t = length(hit.position - origin);
-                material = hit.material;
-            }
+            //Hit hit;
+            //if (prd.instance_index >= 0) {
+            //    hit = process_hit(prd);
+            //    t = length(hit.position - origin);
+            //    material = hit.material;
+            //}
 
             //if (is_volume) {
 
-            MediumSample medium_sample = sample_medium_along_ray(origin, direction, t, medium.majorant, prd.seed);
+            MediumSample medium_sample = sample_medium_along_ray(origin, direction, t, prd.seed);
 
             if (medium_sample.terminated) {
                 radiance   += throughput * medium_sample.emission;
                 break;
             }
             if (medium_sample.scattered) {
+                radiance   += throughput * medium_sample.emission;
                 // Set values for next ray
                 origin     = origin + direction * medium_sample.t;
                 direction  = medium_sample.pf.wi;
-                throughput *= medium_sample.pf.p / medium_sample.pf.pdf;
+                throughput *= medium_sample.albedo * medium_sample.pf.p / medium_sample.pf.pdf;
                 continue;
             }
 
             //}
 
             // Miss. Sample environment map
-            if (prd.instance_index < 0) {
+            //if (prd.instance_index < 0) {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
                 radiance += throughput * le;
                 break;
-            } else {
-                radiance += throughput * material.emission.rgb;
-                break;
-            }
-
-            // Apply russian roulette
-            float probability = max(max(throughput.r, throughput.g), throughput.b);
-            if (properties.russian_roulette == 1 && probability < 1.0 && depth > 3) {
-                
-                if (random1D(prd.seed) > probability) {
-                    break;
-                }
-                throughput /= probability;
-            }
+            //} else {
+            //    radiance += throughput * material.emission.rgb;
+            //    break;
+            //}
         }
 
         result += radiance;

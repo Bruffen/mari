@@ -59,10 +59,14 @@ namespace mari {
     };
 
     struct VolumeUbo {
-        uint64_t volumeBufferBDA;
+        uint64_t densityBufferBDA;
+        uint64_t temperatureBufferBDA;
+        glm::vec4 albedo;
         float g;
         float sigma_a;
         float sigma_s;
+        float temperature_multiplier;
+        float emissiveness_multiplier;
     };
 
     struct FrameInfo {
