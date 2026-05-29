@@ -149,6 +149,14 @@ struct PhaseFunctionSample {
     float pdf;
 };
 
+PhaseFunctionSample pf_isotropic(vec2 random) {
+    return PhaseFunctionSample(
+        sample_uniform_sphere(random.x, random.y), 
+        pdf_uniform_sphere(),
+        pdf_uniform_sphere()
+    );
+}
+
 float pf_henyey_greenstein(float cos_theta, float g) {
     float denom = 1.0 + sqr(g) + 2.0 * g * cos_theta;
     return M_1_4PI * (1.0 - sqr(g)) / (denom * safe_sqrt(denom));
@@ -226,10 +234,8 @@ MediumSample sample_medium_event(vec3 position, vec3 wo, float majorant, inout u
 
         vec2 r = random2D(seed);
 
+        //medium_sample.pf = pf_isotropic(r);
         medium_sample.pf = pf_henyey_greenstein_sample(wo, medium.g, r);
-        //medium_sample.pf.wi = sample_uniform_sphere(r.x, r.y); 
-        //medium_sample.pf.p = pdf_uniform_sphere();
-        //medium_sample.pf.pdf = pdf_uniform_sphere();
         medium_sample.scattered = true;
     // Null
     } else {
