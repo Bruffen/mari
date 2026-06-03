@@ -63,7 +63,7 @@ void main() {
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, tmax, 0);
 
-            // Miss. Sample environment map
+            // Miss. Sample environment map // TODO move this to bottom so it matches the volumetric integrators
             if (prd.instance_index < 0) {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
@@ -179,8 +179,9 @@ void main() {
                 if (li_sample.pdf > 0.0) {
                     vec3 wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
 
-                    float bxdf_f = bxdf_f(hit.material_type, wo, wi, prd.seed);
-                    float bxdf_pdf = bxdf_pdf(hit.material_type, wo, wi, prd.seed);
+                    float material_random = random1D(prd.seed);
+                    float bxdf_f = bxdf_f(hit.material_type, wo, wi, material_random);
+                    float bxdf_pdf = bxdf_pdf(hit.material_type, wo, wi, material_random);
 
                     if (bxdf_f > 0.0 && bxdf_pdf > 0.0) {
                         shadow_prd.visibility = false;
@@ -188,12 +189,12 @@ void main() {
                         traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
 
                         if (shadow_prd.visibility) {
-                            vec3 li_transmission = vec3(1.0);
+                            vec3 li_transmittance = vec3(1.0);
                             if (current_medium >= 0) {
-                                li_transmission = get_transmittance(media[current_medium], li_sample.distance);
+                                li_transmittance = get_transmittance(media[current_medium], li_sample.distance);
                             }
                             float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf);
-                            radiance += throughput * li_transmission * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
+                            radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
                         }
                     }
                 }

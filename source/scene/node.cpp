@@ -10,7 +10,9 @@ namespace mari {
     Node::Node() : Node("") {}
 
     void Node::start(const glm::mat4& parent) {
-        worldMatrix = parent * transform.localMatrix; // TODO fix and replace with transform.mat4();
+        // TODO fix and replace with transform.mat4(); 
+        // localMatrix is currently assigned from gltf loading and ignores scale, position and rotation values from transform
+        worldMatrix = parent * transform.localMatrix; 
         for (auto &child : children) {
             child->start(worldMatrix);
         }

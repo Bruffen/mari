@@ -45,6 +45,10 @@ namespace mari {
                 maxDensity = current;
         } while (densityIter.next());
 
+        // Adjust sigma values to correspond to density range
+        sigma_a *= maxDensity;
+        sigma_s *= maxDensity;
+
         // Normalize the density if needed
         if (maxDensity != 1.0f && maxDensity > 0.0f) {
             densityIter = densityGridData->beginValueAll();

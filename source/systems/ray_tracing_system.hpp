@@ -10,7 +10,8 @@
 namespace mari {
     enum Integrator {
         PATH_TRACING,
-        PATH_TRACING_VOLUME_ONLY
+        PATH_TRACING_VOLUME_ONLY,
+        PATH_TRACING_VOLUMETRIC
     };
 
     class RayTracingSystem {
@@ -38,7 +39,7 @@ namespace mari {
             int                                     maxDepth            = 100;
             bool                                    frameAccumulation   = true;
             bool                                    russianRoulette     = true;
-            bool                                    nextEventEstimation = true;
+            bool                                    nextEventEstimation = false;
             float                                   exposure            = 1.0f;
             int                                     tonemapper          = 2;
             int                                     samplesPerPixel     = 1;

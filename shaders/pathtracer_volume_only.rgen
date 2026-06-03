@@ -1,8 +1,5 @@
 #version 460
 #extension GL_GOOGLE_include_directive                      : require
-#extension GL_EXT_ray_tracing                               : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64    : require
-#extension GL_EXT_scalar_block_layout                       : require
 //#ifdef MARI_DEBUG 
 #extension GL_EXT_debug_printf                              : enable
 //#endif
@@ -71,14 +68,14 @@ void main() {
 
             //if (is_volume) {
 
-            MediumSample medium_sample = sample_medium_along_ray(origin, direction, t, prd.seed);
+            MediumSample medium_sample = sample_medium_along_ray(origin, direction, t, prd.seed, false);
 
             if (medium_sample.terminated) {
                 radiance   += throughput * medium_sample.emission;
                 break;
             }
             if (medium_sample.scattered) {
-                radiance   += throughput * medium_sample.emission;
+                //radiance   += throughput * medium_sample.emission * medium_sample.medium.absorption; 
                 // Set values for next ray
                 origin     = origin + direction * medium_sample.t;
                 direction  = medium_sample.pf.wi;

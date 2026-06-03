@@ -139,6 +139,7 @@ float fresnel_complex(float cos_theta_i, Complex eta) {
 // Given a temperature (in Kelvin), estimate an RGB equivalent
 // https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html
 vec3 blackbody(float temperature) {
+    if (temperature <= 0.0) return vec3(0.0);
     vec3 color;
     float tmp;
 

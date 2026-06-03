@@ -349,7 +349,7 @@ BxdfSample bxdf_sample_material(int material_type, vec3 wo, inout uint seed) {
     }
 }
 
-float bxdf_f(int material_type, vec3 wo, vec3 wi, inout uint seed) {
+float bxdf_f(int material_type, vec3 wo, vec3 wi, float random) {
     switch(material_type) {
         case MaterialType_Diffuse:    
             return brdf_diffuse_f(wo, wi); 
@@ -358,14 +358,14 @@ float bxdf_f(int material_type, vec3 wo, vec3 wi, inout uint seed) {
             return bsdf_dielectric_f(wo, wi, Transport_Mode_Radiance); 
         break;
         case MaterialType_Conductor:
-            if (random1D(seed) < material.metallic) 
+            if (random < material.metallic) 
                 return brdf_conductor_f(wo, wi);
             return brdf_diffuse_f(wo, wi);
         break;
     }
 }
 
-float bxdf_pdf(int material_type, vec3 wo, vec3 wi, inout uint seed) {
+float bxdf_pdf(int material_type, vec3 wo, vec3 wi, float random) {
     switch(material_type) {
         case MaterialType_Diffuse:    
             return brdf_diffuse_pdf(wo, wi); 
@@ -374,7 +374,7 @@ float bxdf_pdf(int material_type, vec3 wo, vec3 wi, inout uint seed) {
             return bsdf_dielectric_pdf(wo, wi); 
         break;
         case MaterialType_Conductor:
-            if (random1D(seed) < material.metallic)
+            if (random < material.metallic)
                 return brdf_conductor_pdf(wo, wi);
             return brdf_diffuse_pdf(wo, wi);
         break;
