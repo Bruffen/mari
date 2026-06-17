@@ -222,7 +222,9 @@ namespace mari {
     void Gui::imGuiInspector(Node &g) {
         ImGui::Text(("ID: " + std::to_string(g.getId())).c_str());
         if (imGuiTransform(g.transform) && g.volume) {
-            g.transform.scale = glm::max(g.transform.scale, glm::vec3(0.01f, 0.01f, 0.01f));
+            if (g.transform.scale.x == 0.0) g.transform.scale.x = 0.00001f;
+            if (g.transform.scale.y == 0.0) g.transform.scale.y = 0.00001f;
+            if (g.transform.scale.z == 0.0) g.transform.scale.z = 0.00001f;
             g.setVolumeTransform();
         }
         if (g.mesh) {
@@ -413,6 +415,7 @@ namespace mari {
         float sigma_s = volume.sigma_s;
         float temperature = volume.temperature_multiplier;
         float emissiveness = volume.emissiveness_multiplier;
+        float jittering = volume.jittering_amount;
 
         bool a = true;
         bool *a_ptr = &a;
@@ -422,22 +425,24 @@ namespace mari {
         
         ImGui::ColorEdit4("Albedo", (float*)&volume.albedo, ImGuiColorEditFlags_Float);
         ImGui::SliderFloat("Phase function g", (float*)&volume.g, -0.999f, 0.999f, "%.3f", silderFlags);
-        ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f, 0.0f, 50.0f);
-        ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f, 0.0f, 50.0f);
+        ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f, 0.0f, 1000.0f);
+        ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f, 0.0f, 1000.0f);
         if (volume.hasTemperature()) {
             ImGui::DragFloat("Temperature multiplier", (float*)&volume.temperature_multiplier, 0.01f, 0.0f, 10000.0f);
             ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.emissiveness_multiplier, 0.01f, 0.0f, 1000.0f);
         }
+        ImGui::DragFloat("Jittering amount", (float*)&volume.jittering_amount, 0.01f, 0.0f, 10000.0f);
 
         ImGui::Indent(-20.0f);
         ImGui::PopID();
 
-        if (albedo       != volume.albedo                 || 
-            g            != volume.g                      || 
-            sigma_a      != volume.sigma_a                || 
-            sigma_s      != volume.sigma_s                ||
-            temperature  != volume.temperature_multiplier ||
-            emissiveness != volume.emissiveness_multiplier) {
+        if (albedo       != volume.albedo                  || 
+            g            != volume.g                       || 
+            sigma_a      != volume.sigma_a                 || 
+            sigma_s      != volume.sigma_s                 ||
+            temperature  != volume.temperature_multiplier  ||
+            emissiveness != volume.emissiveness_multiplier ||
+            jittering    != volume.jittering_amount) {
             inputChanged = true;
         }
     }

@@ -68,18 +68,18 @@ void main() {
 
             //if (is_volume) {
 
-            MediumSample medium_sample = sample_medium_along_ray(origin, direction, t, prd.seed, false);
+            MediumEvent medium_event = sample_medium_along_ray(origin, direction, t, prd.seed);
 
-            if (medium_sample.terminated) {
-                radiance   += throughput * medium_sample.emission;
+            if (medium_event.terminated) {
+                radiance   += throughput * medium_event.sampl.emission;
                 break;
             }
-            if (medium_sample.scattered) {
-                //radiance   += throughput * medium_sample.emission * medium_sample.medium.absorption; 
+            if (medium_event.scattered) {
+                //radiance   += throughput * medium_event.sampl.emission * medium_event.medium.absorption; 
                 // Set values for next ray
-                origin     = origin + direction * medium_sample.t;
-                direction  = medium_sample.pf.wi;
-                throughput *= medium_sample.albedo * medium_sample.pf.p / medium_sample.pf.pdf;
+                origin     = origin + direction * medium_event.t;
+                direction  = medium_event.pf.wi;
+                throughput *= medium_event.sampl.albedo * medium_event.pf.p / medium_event.pf.pdf;
                 continue;
             }
 

@@ -25,14 +25,7 @@ namespace mari {
             temperature = file.readGrid("temperature");
         }
 
-        // Set translation to zero as a temporary fix
-        density->setTransform(openvdb::v12_1::math::Transform::createLinearTransform(density->voxelSize().x()));
-        if (temperature) {
-            temperature->setTransform(openvdb::v12_1::math::Transform::createLinearTransform(temperature->voxelSize().x()));
-        }
         file.close();
-
-        voxelSize = static_cast<float>(density->voxelSize().x());
         
         const openvdb::FloatGrid::Ptr densityGridData = openvdb::gridPtrCast<openvdb::FloatGrid>(density);
 
@@ -103,9 +96,9 @@ namespace mari {
         vdbMat4.setIdentity();
 
         //vdbMat4.setToRotation();
-        vdbMat4.postScale(openvdb::v12_1::math::Vec3d(transform.scale.x, transform.scale.y, transform.scale.z) * voxelSize);
+        vdbMat4.postScale(openvdb::v12_1::math::Vec3d(transform.scale.x, -transform.scale.y, transform.scale.z));
         vdbMat4.setTranslation(openvdb::v12_1::math::Vec3d(transform.position.x, transform.position.y, transform.position.z));
-        
+
         density->setTransform(openvdb::v12_1::math::Transform::createLinearTransform(vdbMat4));
         const openvdb::FloatGrid::Ptr densityGridData = openvdb::gridPtrCast<openvdb::FloatGrid>(density);
         nanovdb::GridHandle<nanovdb::HostBuffer> densityGridHandle = nanovdb::tools::createNanoGrid(*densityGridData);

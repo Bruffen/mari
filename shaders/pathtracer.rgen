@@ -106,6 +106,11 @@ void main() {
                 continue;
             }
 
+            // Render backfaces
+            if (dot(direction, hit.normal_g) > 0.0 && hit.material_type != MaterialType_Dielectric) {
+                flip_orientation(hit);
+            }
+
             const bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
 
             // Sample indirect light

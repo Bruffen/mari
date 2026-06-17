@@ -240,7 +240,8 @@ namespace mari {
                             scene->volumeObject->volume->sigma_a,
                             scene->volumeObject->volume->sigma_s,
                             scene->volumeObject->volume->temperature_multiplier,
-                            scene->volumeObject->volume->emissiveness_multiplier
+                            scene->volumeObject->volume->emissiveness_multiplier,
+                            scene->volumeObject->volume->jittering_amount
                         };
                         volumeUboBuffers[frameIndex]->writeToBuffer(&volumeUbo);
                         volumeUboBuffers[frameIndex]->flush();
@@ -355,7 +356,7 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/cube.glb");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/plane.glb");
-                scene->nodes.at("plane")->transform.localMatrix *= 0.01f;
+                scene->nodes.at("plane")->transform.localMatrix *= 200.0f;
                 break;
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
@@ -364,8 +365,8 @@ namespace mari {
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                 break;
             case 12:
@@ -385,8 +386,8 @@ namespace mari {
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/meadow_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "meadow_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_puresky_4k")));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_dusk_2_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_dusk_2_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_sunset_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_sunset_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/dikhololo_night_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "dikhololo_night_4k")));
@@ -414,7 +415,7 @@ namespace mari {
         }
 
         scene->volumeObject = std::make_shared<Node>("volume");
-        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_quarter.vdb");
+        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_sixteenth.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/fire.vdb"); 

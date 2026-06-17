@@ -140,4 +140,11 @@ Hit process_hit(Payload payload) {
     return hit;
 }
 
+void flip_orientation(inout Hit hit) {
+    hit.normal_g  = -hit.normal_g;
+    hit.normal_s  = -hit.normal_s;
+    hit.tangent   = -hit.tangent;
+    hit.bitangent = -hit.bitangent;
+}
+
 #endif // _HIT_COMMON_GLSL_

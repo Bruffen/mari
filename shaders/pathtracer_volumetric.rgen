@@ -68,13 +68,15 @@ void main() {
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             float t = tmax;
-            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
+            traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
 
             Hit hit;
+            bool hit_surface = false;
             if (prd.instance_index >= 0) {
-                hit = process_hit(prd);
-                t = length(hit.position - origin);
-                material = hit.material;
+                hit         = process_hit(prd);
+                t           = length(hit.position - origin);
+                material    = hit.material;
+                hit_surface = true;
             }
             vec3 wo;
             BxdfSample bxdf_sample;
@@ -82,19 +84,19 @@ void main() {
             // TODO test intersections with every nanovdb bbox, get a list of results and sample them accordingly
             // Sample the participating medium
             // if (medium) {
-            MediumSample medium_sample = sample_medium_along_ray(origin, direction, t, prd.seed, false);
+            MediumEvent medium_event = sample_medium_along_ray(origin, direction, t, prd.seed);
             // Compute throughput' at new path vertex
             //float pdf = 
             // TODO is it spectral only?
             // Compute rescaled path probability for absorption at path vertex
             //float r_e = r_u * 
 
-            if (medium_sample.terminated) {
-                break;
+            if (medium_event.terminated) {
+                break; // TODO THESIS can emission be added in both absorption and scattering events with MIS?
             }
-            if (medium_sample.scattered) {
-                // TODO why does emission only happen acording to the probability of absorption
-                radiance += throughput * medium_sample.medium.absorption * medium_sample.emission; /* / r_e; */
+            if (medium_event.scattered) {
+                // TODO why does emission only happen acording to the coefficient of absorption
+                radiance += throughput * medium_event.medium.absorption * medium_event.sampl.emission; /* / r_e; */
 
                 //float pdf =
 
@@ -103,23 +105,27 @@ void main() {
                 wo = -direction;
 
 
-                if (medium_sample.pf.pdf == 0.0) 
+                if (medium_event.pf.pdf == 0.0) 
                     break;
                 // Set values for next ray
-                origin     = origin + direction * medium_sample.t;
-                direction  = medium_sample.pf.wi;
-                throughput *= medium_sample.albedo * medium_sample.pf.p / medium_sample.pf.pdf;
-                r_l = r_u / medium_sample.pf.pdf;
-                previous_pdf = medium_sample.pf.pdf;
+                origin     = origin + direction * medium_event.t;
+                direction  = medium_event.pf.wi;
+                throughput *= medium_event.sampl.albedo * medium_event.pf.p / medium_event.pf.pdf;
+                r_l = r_u / medium_event.pf.pdf;
+                previous_pdf = medium_event.pf.pdf;
                 is_dirac_delta = false;
                 // TODO light sample context?
                 //continue;
                 // TODO null scatters have to update tracking variables
-            } else if (prd.instance_index >= 0) {
-                
-                //}
+            } else if (hit_surface) {
 
                 // if (hit.material_type == MaterialType_Boundary) {} // TODO
+                
+                // Render backfaces
+                if (dot(direction, hit.normal_g) > 0.0 && hit.material_type != MaterialType_Dielectric) {
+                    flip_orientation(hit);
+                }
+
                 const bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
 
                 // Sample indirect light
@@ -127,7 +133,12 @@ void main() {
                     if (depth == 0 || is_dirac_delta || properties.next_event_estimation == 0) {
                         // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
                         radiance += throughput * hit.material.emission.rgb;
-                    } // TODO MIS
+                    }                 
+                    else {
+                        float light_mis = pdf_light_area(hit.vertices, direction, t, hit.material.emission.rgb, true); // TODO double sided parameter in material
+                        float bxdf_mis = previous_pdf;
+                        radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
+                    }
                 }
 
                 // Sample bxdf
@@ -170,10 +181,10 @@ void main() {
                     vec3 wi;
                     float scatter_f, scatter_pdf;
                     
-                    if (medium_sample.scattered) {
+                    if (medium_event.scattered) {
                         wi = li_sample.wi;
-                        scatter_f = pf_henyey_greenstein_p(wo, wi, medium_sample.medium.g);
-                        scatter_pdf = pf_henyey_greenstein_pdf(wo, wi, medium_sample.medium.g);
+                        scatter_f = pf_henyey_greenstein_p(wo, wi, medium_event.medium.g);
+                        scatter_pdf = pf_henyey_greenstein_pdf(wo, wi, medium_event.medium.g);
                     } else {
                         wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
                         float material_random = random1D(prd.seed);
@@ -193,7 +204,9 @@ void main() {
                             //    li_transmittance = get_transmittance(media[current_medium], li_sample.distance);
                             //}
 
-                            li_transmittance = sample_medium_along_ray(origin, li_sample.wi, t, prd.seed, true).transmittance;
+
+                            // TODO weird bug with volume nee depending on the octant of direction
+                            li_transmittance = sample_medium_along_ray(origin, li_sample.wi, t, prd.seed).transmittance;
 
                             float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;
@@ -202,9 +215,9 @@ void main() {
                 }
             }
 
-            if (medium_sample.scattered) {
+            if (medium_event.scattered) {
                 continue;
-            } else if (prd.instance_index >= 0) {
+            } else if (hit_surface) {
                 // Apply bxdf
                 if (bxdf_sample.pdf == 0.0) {
                     throughput *= 0.0;
@@ -216,7 +229,7 @@ void main() {
 
 
             // Miss. Sample environment map
-            if (prd.instance_index < 0) {
+            if (!hit_surface) {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
                 float mis_weight = 1.0;

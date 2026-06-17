@@ -24,11 +24,11 @@ namespace mari {
             float sigma_s = 1.0f;
             float temperature_multiplier = 1.0f;
             float emissiveness_multiplier = 1.0f;
+            float jittering_amount = 0.4f;
             // TODO maybe create a struct shared by volume and material for participating media
         private:
             openvdb::GridBase::Ptr  density;
             openvdb::GridBase::Ptr  temperature;
-            float                   voxelSize = 1.0f; // TODO non uniform voxel size
             std::unique_ptr<Buffer> nanoDensityBuffer;
             std::unique_ptr<Buffer> nanoTemperatureBuffer;
     };

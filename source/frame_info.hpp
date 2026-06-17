@@ -67,6 +67,7 @@ namespace mari {
         float sigma_s;
         float temperature_multiplier;
         float emissiveness_multiplier;
+        float jittering_amount;
     };
 
     struct FrameInfo {

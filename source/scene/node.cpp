@@ -16,6 +16,12 @@ namespace mari {
         for (auto &child : children) {
             child->start(worldMatrix);
         }
+
+        if (volume) {
+            // TODO this makes it so the buffers are built and sent to gpu twice unnecessarily.
+            // Fix is the TODO written on top of the function's implementation
+            setVolumeTransform(); 
+        }
     }
 
     void Node::update(const glm::mat4& parent) {
