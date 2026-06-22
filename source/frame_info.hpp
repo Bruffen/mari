@@ -62,7 +62,9 @@ namespace mari {
         uint64_t densityBufferBDA;
         uint64_t temperatureBufferBDA;
         glm::vec4 albedo;
+        PhaseFunction phaseFunction;
         float g;
+        float a;
         float sigma_a;
         float sigma_s;
         float temperature_multiplier;

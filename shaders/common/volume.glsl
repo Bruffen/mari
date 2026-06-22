@@ -3,12 +3,15 @@
 
 #include "math.glsl"
 #include "sampling.glsl"
+#include "phase_function.glsl"
 
 layout(binding = 6, set = 0, scalar) uniform Volume {
     uint64_t density_device_address;
     uint64_t temperature_device_address;
     vec4  albedo;
+    uint  phase_function;
     float g;
+    float a;
     float sigma_a;
     float sigma_s;
     float temperature_multiplier;
@@ -17,7 +20,6 @@ layout(binding = 6, set = 0, scalar) uniform Volume {
 } volume;
 
 layout(buffer_reference, scalar) readonly buffer PNanoVDBBuffer { uint p[]; };
-//uint pnanovdb_buf_data[] = PNanoVDBBuffer(volume.device_address).p;
 
 #define PNANOVDB_GLSL
 #include "PNanoVDB.h"
@@ -106,22 +108,43 @@ struct Medium {
     float absorption;
     float scattering;
     float majorant;
+    uint  phase_function;
     float g;
+    float a;
 };
 
 #define MAX_MEDIA 8
 Medium media[MAX_MEDIA];
 int current_medium = -1;
 
-void medium_push(vec3 absorption_color, float absorption, float scattering, float majorant, float g) {
+Medium get_medium_empty() {
+    return Medium(vec3(0.0), 0.0, 0.0, 0.0, 0, 0.0, 0.0);
+}
+
+Medium get_medium_error() {
+    return Medium(ERROR_COLOR / 1000.0, 5.0, 5.0, 10.0, 0, 0.0, 0.0);
+}
+
+void initialize_participating_media() {
+    initialize_volume_nano();
+
+    // Initialize stack with mediums that will show an error color if they get incorrectly sampled
+    for (int i = 0; i < MAX_MEDIA; i++) {
+        media[i] = get_medium_error();
+    }
+}
+
+void medium_push(vec3 absorption_color, float absorption, float scattering, float majorant, uint phase_function, float g, float a) {
     if (current_medium >= MAX_MEDIA - 1) return;
     
     current_medium++;
     media[current_medium].absorption_color = absorption_color;
+    media[current_medium].phase_function = phase_function;
     media[current_medium].absorption = absorption;
     media[current_medium].scattering = scattering;
     media[current_medium].majorant   = majorant;
     media[current_medium].g          = g;
+    media[current_medium].a          = a;
 }
 
 void medium_push(Medium medium) {
@@ -130,16 +153,25 @@ void medium_push(Medium medium) {
         medium.absorption,
         medium.scattering,
         medium.majorant,
-        medium.g
+        medium.phase_function,
+        medium.g,
+        medium.a
     );
 }
 
 Medium medium_get() {
-    return media[current_medium];
+    if (current_medium >= 0 && current_medium < MAX_MEDIA) {
+        return media[current_medium];
+    } else {
+        return get_medium_error();
+    }
 }
 
 void medium_remove() {
-    if (current_medium >= 0) current_medium--;
+    if (current_medium >= 0) {
+        media[current_medium] = get_medium_error();
+        current_medium--;
+    }
 }
 
 vec3 get_transmittance(Medium medium, float distance) {
@@ -160,54 +192,6 @@ float get_transmittance(float majorant, float distance) {
     return exp(-majorant * distance);
 }
 
-struct PhaseFunctionSample {
-    vec3  wi;
-    float p;
-    float pdf;
-};
-
-PhaseFunctionSample pf_isotropic_sample(vec2 random) {
-    return PhaseFunctionSample(
-        sample_uniform_sphere(random.x, random.y), 
-        pdf_uniform_sphere(),
-        pdf_uniform_sphere()
-    );
-}
-
-// TODO pf_isotropic_p()
-// TODO pf_isotropic_pdf()
-
-float pf_henyey_greenstein(float cos_theta, float g) {
-    float denom = 1.0 + sqr(g) + 2.0 * g * cos_theta;
-    return M_1_4PI * (1.0 - sqr(g)) / (denom * safe_sqrt(denom));
-}
-
-PhaseFunctionSample pf_henyey_greenstein_sample(vec3 wo, float g, vec2 random) {
-    float cos_theta;
-    if (abs(g) < 1e-3) {
-        cos_theta = 1.0 - 2.0 * random.x;
-    } else {
-        cos_theta = -1.0 / (2.0 * g) * (1.0 + sqr(g) - sqr((1.0 - sqr(g)) / (1.0 + g - 2.0 * g * random.x)));
-    }
-
-    float sin_theta = safe_sqrt(1.0 - sqr(cos_theta));
-    float phi = 2.0 * M_PI * random.y;
-    mat3 frame = frame_from_z(wo);
-    vec3 wi = from_local(frame[0], frame[1], frame[2], spherical_direction(sin_theta, cos_theta, phi));
-
-    float pdf = pf_henyey_greenstein(cos_theta, g);
-
-    return PhaseFunctionSample(wi, pdf, pdf);
-}
-
-float pf_henyey_greenstein_p(vec3 wo, vec3 wi, float g) {
-    return pf_henyey_greenstein(dot(wo, wi), g);
-}
-
-float pf_henyey_greenstein_pdf(vec3 wo, vec3 wi, float g) {
-    return pf_henyey_greenstein_p(wo, wi, g);
-}
-
 struct MediumSample {
     float sigma_a;
     float sigma_s;
@@ -215,8 +199,12 @@ struct MediumSample {
     vec3  emission;
 };
 
+MediumSample get_medium_sample_empty() {
+    return MediumSample(0, 0, vec3(0), vec3(0));
+}
+
 struct MediumEvent {
-    PhaseFunctionSample pf;
+    PhaseFunctionSample pf; // TODO create phasefunction along with phasefunctionsample, just like medium and mediumsample, maybe???
     MediumSample sampl;
     Medium medium;
     float t;
@@ -227,6 +215,21 @@ struct MediumEvent {
     bool  terminated;
     bool  scattered;
 };
+
+MediumEvent get_medium_event_empty() {
+    return MediumEvent(
+        PhaseFunctionSample(vec3(0.0), 1, 1),
+        get_medium_sample_empty(),
+        get_medium_empty(),
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        vec3(1.0),
+        false,
+        false
+    );
+}
 
 MediumSample sample_medium(vec3 position, vec3 wo, Medium medium) {
     vec2 sample_data  = sample_volume_nano(position);
@@ -244,17 +247,12 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium) {
 }
 
 MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
-    MediumEvent medium_event;
-    medium_event.medium        = medium_get();
-    medium_event.t             = 0.0;
-    medium_event.sampl         = sample_medium(position, wo, medium_event.medium);
-    medium_event.pf            = PhaseFunctionSample(vec3(0.0), 1, 1);
-    medium_event.transmittance = vec3(1.0);
-    medium_event.terminated    = false;
-    medium_event.scattered     = false;
-    medium_event.n_a           = medium_event.sampl.sigma_a / medium_event.medium.majorant;
-    medium_event.n_s           = medium_event.sampl.sigma_s / medium_event.medium.majorant;
-    medium_event.n_n           = max(0.0, 1.0 - medium_event.n_a - medium_event.n_s);
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium      = medium_get();
+    medium_event.sampl       = sample_medium(position, wo, medium_event.medium);
+    medium_event.n_a         = medium_event.sampl.sigma_a / medium_event.medium.majorant;
+    medium_event.n_s         = medium_event.sampl.sigma_s / medium_event.medium.majorant;
+    medium_event.n_n         = max(0.0, 1.0 - medium_event.n_a - medium_event.n_s);
 
     float event = random1D(seed);
 
@@ -267,8 +265,13 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
     else if (event < medium_event.n_a + medium_event.n_s) {
         vec2 r = random2D(seed);
 
-        //medium_event.pf = pf_isotropic_sample(r);
-        medium_event.pf = pf_henyey_greenstein_sample(wo, medium_event.medium.g, r);
+        medium_event.pf = pf_sample(
+            medium_event.medium.phase_function, 
+            wo, 
+            medium_event.medium.g,
+            medium_event.medium.a,
+            r
+        );
         medium_event.scattered = true;
         medium_event.transmittance = vec3(0.0);
     } 
@@ -281,17 +284,8 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
 }
 
 MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmax, inout uint seed) {
-    MediumEvent medium_event;
-    medium_event.medium        = medium_get();
-    medium_event.t             = 0.0;
-    medium_event.sampl         = MediumSample(0, 0, vec3(0), vec3(0));
-    medium_event.pf            = PhaseFunctionSample(vec3(0.0), 1, 1);
-    medium_event.transmittance = vec3(1.0);
-    medium_event.terminated    = false;
-    medium_event.scattered     = false;
-    medium_event.n_a           = 0.0;
-    medium_event.n_s           = 0.0;
-    medium_event.n_n           = 0.0;
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium = medium_get();
     float tmin = 0.0;
     float t = 0.0;
 
@@ -325,8 +319,6 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, ino
     direction = normalize(direction);
 
     float tmin = 0.0;
-    float t = 0.0;
-    float unused = 0.0;
     bool done = false;
 
     float tmax_surface = tmax;// - 0.001;
@@ -342,18 +334,7 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, ino
 
     if (!hit || tmin > tmax) {
         // TODO don't terminate since there can be a bigger non vdb medium, like fog, that needs to be sampled
-        MediumEvent medium_event;
-        medium_event.medium        = Medium(vec3(0), 0, 0, 0, 0);
-        medium_event.t             = tmax;
-        medium_event.sampl         = MediumSample(0, 0, vec3(0), vec3(0));
-        medium_event.pf            = PhaseFunctionSample(vec3(0.0), 1, 1);
-        medium_event.transmittance = vec3(1.0);
-        medium_event.terminated    = false;
-        medium_event.scattered     = false;
-        medium_event.n_a           = 0.0;
-        medium_event.n_s           = 0.0;
-        medium_event.n_n           = 0.0;
-        return medium_event; 
+        return get_medium_event_empty(); 
     }
 
     // Push volume_nano data into array of media
@@ -361,8 +342,10 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, ino
     medium.absorption_color = volume.albedo.rgb;
     medium.absorption = volume.sigma_a;
     medium.scattering = volume.sigma_s;
-    medium.g = volume.g;
     medium.majorant = medium.absorption + medium.scattering;
+    medium.phase_function = volume.phase_function;
+    medium.g = volume.g;
+    medium.a = volume.a;
     medium_push(medium);
 
     MediumEvent medium_event = delta_tracking(origin, direction, tmax, seed);

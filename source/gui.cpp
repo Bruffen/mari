@@ -411,20 +411,18 @@ namespace mari {
 
         glm::vec4 albedo = volume.albedo;
         float g = volume.g;
+        float a = volume.a;
         float sigma_a = volume.sigma_a;
         float sigma_s = volume.sigma_s;
         float temperature = volume.temperature_multiplier;
         float emissiveness = volume.emissiveness_multiplier;
         float jittering = volume.jittering_amount;
-
-        bool a = true;
-        bool *a_ptr = &a;
+        PhaseFunction pf = volume.phaseFunction;
 
         ImGui::PushID("##volume");
         ImGui::Indent(20.0f);
         
         ImGui::ColorEdit4("Albedo", (float*)&volume.albedo, ImGuiColorEditFlags_Float);
-        ImGui::SliderFloat("Phase function g", (float*)&volume.g, -0.999f, 0.999f, "%.3f", silderFlags);
         ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f, 0.0f, 1000.0f);
         ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f, 0.0f, 1000.0f);
         if (volume.hasTemperature()) {
@@ -433,16 +431,43 @@ namespace mari {
         }
         ImGui::DragFloat("Jittering amount", (float*)&volume.jittering_amount, 0.01f, 0.0f, 10000.0f);
 
+        const char* phaseFunctions[] = { "Isotropic", "HenyeyGreenstein", "Draine" };
+        const char* selectedPhaseFunction = phaseFunctions[volume.phaseFunction];
+
+        if (ImGui::BeginCombo("Phase Function", selectedPhaseFunction, 0)) {
+            for (int n = 0; n < IM_ARRAYSIZE(phaseFunctions); n++) {
+                const bool isSelected = (volume.phaseFunction == n);
+                if (ImGui::Selectable(phaseFunctions[n], isSelected)) {
+                    volume.phaseFunction = static_cast<PhaseFunction>(n);
+                }
+
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        if (volume.phaseFunction > 0) {
+            ImGui::SliderFloat("g", (float*)&volume.g, -0.999f, 0.999f, "%.3f", silderFlags);
+            if (volume.phaseFunction == PhaseFunction::Draine) {
+                ImGui::SliderFloat("a", (float*)&volume.a, -0.999f, 0.999f, "%.3f", silderFlags);
+            }
+        }
+
         ImGui::Indent(-20.0f);
         ImGui::PopID();
 
         if (albedo       != volume.albedo                  || 
             g            != volume.g                       || 
+            a            != volume.a                       || 
             sigma_a      != volume.sigma_a                 || 
             sigma_s      != volume.sigma_s                 ||
             temperature  != volume.temperature_multiplier  ||
             emissiveness != volume.emissiveness_multiplier ||
-            jittering    != volume.jittering_amount) {
+            jittering    != volume.jittering_amount        ||
+            pf           != volume.phaseFunction
+        ) {
             inputChanged = true;
         }
     }

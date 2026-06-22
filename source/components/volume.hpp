@@ -7,6 +7,13 @@
 #include <memory>
 
 namespace mari {
+
+    enum PhaseFunction {
+        Isotropic = 0,
+        HenyeyGreenstein = 1,
+        Draine = 2
+    };
+
     class Volume {
         public:
             Volume(Device &device, std::string filepath);
@@ -19,7 +26,9 @@ namespace mari {
             void setTransform(const Transform &transform);
 
             glm::vec4 albedo = glm::vec4(1.0f);
+            PhaseFunction phaseFunction = PhaseFunction::HenyeyGreenstein;
             float g = 0.0f;
+            float a = 0.0f;
             float sigma_a = 0.0f;
             float sigma_s = 1.0f;
             float temperature_multiplier = 1.0f;

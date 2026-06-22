@@ -10,5 +10,7 @@
 #define M_1_4PI    0.0795774715459476678844
 #define M_E        2.718281828459045235360
 #define M_stefan_boltzmann  5.670374419e-8
+#define ERROR_COLOR vec3(5000.0, 0.0, 5000.0)
+
 
 #endif // _CONSTANTS_GLSL_

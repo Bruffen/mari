@@ -165,6 +165,7 @@ namespace mari {
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
         deviceFeatures.shaderInt64 = VK_TRUE;
+        deviceFeatures.shaderFloat64 = VK_TRUE;     // PNanoVDB
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

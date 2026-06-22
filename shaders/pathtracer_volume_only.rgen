@@ -31,9 +31,6 @@ layout(binding = 3, set = 0, scalar) uniform Properties {
     int   samples_per_pixel;
 } properties;
 
-
-#define ERROR_COLOR vec3(5000.0, 0.0, 5000.0)
-
 void main() {
     prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, properties.frame_count);
     vec3 result = vec3(0.0);
@@ -41,7 +38,7 @@ void main() {
     const float tmin = 0.0;
     const float tmax = 10000.0;
 
-    initialize_volume_nano();
+    initialize_participating_media();
 
     for (int sample_count = 0; sample_count < properties.samples_per_pixel; sample_count++) {
         const vec2 pixel_jitter = random2D(prd.seed);
