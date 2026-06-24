@@ -64,12 +64,12 @@ namespace mari {
         glm::vec4 albedo;
         PhaseFunction phaseFunction;
         float g;
-        float a;
+        float particleSize;
         float sigma_a;
         float sigma_s;
-        float temperature_multiplier;
-        float emissiveness_multiplier;
-        float jittering_amount;
+        float temperatureMultiplier;
+        float emissivenessMultiplier;
+        float jitteringAmount;
     };
 
     struct FrameInfo {

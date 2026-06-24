@@ -410,13 +410,13 @@ namespace mari {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
         glm::vec4 albedo = volume.albedo;
-        float g = volume.g;
-        float a = volume.a;
+        float g = volume.anisotropy_g;
+        float a = volume.particleSize;
         float sigma_a = volume.sigma_a;
         float sigma_s = volume.sigma_s;
-        float temperature = volume.temperature_multiplier;
-        float emissiveness = volume.emissiveness_multiplier;
-        float jittering = volume.jittering_amount;
+        float temperature = volume.temperatureMultiplier;
+        float emissiveness = volume.emissivenessMultiplier;
+        float jittering = volume.jitteringAmount;
         PhaseFunction pf = volume.phaseFunction;
 
         ImGui::PushID("##volume");
@@ -426,12 +426,12 @@ namespace mari {
         ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f, 0.0f, 1000.0f);
         ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f, 0.0f, 1000.0f);
         if (volume.hasTemperature()) {
-            ImGui::DragFloat("Temperature multiplier", (float*)&volume.temperature_multiplier, 0.01f, 0.0f, 10000.0f);
-            ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.emissiveness_multiplier, 0.01f, 0.0f, 1000.0f);
+            ImGui::DragFloat("Temperature multiplier", (float*)&volume.temperatureMultiplier, 0.01f, 0.0f, 10000.0f);
+            ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.emissivenessMultiplier, 0.01f, 0.0f, 1000.0f);
         }
-        ImGui::DragFloat("Jittering amount", (float*)&volume.jittering_amount, 0.01f, 0.0f, 10000.0f);
+        ImGui::DragFloat("Jittering amount", (float*)&volume.jitteringAmount, 0.01f, 0.0f, 10000.0f);
 
-        const char* phaseFunctions[] = { "Isotropic", "HenyeyGreenstein", "Draine" };
+        const char* phaseFunctions[] = { "Isotropic", "Rayleigh", "HenyeyGreenstein", "Mie Approximation" };
         const char* selectedPhaseFunction = phaseFunctions[volume.phaseFunction];
 
         if (ImGui::BeginCombo("Phase Function", selectedPhaseFunction, 0)) {
@@ -448,24 +448,24 @@ namespace mari {
             ImGui::EndCombo();
         }
 
-        if (volume.phaseFunction > 0) {
-            ImGui::SliderFloat("g", (float*)&volume.g, -0.999f, 0.999f, "%.3f", silderFlags);
-            if (volume.phaseFunction == PhaseFunction::Draine) {
-                ImGui::SliderFloat("a", (float*)&volume.a, -0.999f, 0.999f, "%.3f", silderFlags);
-            }
+        if (volume.phaseFunction == PhaseFunction::HenyeyGreenstein) {
+            ImGui::SliderFloat("Anisotropy g", (float*)&volume.anisotropy_g, -0.999f, 0.999f, "%.3f", silderFlags);
+        }
+        if (volume.phaseFunction == PhaseFunction::MieApproximation) {
+            ImGui::SliderFloat("Particle size", (float*)&volume.particleSize, 0.0f, 50.0f, "%.3f", silderFlags);
         }
 
         ImGui::Indent(-20.0f);
         ImGui::PopID();
 
-        if (albedo       != volume.albedo                  || 
-            g            != volume.g                       || 
-            a            != volume.a                       || 
-            sigma_a      != volume.sigma_a                 || 
-            sigma_s      != volume.sigma_s                 ||
-            temperature  != volume.temperature_multiplier  ||
-            emissiveness != volume.emissiveness_multiplier ||
-            jittering    != volume.jittering_amount        ||
+        if (albedo       != volume.albedo                   || 
+            g            != volume.anisotropy_g             || 
+            a            != volume.particleSize             || 
+            sigma_a      != volume.sigma_a                  || 
+            sigma_s      != volume.sigma_s                  ||
+            temperature  != volume.temperatureMultiplier    ||
+            emissiveness != volume.emissivenessMultiplier   ||
+            jittering    != volume.jitteringAmount          ||
             pf           != volume.phaseFunction
         ) {
             inputChanged = true;

@@ -4,6 +4,11 @@
 #include "math.glsl"
 #include "sampling.glsl"
 
+#define PhaseFunctionType_Isotropic 0
+#define PhaseFunctionType_Rayleigh 1
+#define PhaseFunctionType_HenyeyGreenstein 2
+#define PhaseFunctionType_Mie_Approximation 3
+
 struct PhaseFunctionSample {
     vec3  wi;
     float p;
@@ -30,6 +35,13 @@ PhaseFunctionSample pf_isotropic_sample(vec2 random) {
         pf_isotropic_pdf()
     );
 }
+
+/****************************************************************
+ * Rayleigh
+ ****************************************************************
+ */
+
+// TODO
 
 /****************************************************************
  * Henyey-Greenstein
@@ -110,45 +122,128 @@ PhaseFunctionSample pf_draine_sample(vec3 wo, float g, float a, vec2 random) {
     mat3 frame = frame_from_z(wo);
     vec3 wi = from_local(frame[0], frame[1], frame[2], spherical_direction(sin_theta, cos_theta, phi));
 
-    float pdf = pf_draine(cos_theta, g, a);
+    //float pdf = pf_draine(cos_theta, g, a);
 
-    return PhaseFunctionSample(wi, pdf, pdf);
+    return PhaseFunctionSample(wi, 1.0, 1.0);
 }
 
-#define PhaseFunctionType_Isotropic 0
-#define PhaseFunctionType_HenyeyGreenstein 1
-#define PhaseFunctionType_Draine 2
+/****************************************************************
+ * Approximate Mie scattering
+ * [Jendersie and d'Eon 2023]
+ * SIGGRAPH 2023 Talks
+ * https://doi.org/10.1145/3587421.3595409
+ ****************************************************************
+ */
 
-float pf_eval_p(uint id, vec3 wo, vec3 wi, float g, float a) {
+void pf_mie_approximate_get_parameters(float particle_size, out float g_hg, out float g_draine, out float a_draine, out float weight) {
+    if (particle_size <= 0.1) {
+        g_hg = 13.8 * particle_size * particle_size;
+        g_draine = 1.1456 * particle_size * sin(9.29044 * particle_size);
+        a_draine = 250;
+        weight = 0.252977 - 312.983 * pow(particle_size, 4.3);
+    }
+    else if (particle_size < 1.5) {
+        float lps = log(particle_size);
+        g_hg = 0.862 - 0.143 * lps * lps;
+        g_draine = 0.379685 *
+            cos(1.19692 *
+                cos(((lps - 0.238604) * (lps + 1.00667)) /
+                    (0.507522 - 0.15677 * lps))
+                + 1.37932 * lps
+                + 0.0625835)
+            + 0.344213;
+        a_draine = 250;
+        weight = 0.146209 * cos(3.38707 * lps + 2.11193) + 0.316072 + 0.0778917 * lps;
+    }
+    else if (particle_size < 5.0) {
+        float lps  = log(particle_size);
+        float llps = log(lps);
+        g_hg = 0.0604931 * llps + 0.940256;
+        g_draine = 0.500411 - 0.081287 / (-2.0 * lps + tan(lps) + 1.27551);
+        a_draine = 7.30354 * lps + 6.31675;
+        weight = 0.026914 * (lps - cos(5.68947 * (llps - 0.0292149))) + 0.376475;
+    }
+    else {
+        g_hg = exp(-0.0990567 / (particle_size - 1.67154));
+        g_draine = exp(-2.20679 / (particle_size + 3.91029) - 0.428934);
+        a_draine = exp(3.62489 - 8.29288 / (particle_size + 5.52825));
+        weight = exp(-0.599085 / (particle_size - 0.641583) - 0.665888);
+    }
+}
+
+float pf_mie_approximate_p(vec3 wo, vec3 wi, float particle_size, float random) {
+    float g_hg, g_draine, a_draine, weight;
+    pf_mie_approximate_get_parameters(particle_size, g_hg, g_draine, a_draine, weight);
+
+    if (random < weight) {
+        return pf_draine(dot(wo, wi), g_draine, a_draine);
+    }
+    else {
+        return pf_henyey_greenstein_p(wo, wi, g_hg);
+    }
+}
+
+float pf_mie_approximate_pdf(vec3 wo, vec3 wi, float particle_size, float random) {
+    float g_hg, g_draine, a_draine, weight;
+    pf_mie_approximate_get_parameters(particle_size, g_hg, g_draine, a_draine, weight);
+
+    if (random < weight) {
+        return pf_draine(dot(wo, wi), g_draine, a_draine);
+    }
+    else {
+        return pf_henyey_greenstein_pdf(wo, wi, g_hg);
+    }
+}
+
+PhaseFunctionSample pf_mie_approximate_sample(vec3 wo, float particle_size, vec3 random) {
+    float g_hg, g_draine, a_draine, weight;
+    pf_mie_approximate_get_parameters(particle_size, g_hg, g_draine, a_draine, weight);
+
+    if (random.z < weight) {
+        return pf_draine_sample(wo, g_draine, a_draine, random.xy);
+    }
+    else {
+        return pf_henyey_greenstein_sample(wo, g_hg, random.xy);
+    }
+}
+
+/****************************************************************
+ * General Functions
+ ****************************************************************
+ */
+
+float pf_eval_p(uint id, vec3 wo, vec3 wi, float g, float particle_size, float random) {
     switch (id) {
         default:
             return pf_isotropic_p();
         case PhaseFunctionType_HenyeyGreenstein:
             return pf_henyey_greenstein_p(wo, wi, g);
-        case PhaseFunctionType_Draine:
-            return pf_draine(wo, wi, g, a);
+        case PhaseFunctionType_Mie_Approximation:
+            return pf_mie_approximate_p(wo, wi, particle_size, random);
     }
 }
 
-float pf_eval_pdf(uint id, vec3 wo, vec3 wi, float g, float a) {
+float pf_eval_pdf(uint id, vec3 wo, vec3 wi, float g, float particle_size, float random) {
     switch (id) {
         default:
             return pf_isotropic_pdf();
         case PhaseFunctionType_HenyeyGreenstein:
             return pf_henyey_greenstein_pdf(wo, wi, g);
-        case PhaseFunctionType_Draine:
-            return pf_draine(wo, wi, g, a);
+        case PhaseFunctionType_Mie_Approximation:
+            return pf_mie_approximate_pdf(wo, wi, particle_size, random);
     }
 }
 
-PhaseFunctionSample pf_sample(uint id, vec3 wo, float g, float a, vec2 random) {
+PhaseFunctionSample pf_sample(uint id, vec3 wo, float g, float particle_size, inout uint seed) {
+    vec2 random = random2D(seed);
+
     switch (id) {
         default:
             return pf_isotropic_sample(random);
         case PhaseFunctionType_HenyeyGreenstein:
             return pf_henyey_greenstein_sample(wo, g, random);
-        case PhaseFunctionType_Draine:
-            return pf_draine_sample(wo, g, a, random);
+        case PhaseFunctionType_Mie_Approximation:
+            return pf_mie_approximate_sample(wo, particle_size, vec3(random, random1D(seed)));
     }
 }
 

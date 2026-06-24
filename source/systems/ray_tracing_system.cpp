@@ -275,7 +275,6 @@ namespace mari {
         pipeline->bind(frameInfo.commandBuffer);
 
         vkCmdBindDescriptorSets(frameInfo.commandBuffer, pipeline->bindPoint(), pipelineLayout->handle(), 0, 1, &frameInfo.globalDescriptorSet, 0, 0);
-        // TODO release build crashes here only some of the times
         vkCmdTraceRaysKHR(frameInfo.commandBuffer, &pipeline->raygenSBTEntry, &pipeline->missSBTEntry, &pipeline->hitSBTEntry, &pipeline->callableSBTEntry, width, height, 1);
 
         device.copyImageToImage(frameInfo.commandBuffer, presentImage->handle, swapchain.getImage(frameInfo.frameIndex), presentImage->size);

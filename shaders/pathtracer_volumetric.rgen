@@ -179,16 +179,15 @@ void main() {
                     vec3 wi = vec3(0.0);
                     float scatter_f = 0.0;
                     float scatter_pdf = 0.0;
-                    
+                    float lobe_random = random1D(prd.seed);
                     if (medium_event.scattered) {
                         wi = li_sample.wi;
-                        scatter_f   = pf_eval_p  (medium_event.medium.phase_function, wo, wi, medium_event.medium.g, medium_event.medium.a);
-                        scatter_pdf = pf_eval_pdf(medium_event.medium.phase_function, wo, wi, medium_event.medium.g, medium_event.medium.a);
+                        scatter_f   = pf_eval_p  (medium_event.medium.phase_function, wo, wi, medium_event.medium.g, medium_event.medium.particle_size, lobe_random);
+                        scatter_pdf = pf_eval_pdf(medium_event.medium.phase_function, wo, wi, medium_event.medium.g, medium_event.medium.particle_size, lobe_random);
                     } else {
                         wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
-                        float material_random = random1D(prd.seed);
-                        scatter_f = bxdf_f(hit.material_type, wo, wi, material_random) * abs_cos_theta(wi);
-                        scatter_pdf = bxdf_pdf(hit.material_type, wo, wi, material_random);
+                        scatter_f = bxdf_f(hit.material_type, wo, wi, lobe_random) * abs_cos_theta(wi);
+                        scatter_pdf = bxdf_pdf(hit.material_type, wo, wi, lobe_random);
                     }
 
 

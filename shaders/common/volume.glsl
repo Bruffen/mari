@@ -11,7 +11,7 @@ layout(binding = 6, set = 0, scalar) uniform Volume {
     vec4  albedo;
     uint  phase_function;
     float g;
-    float a;
+    float particle_size;
     float sigma_a;
     float sigma_s;
     float temperature_multiplier;
@@ -110,7 +110,7 @@ struct Medium {
     float majorant;
     uint  phase_function;
     float g;
-    float a;
+    float particle_size;
 };
 
 #define MAX_MEDIA 8
@@ -134,17 +134,17 @@ void initialize_participating_media() {
     }
 }
 
-void medium_push(vec3 absorption_color, float absorption, float scattering, float majorant, uint phase_function, float g, float a) {
+void medium_push(vec3 absorption_color, float absorption, float scattering, float majorant, uint phase_function, float g, float particle_size) {
     if (current_medium >= MAX_MEDIA - 1) return;
     
     current_medium++;
     media[current_medium].absorption_color = absorption_color;
-    media[current_medium].phase_function = phase_function;
-    media[current_medium].absorption = absorption;
-    media[current_medium].scattering = scattering;
-    media[current_medium].majorant   = majorant;
-    media[current_medium].g          = g;
-    media[current_medium].a          = a;
+    media[current_medium].phase_function   = phase_function;
+    media[current_medium].absorption       = absorption;
+    media[current_medium].scattering       = scattering;
+    media[current_medium].majorant         = majorant;
+    media[current_medium].g                = g;
+    media[current_medium].particle_size    = particle_size;
 }
 
 void medium_push(Medium medium) {
@@ -155,7 +155,7 @@ void medium_push(Medium medium) {
         medium.majorant,
         medium.phase_function,
         medium.g,
-        medium.a
+        medium.particle_size
     );
 }
 
@@ -263,14 +263,12 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
     } 
     // Scattering
     else if (event < medium_event.n_a + medium_event.n_s) {
-        vec2 r = random2D(seed);
-
         medium_event.pf = pf_sample(
             medium_event.medium.phase_function, 
             wo, 
             medium_event.medium.g,
-            medium_event.medium.a,
-            r
+            medium_event.medium.particle_size,
+            seed
         );
         medium_event.scattered = true;
         medium_event.transmittance = vec3(0.0);
@@ -345,7 +343,7 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float tmax, ino
     medium.majorant = medium.absorption + medium.scattering;
     medium.phase_function = volume.phase_function;
     medium.g = volume.g;
-    medium.a = volume.a;
+    medium.particle_size = volume.particle_size;
     medium_push(medium);
 
     MediumEvent medium_event = delta_tracking(origin, direction, tmax, seed);
