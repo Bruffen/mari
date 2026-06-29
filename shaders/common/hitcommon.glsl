@@ -27,7 +27,7 @@ struct Hit {
     vec3 vertices[3];
     vec3 position;
     vec3 normal_s;       // Shading normal from interpolated vertex normals and normal map
-    vec3 normal_g;       // Geometric normal indicating where triangle is facing
+    vec3 normal_g;       // Geometric normal indicating the direction the triangle is facing
     vec3 tangent;
     vec3 bitangent;
     int  material_type;
@@ -99,7 +99,7 @@ Hit process_hit(Payload payload) {
     uint64_t mesh_bda  = pPrimMeshInfos.addresses[payload.instance_index];
     PrimMeshInfo prim_mesh = PrimMeshInfos(mesh_bda).p[payload.geometry_index];
 
-    Indices indices_buffer   = Indices(prim_mesh.indices_bda);
+    Indices  indices_buffer  = Indices(prim_mesh.indices_bda);
     Vertices vertices_buffer = Vertices(prim_mesh.vertices_bda);
 
     Vertex vertices[3];
@@ -108,22 +108,21 @@ Hit process_hit(Payload payload) {
         hit.vertices[i] = vertices[i].position;
     }
 
-    // Interpolate information according to barycentric coordinates
-    // TODO T interpolate_barycentric(T data[3], vec3 coords)
-    hit.position = vertices[0].position * payload.barycentrics.x + vertices[1].position * payload.barycentrics.y + vertices[2].position * payload.barycentrics.z;
-    hit.normal_s = vertices[0].normal   * payload.barycentrics.x + vertices[1].normal   * payload.barycentrics.y + vertices[2].normal   * payload.barycentrics.z;
-    hit.normal_s = normalize(hit.normal_s);
-    hit.normal_g = normalize(cross(vertices[1].position - vertices[0].position, vertices[2].position - vertices[0].position));
-    //hit.tangent = vertices[0].tangent.xyz * payload.barycentrics.x + vertices[1].tangent.xyz * payload.barycentrics.y + vertices[2].tangent.xyz * payload.barycentrics.z;
-    //hit.tangent = normalize(tri.tangent.xyz);
-    //float fsign = tri.vertices[0].tangent.w;
-    vec4 hit_color = vertices[0].color * payload.barycentrics.x + vertices[1].color * payload.barycentrics.y + vertices[2].color * payload.barycentrics.z;
-    vec2 hit_uv    = vertices[0].uv * payload.barycentrics.x + vertices[1].uv * payload.barycentrics.y + vertices[2].uv * payload.barycentrics.z;
+    // Interpolate data with barycentric coordinates
+    hit.position   = vertices[0].position * payload.barycentrics.x + vertices[1].position * payload.barycentrics.y + vertices[2].position * payload.barycentrics.z;
+    hit.normal_s   = vertices[0].normal   * payload.barycentrics.x + vertices[1].normal   * payload.barycentrics.y + vertices[2].normal   * payload.barycentrics.z;
+    vec4 tangent   = vertices[0].tangent  * payload.barycentrics.x + vertices[1].tangent  * payload.barycentrics.y + vertices[2].tangent  * payload.barycentrics.z;
+    vec4 hit_color = vertices[0].color    * payload.barycentrics.x + vertices[1].color    * payload.barycentrics.y + vertices[2].color    * payload.barycentrics.z;
+    vec2 hit_uv    = vertices[0].uv       * payload.barycentrics.x + vertices[1].uv       * payload.barycentrics.y + vertices[2].uv       * payload.barycentrics.z;
+    hit.normal_g   = normalize(cross(vertices[1].position - vertices[0].position, vertices[2].position - vertices[0].position));
+    hit.normal_s   = normalize(hit.normal_s);
+    hit.tangent    = normalize(tangent.xyz);
+    float fsign    = sign(tangent.w);
 
-    // TODO fix mikktspace tangents so we don't have to calculate them here
-    vec3 up = abs(hit.normal_s.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
-    hit.tangent = normalize(cross(up, hit.normal_s));
-    float fsign = 1.0;
+    // Alternative to mikktspace tangents
+    //vec3 up = abs(hit.normal_s.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    //hit.tangent = normalize(cross(up, hit.normal_s));
+    //float fsign = 1.0;
 
     // Transform information into world space
     hit.position  = vec3(payload.object_to_world * vec4(hit.position, 1.0));
@@ -136,6 +135,22 @@ Hit process_hit(Payload payload) {
     MaterialData material_data = Materials(prim_mesh.material_bda).m[0];
     hit.material = process_material(material_data, hit_color, hit_uv);
     hit.material_type = get_material_type(hit.material);
+
+    // Apply normal mapping
+    if (material_data.indices.normal > -1) {
+        mat3 tbn = mat3(hit.tangent, hit.bitangent, hit.normal_s);
+        
+        vec3 normal = texture(textures[nonuniformEXT(material_data.indices.normal)], hit_uv).xyz;
+        normal = normal * 2.0 - vec3(1.0);
+        // Flip from glTF +Y up convention to -Y up
+        normal.y = -normal.y;
+
+        // TODO Implement Microfacet-based Normal Mapping
+
+        hit.normal_s  = normalize(tbn * normal);
+        hit.tangent   = normalize(hit.tangent - dot(hit.tangent, hit.normal_s) * hit.normal_s);
+        hit.bitangent = cross(hit.normal_s, hit.tangent);
+    }
 
     return hit;
 }

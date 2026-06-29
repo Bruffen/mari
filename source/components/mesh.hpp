@@ -40,9 +40,6 @@ namespace mari {
             Mesh(const Mesh &) = delete;
             Mesh &operator=(const Mesh &) = delete;
 
-            static std::unique_ptr<Mesh> createModelFromFile(Device &device, const std::string &filepath);
-            static std::unique_ptr<Mesh> createCubeModel(Device& device, glm::vec3 offset);
-
             void bind(VkCommandBuffer commandBuffer);
             void draw(VkCommandBuffer commandBuffer);
             void calculateTangents();

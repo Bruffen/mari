@@ -23,7 +23,7 @@ namespace mari {
 
         this->vertices = vertices;
 
-        // TODO calculateTangents(); // This will calculate tangents in this->vertices but not in vertices!
+        calculateTangents(); // This will calculate tangents in this->vertices but not in vertices!
 
         vertexBuffer = std::make_unique<Buffer>(
             device,
