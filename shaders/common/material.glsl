@@ -1,15 +1,28 @@
 #ifndef _MATERIAL_GLSL_
 #define _MATERIAL_GLSL_
 
-struct MaterialConstants {
-    vec4  albedo;
-    float metallic;
-    float roughness;
-    float ior;
-    float thickness;
-    vec4  absorption;
+struct PhaseFunction {
+    uint  type;
+    float anisotropy;
+    float particle_size;
+};
+
+struct Medium {
+    vec3  albedo;
+    float absorption;
     float scattering;
-    vec4  emission;   // rgb for color, a for strength
+    PhaseFunction phase_function;
+    int   heterogeneous;
+};
+
+struct MaterialConstants {
+    vec4   albedo;
+    float  metallic;
+    float  roughness;
+    float  ior;
+    float  thickness;
+    Medium medium;
+    vec4   emission;   // rgb for color, a for strength
 };
 
 struct TextureIndices {

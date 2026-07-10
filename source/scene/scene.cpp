@@ -387,15 +387,15 @@ namespace mari {
             if (gltfMat.volume) {
                 // Check material.hpp for info
                 m->data.constants.thickness = 1.0; // gltfMat.volume->thicknessFactor; 
-                m->data.constants.absorption = glm::vec4(
+                m->data.constants.medium.albedo = glm::vec3(
                     gltfMat.volume->attenuationColor[0],
                     gltfMat.volume->attenuationColor[1],
-                    gltfMat.volume->attenuationColor[2],
-                    1.0f / gltfMat.volume->attenuationDistance
+                    gltfMat.volume->attenuationColor[2]
                 );
+                m->data.constants.medium.absorption = 1.0f / gltfMat.volume->attenuationDistance;
 
                 // glTF KHR_materials_volume_scatter is an upcoming extension in 4.2
-                m->data.constants.scattering = 0.0f; 
+                m->data.constants.medium.scattering = 0.0f; 
 
                 /* if (gltfMat.volume->thicknessTexture.has_value()) {
                     const fastgltf::Texture& texture = gltfTextures[gltfMat.volume->thicknessTexture.value().textureIndex];

@@ -12,7 +12,7 @@ MaterialConstants material;
 #include "common/hitcommon.glsl"
 #include "common/tonemapping.glsl"
 #include "common/light.glsl"
-#include "common/volume.glsl"
+#include "common/medium.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
@@ -54,7 +54,6 @@ void main() {
         vec3 direction  = (properties.view_inverse * vec4(normalize(target.xyz), 0)).xyz;
         vec3 radiance   = vec3(0.0);
         vec3 throughput = vec3(1.0);
-        bool is_volume  = false;
 
         float previous_pdf = 1.0;
         float eta_scale = 1.0;
@@ -62,10 +61,11 @@ void main() {
         float r_u = 1.0;
         float r_l = 1.0;
         bool is_dirac_delta = false;
+        bool inside_dielectric = false;
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             float t = tmax;
-            traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
+            traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, tmax, 0);
 
             Hit hit;
             bool hit_surface = false;
@@ -80,42 +80,40 @@ void main() {
 
             // TODO test intersections with every nanovdb bbox, get a list of results and sample them accordingly
             // Sample the participating medium
-            // if (medium) {
             MediumEvent medium_event = sample_medium_along_ray(origin, direction, t, prd.seed);
+
             // Compute throughput' at new path vertex
             //float pdf = 
             // TODO is it spectral only?
             // Compute rescaled path probability for absorption at path vertex
             //float r_e = r_u * 
 
-            // Medium delta tracking
+            // Medium interaction
             if (medium_event.terminated) {
                 break; // TODO THESIS can emission be added in both absorption and scattering events with MIS?
             }
             if (medium_event.scattered) {
-                // TODO why does emission only happen acording to the coefficient of absorption
+                // TODO why does emission only happen acording to the coefficient of absorption? Use MIS?
                 radiance += throughput * medium_event.medium.absorption * medium_event.sampl.emission; /* / r_e; */
-
-                //float pdf =
-
-                // Sample next event estimation (direct lighting)
-                // TODO
-                wo = -direction;
-
 
                 if (medium_event.pf.pdf == 0.0) 
                     break;
+
+                wo = -direction;
                 // Set values for next ray
-                origin     = origin + direction * medium_event.t;
-                direction  = medium_event.pf.wi;
-                throughput *= medium_event.sampl.albedo * medium_event.pf.p / medium_event.pf.pdf;
-                r_l = r_u / medium_event.pf.pdf;
-                previous_pdf = medium_event.pf.pdf;
-                is_dirac_delta = false;
+                origin          = origin + direction * medium_event.t;
+                direction       = medium_event.pf.wi;
+                throughput     *= medium_event.sampl.albedo;
+                r_l             = r_u / medium_event.pf.pdf;
+                previous_pdf    = medium_event.pf.pdf;
+                is_dirac_delta  = false;
+
                 // TODO light sample context?
                 //continue;
                 // TODO null scatters have to update tracking variables
-            } else if (hit_surface) {
+            } 
+            // Surface interaction
+            else if (hit_surface) {
 
                 // if (hit.material_type == MaterialType_Boundary) {} // TODO
                 
@@ -146,22 +144,37 @@ void main() {
                     break;
                 }
 
+                // TODO directly multiply transmittance if not using a multiple scattering medium technique like delta tracking
+                // ie when absorption is higher than zero, but scattering is zero
+
                 // Set values for next ray
                 throughput    *= hit.material.albedo.rgb;
                 is_dirac_delta = bxdf_sample.is_dirac_delta;
                 previous_pdf   = bxdf_sample.pdf;
                 direction      = from_local(hit.tangent, hit.bitangent, hit.normal_s, bxdf_sample.wi);
+
                 // If next ray goes inside non dielectric object, consider it absorbed
                 bool going_inside = dot(direction, hit.normal_g) < 0.0;
                 if (hit.material_type != MaterialType_Dielectric && going_inside) break;
                 origin = offset_position(hit.position, going_inside ? -hit.normal_g : hit.normal_g);
 
-                // TODO transmission, eta_scale, etc
+                // Add or remove medium in stack when entering or exiting dielectric
+                if (bxdf_sample.is_transmission) {
+                    if (going_inside) {
+                        medium_push(hit.material.medium);
+                        inside_dielectric = true;
+                    } else {
+                        medium_remove();
+                        inside_dielectric = false;
+                    }
+                    // Update eta_scale for russian roulette
+                    eta_scale *= bxdf_sample.eta; 
+                }
             }
 
             // Sample direct light
             LiSample li_sample;
-            if ((hit_surface || medium_event.scattered) && !is_dirac_delta && properties.next_event_estimation == 1) {
+            if ((hit_surface || medium_event.scattered) && !is_dirac_delta && !inside_dielectric && properties.next_event_estimation == 1) {
                 float piecewise_pdf = 1.0;
 
                 LightInfo light = sample_light(random1D(prd.seed), piecewise_pdf);
@@ -177,34 +190,29 @@ void main() {
 
                 if (li_sample.pdf > 0.0) {
                     vec3 wi = vec3(0.0);
-                    float scatter_f = 0.0;
+                    float scatter_f   = 0.0;
                     float scatter_pdf = 0.0;
                     float lobe_random = random1D(prd.seed);
                     if (medium_event.scattered) {
                         wi = li_sample.wi;
-                        scatter_f   = pf_eval_p  (medium_event.medium.phase_function, wo, wi, medium_event.medium.g, medium_event.medium.particle_size, lobe_random);
-                        scatter_pdf = pf_eval_pdf(medium_event.medium.phase_function, wo, wi, medium_event.medium.g, medium_event.medium.particle_size, lobe_random);
+                        scatter_f   = pf_eval_p  (medium_event.medium.phase_function, wo, wi, lobe_random);
+                        scatter_pdf = pf_eval_pdf(medium_event.medium.phase_function, wo, wi, lobe_random);
                     } else {
                         wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
-                        scatter_f = bxdf_f(hit.material_type, wo, wi, lobe_random) * abs_cos_theta(wi);
+                        scatter_f   = bxdf_f(hit.material_type, wo, wi, lobe_random) * abs_cos_theta(wi);
                         scatter_pdf = bxdf_pdf(hit.material_type, wo, wi, lobe_random);
                     }
-
 
                     if (scatter_f > 0.0 && scatter_pdf > 0.0) {
                         shadow_prd.visibility = false;
                         const uint shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-                        traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
+                        const float shadow_tmax = li_sample.distance - 1e-6;
+                        traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, shadow_tmax, 1);
 
                         if (shadow_prd.visibility) {
                             vec3 li_transmittance = vec3(1.0);
-                            //if (current_medium >= 0) {
-                            //    li_transmittance = get_transmittance(media[current_medium], li_sample.distance);
-                            //}
 
-
-                            // TODO weird bug with volume nee depending on the octant of direction
-                            li_transmittance = sample_medium_along_ray(origin, li_sample.wi, li_sample.distance, prd.seed).transmittance;
+                            li_transmittance = sample_transmittance_along_ray(origin, li_sample.wi, shadow_tmax, prd.seed);
 
                             float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;
@@ -213,10 +221,13 @@ void main() {
                 }
             }
 
+            // Apply bounce throughput for next ray
             if (medium_event.scattered) {
+                // Phase Function
+                throughput *= medium_event.pf.p / medium_event.pf.pdf;
                 continue;
             } else if (hit_surface) {
-                // Apply bxdf
+                // Bxdf
                 if (bxdf_sample.pdf == 0.0) {
                     throughput *= 0.0;
                 } else {
@@ -224,7 +235,6 @@ void main() {
                     r_l = r_u / bxdf_sample.pdf;
                 }
             }
-
 
             // Miss. Sample environment map
             if (!hit_surface) {
@@ -239,7 +249,7 @@ void main() {
                 break;            
             }
 
-            // Apply russian roulette
+            // Russian roulette
             float probability = max(max(throughput.r, throughput.g), throughput.b) * eta_scale;
             if (properties.russian_roulette == 1 && probability < 1.0 && depth > 3) {
                 

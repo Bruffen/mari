@@ -123,7 +123,7 @@ namespace mari {
             ImGui::Text("========================");
 #endif
             imGuiFramerate(frameInfo.deltaTime);
-            ImGui::Text("Samples: %i", frameInfo.frameCounter);
+            ImGui::Text("Samples: %i", frameInfo.frameCounter + 1);
             ImGui::Text("Triangle count: %i", triangleCount);
 
             ImGui::BeginChild("TabChild", ImVec2(0, 0), ImGuiChildFlags_None);
@@ -336,6 +336,36 @@ namespace mari {
         ImGui::Indent(-20.0f);
     }
 
+    void Gui::imGuiMedium(Medium &medium) {
+        ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
+        ImGui::ColorEdit3("Albedo", (float*)&medium.albedo, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::SliderFloat("Absorption", (float*)&medium.absorption, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
+        ImGui::SliderFloat("Scattering", (float*)&medium.scattering, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
+        const char* phaseFunctions[] = { "Isotropic", "Rayleigh", "HenyeyGreenstein", "Mie Approximation" };
+        const char* selectedPhaseFunction = phaseFunctions[medium.phaseFunction.type];
+
+        // TODO create a function for phase functions and use it in both imGuiVolume() and imGuiMaterial()
+        if (ImGui::BeginCombo("Phase Function", selectedPhaseFunction, 0)) {
+            for (int n = 0; n < IM_ARRAYSIZE(phaseFunctions); n++) {
+                const bool isSelected = (medium.phaseFunction.type == n);
+                if (ImGui::Selectable(phaseFunctions[n], isSelected)) {
+                    medium.phaseFunction.type = static_cast<PhaseFunctionType>(n);
+                }
+
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (medium.phaseFunction.type == PhaseFunctionType::HenyeyGreenstein) {
+            ImGui::SliderFloat("Anisotropy g", (float*)&medium.phaseFunction.anisotropy, -0.999f, 0.999f, "%.3f", silderFlags);
+        }
+        if (medium.phaseFunction.type == PhaseFunctionType::MieApproximation) {
+            ImGui::SliderFloat("Particle size", (float*)&medium.phaseFunction.particleSize, 0.0f, 50.0f, "%.3f", silderFlags);
+        }
+    }
+
     void Gui::imGuiMaterial(Material &material) {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
@@ -359,22 +389,14 @@ namespace mari {
             ImGui::Indent(10.0f);
             ImGui::SliderFloat("Thickness", (float*)&material.data.constants.thickness, 0.0f, 1.0f, "%1.0f", silderFlags);
             ImGui::SliderFloat("Refraction Index", (float*)&material.data.constants.ior, 1.0f, 3.0f, "%.3f", silderFlags);
-            ImGui::ColorEdit4("Absorption", (float*)&material.data.constants.absorption, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-            ImGui::SliderFloat("Scattering", (float*)&material.data.constants.scattering, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
+            imGuiMedium(material.data.constants.medium);
             ImGui::Indent(-10.0f);
         }
         ImGui::Indent(-10.0f);
         ImGui::PopID();
 
 
-        if (mc.albedo       != material.data.constants.albedo       || 
-            mc.metallic     != material.data.constants.metallic     || 
-            mc.roughness    != material.data.constants.roughness    ||
-            mc.emission     != material.data.constants.emission     ||
-            mc.thickness    != material.data.constants.thickness    ||
-            mc.ior          != material.data.constants.ior          ||
-            mc.absorption   != material.data.constants.absorption   ||
-            mc.scattering   != material.data.constants.scattering) {
+        if (mc != material.data.constants) {
             inputChanged = true;
             scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
         }
@@ -409,64 +431,29 @@ namespace mari {
     void Gui::imGuiVolume(Volume &volume) {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
-        glm::vec4 albedo = volume.albedo;
-        float g = volume.anisotropy_g;
-        float a = volume.particleSize;
-        float sigma_a = volume.sigma_a;
-        float sigma_s = volume.sigma_s;
+        Medium m = volume.medium;
         float temperature = volume.temperatureMultiplier;
         float emissiveness = volume.emissivenessMultiplier;
         float jittering = volume.jitteringAmount;
-        PhaseFunction pf = volume.phaseFunction;
 
         ImGui::PushID("##volume");
         ImGui::Indent(20.0f);
-        
-        ImGui::ColorEdit4("Albedo", (float*)&volume.albedo, ImGuiColorEditFlags_Float);
-        ImGui::DragFloat("Sigma_a", (float*)&volume.sigma_a, 0.001f, 0.0f, 1000.0f);
-        ImGui::DragFloat("Sigma_s", (float*)&volume.sigma_s, 0.001f, 0.0f, 1000.0f);
+
+        imGuiMedium(volume.medium);
         if (volume.hasTemperature()) {
             ImGui::DragFloat("Temperature multiplier", (float*)&volume.temperatureMultiplier, 0.01f, 0.0f, 10000.0f);
             ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.emissivenessMultiplier, 0.01f, 0.0f, 1000.0f);
         }
         ImGui::DragFloat("Jittering amount", (float*)&volume.jitteringAmount, 0.01f, 0.0f, 10000.0f);
 
-        const char* phaseFunctions[] = { "Isotropic", "Rayleigh", "HenyeyGreenstein", "Mie Approximation" };
-        const char* selectedPhaseFunction = phaseFunctions[volume.phaseFunction];
-
-        if (ImGui::BeginCombo("Phase Function", selectedPhaseFunction, 0)) {
-            for (int n = 0; n < IM_ARRAYSIZE(phaseFunctions); n++) {
-                const bool isSelected = (volume.phaseFunction == n);
-                if (ImGui::Selectable(phaseFunctions[n], isSelected)) {
-                    volume.phaseFunction = static_cast<PhaseFunction>(n);
-                }
-
-                if (isSelected) {
-                    ImGui::SetItemDefaultFocus();
-                }
-            }
-            ImGui::EndCombo();
-        }
-
-        if (volume.phaseFunction == PhaseFunction::HenyeyGreenstein) {
-            ImGui::SliderFloat("Anisotropy g", (float*)&volume.anisotropy_g, -0.999f, 0.999f, "%.3f", silderFlags);
-        }
-        if (volume.phaseFunction == PhaseFunction::MieApproximation) {
-            ImGui::SliderFloat("Particle size", (float*)&volume.particleSize, 0.0f, 50.0f, "%.3f", silderFlags);
-        }
 
         ImGui::Indent(-20.0f);
         ImGui::PopID();
 
-        if (albedo       != volume.albedo                   || 
-            g            != volume.anisotropy_g             || 
-            a            != volume.particleSize             || 
-            sigma_a      != volume.sigma_a                  || 
-            sigma_s      != volume.sigma_s                  ||
+        if (m            != volume.medium                   ||
             temperature  != volume.temperatureMultiplier    ||
             emissiveness != volume.emissivenessMultiplier   ||
-            jittering    != volume.jitteringAmount          ||
-            pf           != volume.phaseFunction
+            jittering    != volume.jitteringAmount
         ) {
             inputChanged = true;
         }

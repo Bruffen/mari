@@ -61,12 +61,7 @@ namespace mari {
     struct VolumeUbo {
         uint64_t densityBufferBDA;
         uint64_t temperatureBufferBDA;
-        glm::vec4 albedo;
-        PhaseFunction phaseFunction;
-        float g;
-        float particleSize;
-        float sigma_a;
-        float sigma_s;
+        Medium medium;
         float temperatureMultiplier;
         float emissivenessMultiplier;
         float jitteringAmount;

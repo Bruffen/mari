@@ -1,6 +1,7 @@
 #pragma once
 
 #include "image.hpp"
+#include "scene/participating_media.hpp"
 
 #include <glm/vec4.hpp>
 #include <memory>
@@ -64,15 +65,14 @@ namespace mari {
         // yet a material with transmission of 1 can be both thin walled and a volume
         // and thickness value is used to tell them apart, so we set it to 1 when it's a volume
         float                       thickness = 0.0f;
-        glm::vec4                   absorption; // xyz color, w coefficient
-        float                       scattering;
-        // TODO phase function params
+        Medium                      medium;
 
         // KHR_materials_anisotropy // TODO convert from gltf anisotropy parameters to pbrt's
         //float                       anisotropyStrength = 0.0f;
         //float                       anisotropyRotation = 0.0f; 
 
         glm::vec4                   emission;   // rgb color, a strength
+        auto operator<=>(const MaterialConstants&) const = default;
     };
 
     struct TextureIndices {

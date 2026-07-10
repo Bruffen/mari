@@ -8,6 +8,10 @@ namespace mari {
     bool isOpenvdbInitialized = false; // TODO static member
 
     Volume::Volume(Device &device, std::string filepath) {
+        medium.absorption = 0.0f;
+        medium.scattering = 1.0f;
+        medium.heterogeneous = 1;
+
         if (!isOpenvdbInitialized) {
             openvdb::initialize(); 
             isOpenvdbInitialized = true;
@@ -39,8 +43,8 @@ namespace mari {
         } while (densityIter.next());
 
         // Adjust sigma values to correspond to density range
-        sigma_a *= maxDensity;
-        sigma_s *= maxDensity;
+        medium.absorption *= maxDensity;
+        medium.scattering *= maxDensity;
 
         // Normalize the density if needed
         if (maxDensity != 1.0f && maxDensity > 0.0f) {
@@ -90,7 +94,7 @@ namespace mari {
     // and copies the whole nanovdb buffer to the device!!!
     // Very inefficient!!!
     // TODO Store the nanovdb grid instead, figure out how to modify its transform
-    // and also where and how to copy to the device only the transform
+    // and also where and how to copy only the transform to the device
     void Volume::setTransform(const Transform &transform) {
         auto vdbMat4 = openvdb::v12_1::math::Mat4d();
         vdbMat4.setIdentity();

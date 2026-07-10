@@ -12,7 +12,7 @@ MaterialConstants material;
 #include "common/hitcommon.glsl"
 #include "common/tonemapping.glsl"
 #include "common/light.glsl"
-#include "common/volume.glsl"
+#include "common/medium.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
@@ -86,15 +86,7 @@ void main() {
                 //origin = hit.position + direction * 0.001;
                 origin = offset_position(hit.position, entering ? -hit.normal_g : hit.normal_g);
                 if (entering) {
-                    medium_push(
-                        hit.material.absorption.rgb,
-                        hit.material.absorption.w,
-                        hit.material.scattering,
-                        hit.material.absorption.w + hit.material.scattering,
-                        0,
-                        0.0,
-                        0.0
-                    );
+                    medium_push(hit.material.medium);
                 } else {
                     // Process transmission from existing medium
                     if (current_medium >= 0) {
@@ -151,15 +143,7 @@ void main() {
             // Add or remove medium in stack when entering or exiting dielectric
             if (bxdf_sample.is_transmission) {
                 if (going_inside) {
-                    medium_push(
-                        hit.material.absorption.rgb,
-                        hit.material.absorption.w,
-                        hit.material.scattering,
-                        hit.material.absorption.w + hit.material.scattering,
-                        0,
-                        0.0,
-                        0.0
-                    );
+                    medium_push(hit.material.medium);
                 } else {
                     medium_remove();
                 }

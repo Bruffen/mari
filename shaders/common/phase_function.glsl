@@ -3,6 +3,7 @@
 
 #include "math.glsl"
 #include "sampling.glsl"
+#include "material.glsl"
 
 #define PhaseFunctionType_Isotropic 0
 #define PhaseFunctionType_Rayleigh 1
@@ -212,38 +213,38 @@ PhaseFunctionSample pf_mie_approximate_sample(vec3 wo, float particle_size, vec3
  ****************************************************************
  */
 
-float pf_eval_p(uint id, vec3 wo, vec3 wi, float g, float particle_size, float random) {
-    switch (id) {
+float pf_eval_p(PhaseFunction pf, vec3 wo, vec3 wi, float random) {
+    switch (pf.type) {
         default:
             return pf_isotropic_p();
         case PhaseFunctionType_HenyeyGreenstein:
-            return pf_henyey_greenstein_p(wo, wi, g);
+            return pf_henyey_greenstein_p(wo, wi, pf.anisotropy);
         case PhaseFunctionType_Mie_Approximation:
-            return pf_mie_approximate_p(wo, wi, particle_size, random);
+            return pf_mie_approximate_p(wo, wi, pf.particle_size, random);
     }
 }
 
-float pf_eval_pdf(uint id, vec3 wo, vec3 wi, float g, float particle_size, float random) {
-    switch (id) {
+float pf_eval_pdf(PhaseFunction pf, vec3 wo, vec3 wi, float random) {
+    switch (pf.type) {
         default:
             return pf_isotropic_pdf();
         case PhaseFunctionType_HenyeyGreenstein:
-            return pf_henyey_greenstein_pdf(wo, wi, g);
+            return pf_henyey_greenstein_pdf(wo, wi, pf.anisotropy);
         case PhaseFunctionType_Mie_Approximation:
-            return pf_mie_approximate_pdf(wo, wi, particle_size, random);
+            return pf_mie_approximate_pdf(wo, wi, pf.particle_size, random);
     }
 }
 
-PhaseFunctionSample pf_sample(uint id, vec3 wo, float g, float particle_size, inout uint seed) {
+PhaseFunctionSample pf_sample(PhaseFunction pf, vec3 wo, inout uint seed) {
     vec2 random = random2D(seed);
 
-    switch (id) {
+    switch (pf.type) {
         default:
             return pf_isotropic_sample(random);
         case PhaseFunctionType_HenyeyGreenstein:
-            return pf_henyey_greenstein_sample(wo, g, random);
+            return pf_henyey_greenstein_sample(wo, pf.anisotropy, random);
         case PhaseFunctionType_Mie_Approximation:
-            return pf_mie_approximate_sample(wo, particle_size, vec3(random, random1D(seed)));
+            return pf_mie_approximate_sample(wo, pf.particle_size, vec3(random, random1D(seed)));
     }
 }
 

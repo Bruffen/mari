@@ -32,6 +32,7 @@ namespace mari {
             bool imGuiTransform(Transform &transform);
             void imGuiMesh(const Mesh &mesh);
             void imGuiSubMesh(const PrimMesh &submesh);
+            void imGuiMedium(Medium &medium);
             void imGuiMaterial(Material &material);
             void imGuiImage(const Image &image);
             void imGuiCamera(Camera &camera);

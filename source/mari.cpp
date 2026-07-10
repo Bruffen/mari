@@ -175,6 +175,7 @@ namespace mari {
 
             if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
+                frameCounter = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
                 FrameInfo frameInfo {
                     frameIndex,
                     frameCounter,
@@ -191,7 +192,6 @@ namespace mari {
                     RayTracingUbo ubo{};
                     ubo.viewInverse         = scene->currentCamera->camera->getInverseView();
                     ubo.projInverse         = scene->currentCamera->camera->getInverseProjection();
-                    frameCounter            = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
                     ubo.frameCount          = frameCounter;
                     ubo.maxDepth            = rayTracingSystem.maxDepth;
                     ubo.frameAccumulation   = static_cast<int>(rayTracingSystem.frameAccumulation);
@@ -235,12 +235,7 @@ namespace mari {
                         VolumeUbo volumeUbo = {
                             scene->volumeObject->volume->getDensityDeviceAddress(),
                             scene->volumeObject->volume->getTemperatureDeviceAddress(),
-                            scene->volumeObject->volume->albedo,
-                            scene->volumeObject->volume->phaseFunction,
-                            scene->volumeObject->volume->anisotropy_g,
-                            scene->volumeObject->volume->particleSize,
-                            scene->volumeObject->volume->sigma_a,
-                            scene->volumeObject->volume->sigma_s,
+                            scene->volumeObject->volume->medium,
                             scene->volumeObject->volume->temperatureMultiplier,
                             scene->volumeObject->volume->emissivenessMultiplier,
                             scene->volumeObject->volume->jitteringAmount
@@ -310,7 +305,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  9  ) {
+        switch (  6  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -338,8 +333,8 @@ namespace mari {
                 break;
             case 6:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
                 break;
             case 7:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
@@ -351,6 +346,7 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/AttenuationTest/glTF-Binary/AttenuationTest.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/NormalTangentTest/glTF-Binary/NormalTangentTest.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb");
                 break;
             case 9:
@@ -362,22 +358,24 @@ namespace mari {
                 break;
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-MediumLight.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-MediumLight.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-BigLight.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/ship_zoom.glb");
                 break;
             case 12:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/lightning.glb");
-                scene->nodes.at("Cube")->transform.localMatrix *= 30.0f;
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Bruff_Lightning.glb");
+                break;
+            case 13:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/landscapes/snowy_mountain_landscape.glb");
                 break;
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
@@ -386,6 +384,7 @@ namespace mari {
         std::vector<std::shared_ptr<InfiniteAreaLight>> lights{};
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageWhite32f(), 1));
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
+        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/citrus_orchard_road_puresky_1k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "citrus_orchard_road_puresky_1k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
@@ -400,7 +399,7 @@ namespace mari {
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rosendal_park_sunset_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rosendal_park_sunset_puresky_4k")));
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rustig_koppie_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rustig_koppie_puresky_4k")));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sun_only.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sun_only")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sun_only.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sun_only")));
 
         //gui->saveImageFromData((void *)lights[0]->imageBuffer->getMappedMemory(), 4096, 4096, 4, true);
 
@@ -420,19 +419,18 @@ namespace mari {
             node->light = l;
             scene->lightObjects.emplace_back(node);
         }
-
+/*
         scene->volumeObject = std::make_shared<Node>("volume");
-        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_quarter.vdb");
+        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_sixteenth.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/fire.vdb"); 
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb");
         scene->volumeObject->transform.scale *= 0.005f;
-        scene->volumeObject->volume->sigma_s *= 80.0f;
+        scene->volumeObject->volume->medium.scattering *= 80.0f;
         scene->volumeObject->volume->jitteringAmount = 0.0f;
-        scene->volumeObject->volume->phaseFunction = PhaseFunction::MieApproximation;
-        scene->volumeObject->volume->particleSize = 20.0f;
-
+        scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
+        scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;
         // cornell box transformation
         //scene->volumeObject->transform.position = glm::vec3(0.05f, -0.47f, 0.2f);
         //scene->volumeObject->transform.scale = glm::vec3(0.017f, 0.024f, 0.013f);
@@ -440,7 +438,8 @@ namespace mari {
         //scene->volumeObject->volume->jitteringAmount = 1.6f;
         
         scene->addNode(scene->volumeObject);
-
+*/
+        
 
 
         scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
