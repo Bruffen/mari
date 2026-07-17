@@ -205,6 +205,7 @@ namespace mari {
 
                 shadersClosestHit.push_back("../../shaders/spv/pathtracer.rchit.spv");
                 shadersAnyHit.push_back("../../shaders/spv/pathtracer.rahit.spv");
+                shadersAnyHit.push_back("../../shaders/spv/shadow.rahit.spv");
                 
                 shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
                 shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");
@@ -219,6 +220,7 @@ namespace mari {
 
                 shadersClosestHit.push_back("../../shaders/spv/pathtracer.rchit.spv");
                 shadersAnyHit.push_back("../../shaders/spv/pathtracer.rahit.spv");
+                shadersAnyHit.push_back("../../shaders/spv/shadow_volumetric.rahit.spv");
                 
                 shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
                 shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");

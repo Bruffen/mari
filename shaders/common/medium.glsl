@@ -7,16 +7,16 @@
 #include "phase_function.glsl"
 #include "volume_nanovdb.glsl"
 
-#define MAX_MEDIA 8
+#define MAX_MEDIA 4
 Medium media[MAX_MEDIA];
 int current_medium = -1;
 
 Medium get_medium_empty() {
-    return Medium(vec3(0.0), 0.0, 0.0, PhaseFunction(0, 0.0, 0.0), 0);
+    return Medium(vec3(0.0), 0.0, 0.0, PhaseFunction(0, 0.0, 0.0), false);
 }
 
 Medium get_medium_error() {
-    return Medium(ERROR_COLOR / 1000.0, 5.0, 5.0, PhaseFunction(0, 0.0, 0.0), 0);
+    return Medium(ERROR_COLOR / 1000.0, 5.0, 5.0, PhaseFunction(0, 0.0, 0.0), false);
 }
 
 void initialize_participating_media() {
@@ -50,18 +50,17 @@ void medium_remove() {
     }
 }
 
+// Beer's law directly
 vec3 get_transmittance(Medium medium, float distance) {
     float attenuation = medium.absorption + medium.scattering;
     if (attenuation <= 0.0) return vec3(1.0);
 
-    // Apply beer's law directly
-    //return pow(albedo, vec3(distance / attenuation));
-    return exp(-attenuation * (vec3(1.0) - medium.albedo) * distance);
+    return vec3(exp(-attenuation * distance));
 }
 
-float get_transmittance(float majorant, float distance) {
-    if (majorant <= 0.0) return 1.0;
-    return exp(-majorant * distance);
+float get_transmittance(float attenuation, float distance) {
+    if (attenuation <= 0.0) return 1.0;
+    return exp(-attenuation * distance);
 }
 
 struct MediumSample {
@@ -106,7 +105,7 @@ MediumEvent get_medium_event_empty() {
 }
 
 MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant) {
-    if (medium.heterogeneous == 0) {
+    if (!medium.heterogeneous) {
         //if (length(position) < 0.1) {
         return MediumSample(medium.albedo, medium.absorption, medium.scattering, vec3(0.0));
         //} else {
@@ -190,13 +189,11 @@ MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
     return medium_event;
 }
 
-vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float t, inout uint seed) {
+vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     vec3 transmittance = vec3(1.0);
     direction = normalize(direction);
 
-    float tmin = 1e-6;
-    float tmax = t;
-    bool  done = false;
+    tmin = max(1e-6, tmin);
     bool  to_remove_medium = false;
 
     if (current_medium < 0) {
@@ -225,14 +222,16 @@ vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float t, inout 
         to_remove_medium = true;
     }
 
-    if (medium_get().heterogeneous == 1) {
-        transmittance = delta_tracking(origin, direction, tmin, tmax, seed).transmittance;
-    } else {
-        transmittance = get_transmittance(medium_get(), tmax - tmin);
-    }
+    if (current_medium >= 0) {
+        if (medium_get().heterogeneous) {
+            transmittance = delta_tracking(origin, direction, tmin, tmax, seed).transmittance;
+        } else {
+            transmittance = get_transmittance(medium_get(), tmax - tmin);
+        }
 
-    if (to_remove_medium) {
-        medium_remove();
+        if (to_remove_medium) {
+            medium_remove();
+        }
     }
     return transmittance;
 }

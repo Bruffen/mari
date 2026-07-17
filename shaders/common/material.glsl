@@ -12,7 +12,7 @@ struct Medium {
     float absorption;
     float scattering;
     PhaseFunction phase_function;
-    int   heterogeneous;
+    bool  heterogeneous;
 };
 
 struct MaterialConstants {

@@ -194,9 +194,9 @@ namespace mari {
                     ubo.projInverse         = scene->currentCamera->camera->getInverseProjection();
                     ubo.frameCount          = frameCounter;
                     ubo.maxDepth            = rayTracingSystem.maxDepth;
-                    ubo.frameAccumulation   = static_cast<int>(rayTracingSystem.frameAccumulation);
-                    ubo.russianRoulette     = static_cast<int>(rayTracingSystem.russianRoulette);
-                    ubo.nextEventEstimation = static_cast<int>(rayTracingSystem.nextEventEstimation);
+                    ubo.frameAccumulation   = static_cast<VkBool32>(rayTracingSystem.frameAccumulation);
+                    ubo.russianRoulette     = static_cast<VkBool32>(rayTracingSystem.russianRoulette);
+                    ubo.nextEventEstimation = static_cast<VkBool32>(rayTracingSystem.nextEventEstimation);
                     ubo.exposure            = rayTracingSystem.exposure;
                     ubo.tonemapper          = rayTracingSystem.tonemapper;
                     ubo.samplesPerPixel     = rayTracingSystem.samplesPerPixel;

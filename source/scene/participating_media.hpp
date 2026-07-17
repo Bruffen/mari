@@ -20,7 +20,7 @@ namespace mari {
         float                       absorption = 0.0f;
         float                       scattering = 0.0f;
         PhaseFunction               phaseFunction;
-        int                         heterogeneous = 0;
+        VkBool32                    heterogeneous = false;
         auto operator<=>(const Medium&) const = default;
     };
 }

@@ -28,20 +28,20 @@ layout(binding = 3, set = 0, scalar) uniform Properties {
     int   max_depth;
     float exposure;
     int   tonemapper;
-    int   frame_accumulation;
-    int   russian_roulette;
-    int   next_event_estimation;
+    bool  frame_accumulation;
+    bool  russian_roulette;
+    bool  next_event_estimation;
     int   samples_per_pixel;
 } properties;
 
 void main() {
     prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, properties.frame_count);
+    shadow_prd.seed = prd.seed;
     vec3 result = vec3(0.0);
-
-    initialize_participating_media();
 
     const float tmin = 0.0;
     const float tmax = 10000.0;
+    const uint  shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 
     for (int sample_count = 0; sample_count < properties.samples_per_pixel; sample_count++) {
         const vec2 pixel_jitter = random2D(prd.seed);
@@ -67,7 +67,7 @@ void main() {
                 vec3 le = sample_Le_infinite(direction, uv);
 
                 float mis_weight = 1.0;
-                if (!is_dirac_delta && depth != 0 && properties.next_event_estimation == 1) {
+                if (!is_dirac_delta && depth != 0 && properties.next_event_estimation) {
                     mis_weight = power_heuristic(previous_pdf, pdf_light_infinite(uv));
                 }
 
@@ -79,25 +79,6 @@ void main() {
             material = hit.material; // TODO remove global material
             const float distance = length(hit.position - origin);
 
-            // Hit a volume boundary. Keep going without interacting.
-            if (hit.material_type == MaterialType_Boundary) {
-                bool entering = dot(direction, -hit.normal_g) > 0.0;
-
-                //origin = hit.position + direction * 0.001;
-                origin = offset_position(hit.position, entering ? -hit.normal_g : hit.normal_g);
-                if (entering) {
-                    medium_push(hit.material.medium);
-                } else {
-                    // Process transmission from existing medium
-                    if (current_medium >= 0) {
-                        throughput *= get_transmittance(media[current_medium], distance);
-                    }
-                    medium_remove();
-                }
-
-                continue;
-            }
-
             // Render backfaces
             if (dot(direction, hit.normal_g) > 0.0 && hit.material_type != MaterialType_Dielectric) {
                 flip_orientation(hit);
@@ -107,7 +88,7 @@ void main() {
 
             // Sample indirect light
             if (is_emissive) {
-                if (depth == 0 || is_dirac_delta || properties.next_event_estimation == 0) {
+                if (depth == 0 || is_dirac_delta || properties.next_event_estimation) {
                     // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
                     radiance += throughput * hit.material.emission.rgb;
                 }
@@ -135,25 +116,14 @@ void main() {
             if (hit.material_type != MaterialType_Dielectric && going_inside) break;
             origin = offset_position(hit.position, going_inside ? -hit.normal_g : hit.normal_g);
 
-            // Process transmission from existing medium
-            if (current_medium >= 0) {
-                throughput *= get_transmittance(media[current_medium], distance);
-            }
-
-            // Add or remove medium in stack when entering or exiting dielectric
+            // Update eta_scale for russian roulette
             if (bxdf_sample.is_transmission) {
-                if (going_inside) {
-                    medium_push(hit.material.medium);
-                } else {
-                    medium_remove();
-                }
-                // Update eta_scale for russian roulette
                 eta_scale *= bxdf_sample.eta; 
             }
 
             // Sample direct light
             LiSample li_sample;
-            if (!is_dirac_delta && properties.next_event_estimation == 1) {
+            if (!is_dirac_delta && properties.next_event_estimation) {
                 float piecewise_pdf = 1.0;
 
                 LightInfo light = sample_light(random1D(prd.seed), piecewise_pdf);
@@ -176,16 +146,11 @@ void main() {
 
                     if (bxdf_f > 0.0 && bxdf_pdf > 0.0) {
                         shadow_prd.visibility = false;
-                        const uint shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-                        traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
+                        traceRayEXT(tlas, shadow_flags, 0xff, 1, 32 /*TODO bring SBT stride from host*/, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
 
                         if (shadow_prd.visibility) {
-                            vec3 li_transmittance = vec3(1.0);
-                            if (current_medium >= 0) {
-                                li_transmittance = get_transmittance(media[current_medium], li_sample.distance);
-                            }
                             float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf);
-                            radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
+                            radiance += throughput * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
                         }
                     }
                 }
@@ -218,7 +183,7 @@ void main() {
 
             // Apply russian roulette
             float probability = max(max(throughput.r, throughput.g), throughput.b) * eta_scale;
-            if (properties.russian_roulette == 1 && probability < 1.0 && depth > 3) {
+            if (properties.russian_roulette && probability < 1.0 && depth > 3) {
                 
                 if (random1D(prd.seed) > probability) {
                     break;
@@ -235,7 +200,7 @@ void main() {
     if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = ERROR_COLOR;
     if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = ERROR_COLOR;
 
-    if (properties.frame_accumulation == 1) {
+    if (properties.frame_accumulation) {
         // Load existing accumulated color
         vec4 previous_color = vec4(0.0);
         if (properties.frame_count > 0) {

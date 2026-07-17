@@ -9,7 +9,7 @@
 #include "common/hitcommon.glsl"
 #include "common/sampling.glsl"
 
-layout(location = 0) rayPayloadInEXT Payload prd;
+layout(location = 1) rayPayloadInEXT ShadowPayload prd;
 hitAttributeEXT vec2 attribs;
 
 void main() {
@@ -19,6 +19,7 @@ void main() {
 
     float alpha = material.constants.albedo.a;
     if (material.indices.albedo < 0 && alpha >= 1.0) {
+        terminateRayEXT;
         return;
     }
 
@@ -37,5 +38,7 @@ void main() {
 
     if(random1D(prd.seed) > alpha) {
         ignoreIntersectionEXT;
+    } else {
+        terminateRayEXT;
     }
 }

@@ -17,6 +17,36 @@ struct Payload {
 
 struct ShadowPayload {
     bool visibility;
+    uint seed;
 };
+
+struct VolumeBoundaryHits {
+    float t;
+    uint64_t material_bda;
+};
+
+#define SHADOW_VOLUMETRIC_MAX_HITS 8
+
+struct ShadowVolumetricPayload {
+    bool visibility;
+    uint seed;
+    uint hit_count;
+    VolumeBoundaryHits hits[SHADOW_VOLUMETRIC_MAX_HITS];
+};
+
+// Insertion sort
+void sort_hits(inout VolumeBoundaryHits hits[SHADOW_VOLUMETRIC_MAX_HITS], uint count) {
+    for (int i = 0; i < count; i++) {
+        VolumeBoundaryHits k = hits[i];
+        int j = i - 1;
+
+        while (j >= 0 && hits[j].t > k.t) {
+            hits[j + 1] = hits[j];
+            j--;
+        }
+
+        hits[j + 1] = k;
+    }
+}
 
 #endif // _RAY_COMMON_GLSL_

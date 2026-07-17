@@ -31,9 +31,9 @@ namespace mari {
         int maxDepth;
         float exposure;
         int tonemapper;
-        int frameAccumulation;
-        int russianRoulette;
-        int nextEventEstimation;
+        VkBool32 frameAccumulation;
+        VkBool32 russianRoulette;
+        VkBool32 nextEventEstimation;
         int samplesPerPixel;
     };
 

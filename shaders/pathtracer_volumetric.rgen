@@ -20,7 +20,7 @@ layout(binding = 2, set = 0, rgba8) uniform image2D present_image;
 layout(binding = 8, set = 0) uniform sampler2D textures[];
 
 layout(location = 0) rayPayloadEXT Payload prd;
-layout(location = 1) rayPayloadEXT ShadowPayload shadow_prd;
+layout(location = 1) rayPayloadEXT ShadowVolumetricPayload shadow_prd;
 
 layout(binding = 3, set = 0, scalar) uniform Properties {
     mat4  view_inverse;
@@ -29,20 +29,22 @@ layout(binding = 3, set = 0, scalar) uniform Properties {
     int   max_depth;
     float exposure;
     int   tonemapper;
-    int   frame_accumulation;
-    int   russian_roulette;
-    int   next_event_estimation;
+    bool  frame_accumulation;
+    bool  russian_roulette;
+    bool  next_event_estimation;
     int   samples_per_pixel;
 } properties;
 
 void main() {
     prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, properties.frame_count);
+    shadow_prd.seed = prd.seed;
     vec3 result = vec3(0.0);
 
     const float tmin = 0.0;
     const float tmax = 10000.0;
+    const uint  shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 
-    initialize_participating_media();
+    initialize_participating_media(); // TODO make it a #define so non volumetric path tracer does not need to allocate media stuff
 
     for (int sample_count = 0; sample_count < properties.samples_per_pixel; sample_count++) {
         const vec2 pixel_jitter = random2D(prd.seed);
@@ -115,7 +117,18 @@ void main() {
             // Surface interaction
             else if (hit_surface) {
 
-                // if (hit.material_type == MaterialType_Boundary) {} // TODO
+                // Hit a volume boundary. Keep going without interacting.
+                if (hit.material_type == MaterialType_Boundary) {
+                    bool entering = dot(direction, -hit.normal_g) > 0.0;
+
+                    origin = offset_position(hit.position, entering ? -hit.normal_g : hit.normal_g);
+                    if (entering) {
+                        medium_push(hit.material.medium);
+                    } else {
+                        medium_remove();
+                    }
+                    continue;
+                }
                 
                 // Render backfaces
                 if (dot(direction, hit.normal_g) > 0.0 && hit.material_type != MaterialType_Dielectric) {
@@ -126,7 +139,7 @@ void main() {
 
                 // Sample indirect light
                 if (is_emissive) {
-                    if (depth == 0 || is_dirac_delta || properties.next_event_estimation == 0) {
+                    if (depth == 0 || is_dirac_delta || properties.next_event_estimation) {
                         // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
                         radiance += throughput * hit.material.emission.rgb;
                     }                 
@@ -174,7 +187,7 @@ void main() {
 
             // Sample direct light
             LiSample li_sample;
-            if ((hit_surface || medium_event.scattered) && !is_dirac_delta && !inside_dielectric && properties.next_event_estimation == 1) {
+            if ((hit_surface || medium_event.scattered) && !is_dirac_delta && /*!inside_dielectric &&*/ properties.next_event_estimation) {
                 float piecewise_pdf = 1.0;
 
                 LightInfo light = sample_light(random1D(prd.seed), piecewise_pdf);
@@ -205,14 +218,42 @@ void main() {
 
                     if (scatter_f > 0.0 && scatter_pdf > 0.0) {
                         shadow_prd.visibility = false;
-                        const uint shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+                        shadow_prd.hit_count = 0;
                         const float shadow_tmax = li_sample.distance - 1e-6;
-                        traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, shadow_tmax, 1);
+
+                        traceRayEXT(tlas, shadow_flags, 0xff, 1, 32 /*TODO bring SBT stride from host*/, 1, origin, tmin, li_sample.wi, shadow_tmax, 1);
 
                         if (shadow_prd.visibility) {
                             vec3 li_transmittance = vec3(1.0);
 
-                            li_transmittance = sample_transmittance_along_ray(origin, li_sample.wi, shadow_tmax, prd.seed);
+                            // Volume Boundary Meshes
+                            if (shadow_prd.hit_count > 0) {
+                                sort_hits(shadow_prd.hits, shadow_prd.hit_count);
+
+                                // If amount of boundary hits is even, it means the ray starts outside of a medium
+                                // therefore skip the first section of the ray for transmittance calculation
+                                int   start = shadow_prd.hit_count % 2 == 0 ? 1 : 0;
+                                float stmin = 0.0;
+                                float stmax = shadow_tmax;
+
+                                for (int i = start; i < shadow_prd.hit_count; i += 2) {
+                                    medium_push(get_material(shadow_prd.hits[i].material_bda).constants.medium);
+
+                                    if (i == 0) {
+                                        stmax = shadow_prd.hits[i].t;
+                                    } else {
+                                        stmax = shadow_prd.hits[i].t;
+                                        stmin = shadow_prd.hits[i - 1].t;
+                                    }
+
+                                    if (stmax - stmin > 0.0) {
+                                        li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed);
+                                    }
+                                    medium_remove();
+                                }
+                            }
+                            // NanoVDB
+                            //li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, 0.0, shadow_tmax, prd.seed);
 
                             float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;
@@ -241,7 +282,7 @@ void main() {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
                 float mis_weight = 1.0;
-                if (!is_dirac_delta && depth != 0 && properties.next_event_estimation == 1) {
+                if (!is_dirac_delta && depth != 0 && properties.next_event_estimation) {
                     mis_weight = power_heuristic(previous_pdf, pdf_light_infinite(uv));
                 }
 
@@ -251,7 +292,7 @@ void main() {
 
             // Russian roulette
             float probability = max(max(throughput.r, throughput.g), throughput.b) * eta_scale;
-            if (properties.russian_roulette == 1 && probability < 1.0 && depth > 3) {
+            if (properties.russian_roulette && probability < 1.0 && depth > 3) {
                 
                 if (random1D(prd.seed) > probability) {
                     break;
@@ -269,7 +310,7 @@ void main() {
     if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = ERROR_COLOR;
     if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = ERROR_COLOR;
 
-    if (properties.frame_accumulation == 1) {
+    if (properties.frame_accumulation) {
         // Load existing accumulated color
         vec4 previous_color = vec4(0.0);
         if (properties.frame_count > 0) {

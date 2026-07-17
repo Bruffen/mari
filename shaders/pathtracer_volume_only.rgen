@@ -25,9 +25,9 @@ layout(binding = 3, set = 0, scalar) uniform Properties {
     int   max_depth;
     float exposure;
     int   tonemapper;
-    int   frame_accumulation;
-    int   russian_roulette;
-    int   next_event_estimation;
+    bool  frame_accumulation;
+    bool  russian_roulette;
+    bool  next_event_estimation;
     int   samples_per_pixel;
 } properties;
 
@@ -102,7 +102,7 @@ void main() {
     if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = ERROR_COLOR;
     if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = ERROR_COLOR;
 
-    if (properties.frame_accumulation == 1) {
+    if (properties.frame_accumulation) {
         // Load existing accumulated color
         vec4 previous_color = vec4(0.0);
         if (properties.frame_count > 0) {

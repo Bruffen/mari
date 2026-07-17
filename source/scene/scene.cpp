@@ -195,7 +195,6 @@ namespace mari {
     }   
 
     void Scene::loadMeshes(const fastgltf::Asset &gltf) {
-
         std::vector<uint32_t> indices;
         std::vector<Mesh::Vertex> vertices;
 
@@ -307,7 +306,7 @@ namespace mari {
     void Scene::loadMaterials(const std::vector<fastgltf::Material> &gltfMaterials, const std::vector<fastgltf::Texture> &gltfTextures) {
         for (const fastgltf::Material& gltfMat : gltfMaterials) {
             std::shared_ptr<Material> m = std::make_shared<Material>();
-            m->name                     = gltfMat.name.empty() ? "mari_unnamed_material" : gltfMat.name.c_str();
+            m->name = gltfMat.name.empty() ? "mari_unnamed_material" : gltfMat.name.c_str();
             
             if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque)  m->transparent = true;
 
@@ -396,15 +395,6 @@ namespace mari {
 
                 // glTF KHR_materials_volume_scatter is an upcoming extension in 4.2
                 m->data.constants.medium.scattering = 0.0f; 
-
-                /* if (gltfMat.volume->thicknessTexture.has_value()) {
-                    const fastgltf::Texture& texture = gltfTextures[gltfMat.volume->thicknessTexture.value().textureIndex];
-                    if (texture.imageIndex.has_value()) {
-                        size_t img = texture.imageIndex.value();
-                        m->textures.thickness = images[img];
-                        m->data.indices.thickness = static_cast<int32_t>(img);
-                    }
-                } */
             }
 
             materials.emplace_back(m);

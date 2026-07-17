@@ -69,6 +69,10 @@ vec3 offset_position(vec3 position, vec3 normal)
     );
 }
 
+MaterialData get_material(uint64_t bda) {
+    return Materials(bda).m[0];
+}
+
 MaterialConstants process_material(MaterialData data, vec4 color, vec2 uv) {
     MaterialConstants mc = data.constants;
     mc.albedo     *= color;
@@ -132,7 +136,7 @@ Hit process_hit(Payload payload) {
     hit.bitangent = cross(hit.normal_s, hit.tangent) * fsign;
 
     // Process material
-    MaterialData material_data = Materials(prim_mesh.material_bda).m[0];
+    MaterialData material_data = get_material(prim_mesh.material_bda);
     hit.material = process_material(material_data, hit_color, hit_uv);
     hit.material_type = get_material_type(hit.material);
 

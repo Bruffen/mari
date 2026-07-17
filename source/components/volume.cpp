@@ -10,7 +10,7 @@ namespace mari {
     Volume::Volume(Device &device, std::string filepath) {
         medium.absorption = 0.0f;
         medium.scattering = 1.0f;
-        medium.heterogeneous = 1;
+        medium.heterogeneous = true;
 
         if (!isOpenvdbInitialized) {
             openvdb::initialize(); 
