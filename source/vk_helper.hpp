@@ -10,7 +10,6 @@ namespace mari {
     extern PFN_vkGetAccelerationStructureBuildSizesKHR    vkGetAccelerationStructureBuildSizesKHR;
     extern PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
     extern PFN_vkCmdBuildAccelerationStructuresKHR        vkCmdBuildAccelerationStructuresKHR;
-    extern PFN_vkBuildAccelerationStructuresKHR           vkBuildAccelerationStructuresKHR;
     extern PFN_vkCmdTraceRaysKHR                          vkCmdTraceRaysKHR;
     extern PFN_vkGetRayTracingShaderGroupHandlesKHR       vkGetRayTracingShaderGroupHandlesKHR;
     extern PFN_vkCreateRayTracingPipelinesKHR             vkCreateRayTracingPipelinesKHR;

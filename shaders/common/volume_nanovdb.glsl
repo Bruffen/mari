@@ -96,4 +96,25 @@ vec2 sample_volume_nano(vec3 position) {
     return data;
 }
 
+bool test_intersection_volume_nano(vec3 origin, vec3 direction, inout float tmin, inout float tmax) {
+    tmin = max(1e-6, tmin);
+
+    float tmax_surface = tmax;
+    bool hit = pnanovdb_hdda_ray_clip(
+        volume_nano.density.bbox_min,
+        volume_nano.density.bbox_max,
+        origin,
+        tmin,
+        direction,
+        tmax
+    );
+    // Handling impossible cases
+    if (tmax < 0.0)  hit = false; 
+    if (tmin < 1e-6) hit = false;
+    if (tmin > tmax) hit = false;
+    tmax = min(tmax_surface, tmax);
+
+    return hit;
+}
+
 #endif //_VOLUME_NANOVDB_GLSL_

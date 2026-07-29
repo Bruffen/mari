@@ -98,7 +98,7 @@ namespace mari {
 
     /**
      * Copies the specified data to a buffer only in device memory. 
-     * A staging buffer in host memory is used as a intermediary to perform the copy.
+     * A staging buffer in host memory is used as an intermediary to perform the copy.
      * 
      * @param data Pointer to the data to copy
      */

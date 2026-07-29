@@ -63,15 +63,6 @@ namespace mari {
     }
 
     void KeyboardController::handleInput(GLFWwindow *window) {
-        if (glfwGetKey(window, keys.changePipeline) == GLFW_PRESS) {
-            changePipelinePressed = true;
-        }
-        if (glfwGetKey(window, keys.changePipeline) == GLFW_RELEASE && changePipelinePressed) {
-            changePipelinePressed = false;
-            isRaytracing = !isRaytracing;
-            resetFrame = true;
-        }
-
         if (glfwGetKey(window, keys.hideshowGui) == GLFW_PRESS && !hideshowGuiPressed) {
             gui.isActive = !gui.isActive;
             hideshowGuiPressed = true;

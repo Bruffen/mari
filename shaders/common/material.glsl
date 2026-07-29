@@ -23,6 +23,7 @@ struct MaterialConstants {
     float  thickness;
     Medium medium;
     vec4   emission;   // rgb for color, a for strength
+    bool   dielectric_nee_cheat;
 };
 
 struct TextureIndices {

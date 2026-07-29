@@ -10,9 +10,7 @@ namespace mari {
     Node::Node() : Node("") {}
 
     void Node::start(const glm::mat4& parent) {
-        // TODO fix and replace with transform.mat4(); 
-        // localMatrix is currently assigned from gltf loading and ignores scale, position and rotation values from transform
-        worldMatrix = parent * transform.localMatrix; 
+        worldMatrix = parent * transform.mat4(); 
         for (auto &child : children) {
             child->start(worldMatrix);
         }
@@ -33,21 +31,13 @@ namespace mari {
             camera->update(transform, parent);
         }
 
+        worldMatrix = parent * transform.mat4();
         for (auto &child : children) {
-            child->update(parent);
+            child->update(worldMatrix);
         }
     }
 
     void Node::render() {
 
-    }
-
-    Node Node::makePointLight(float intensity, float radius, glm::vec3 color) {
-        Node node = Node();
-        node.color = color;
-        node.transform.scale.x = radius;
-        node.pointLight = std::make_unique<PointLightComponent>();
-        node.pointLight->lightIntensity = intensity;
-        return node;
     }
 }

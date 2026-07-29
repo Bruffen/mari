@@ -191,46 +191,12 @@ MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
 
 vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     vec3 transmittance = vec3(1.0);
-    direction = normalize(direction);
-
-    tmin = max(1e-6, tmin);
-    bool  to_remove_medium = false;
-
-    if (current_medium < 0) {
-        float tmax_surface = tmax;
-        bool hit = pnanovdb_hdda_ray_clip(
-            volume_nano.density.bbox_min,
-            volume_nano.density.bbox_max,
-            origin,
-            tmin,
-            direction,
-            tmax
-        );
-        // Handling impossible cases
-        if (tmax < 0.0)  hit = false; 
-        if (tmin < 1e-6) hit = false;
-        if (tmin > tmax) hit = false;
-        tmax = min(tmax_surface, tmax);
-
-        if (!hit) {
-            // TODO don't terminate since there can be a bigger non vdb medium, like fog, that needs to be sampled
-            return vec3(1.0); 
-        }
-
-        // Push volume_nano data into array of media
-        medium_push(volume.medium);
-        to_remove_medium = true;
-    }
 
     if (current_medium >= 0) {
         if (medium_get().heterogeneous) {
             transmittance = delta_tracking(origin, direction, tmin, tmax, seed).transmittance;
         } else {
             transmittance = get_transmittance(medium_get(), tmax - tmin);
-        }
-
-        if (to_remove_medium) {
-            medium_remove();
         }
     }
     return transmittance;
@@ -246,7 +212,7 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float t, inout 
     bool  done = false;
     bool  to_remove_medium = false;
 
-    if (current_medium < 0) {
+    if (current_medium < 0) { // TODO replace with test_intersection_volume_nano() to ray gen shader
         float tmax_surface = tmax;
         bool hit = pnanovdb_hdda_ray_clip(
             volume_nano.density.bbox_min,

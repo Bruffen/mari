@@ -35,8 +35,6 @@ namespace mari {
 
             void update(GLFWwindow *window, float deltatime, Node &node);
             bool checkFrameAccumulationReset();
-            bool isRayTracingOn() { return isRaytracing; }
-
         private:
             void moveCamera(GLFWwindow *window, float deltatime, Node &node);
             void rotateCamera(GLFWwindow *window, float deltatime, Node &node);
@@ -48,9 +46,7 @@ namespace mari {
             float moveSpeed{1.0f};
             float currentSpeed{moveSpeed};
             float lookSpeed{0.002f};
-            bool  changePipelinePressed = false;// TODO
             bool  resetFrame = false;
-            bool  isRaytracing = true;
             bool  hideshowGuiPressed = false;
     };
     

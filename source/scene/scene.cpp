@@ -123,11 +123,6 @@ namespace mari {
                     newNode->transform.position = tl;
                     newNode->transform.rotation = glm::eulerAngles(rot);
                     newNode->transform.scale    = sc;
-
-                    newNode->transform.localMatrix = 
-                        glm::translate(glm::mat4(1.0f), tl) *
-                        glm::mat4(rot) *
-                        glm::scale(glm::mat4(1.0f), sc);
                 } },
                 node.transform
             );
@@ -308,7 +303,8 @@ namespace mari {
             std::shared_ptr<Material> m = std::make_shared<Material>();
             m->name = gltfMat.name.empty() ? "mari_unnamed_material" : gltfMat.name.c_str();
             
-            if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque)  m->transparent = true;
+            if (gltfMat.alphaMode != fastgltf::AlphaMode::Opaque)
+                m->transparent = true;
 
             // PBR data
             m->data.constants.albedo.x  = gltfMat.pbrData.baseColorFactor[0];

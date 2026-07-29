@@ -19,7 +19,7 @@ void main() {
     MaterialData material = get_material(primMeshInfo.material_bda);
 
     uint material_type = get_material_type(material.constants);
-    if (material_type == MaterialType_Boundary || material_type == MaterialType_Dielectric) {
+    if (material_type == MaterialType_Boundary || (material_type == MaterialType_Dielectric && material.constants.dielectric_nee_cheat)) {
         prd.hit_count++;
         if (prd.hit_count <= SHADOW_VOLUMETRIC_MAX_HITS) {
             prd.hits[prd.hit_count - 1].t = gl_HitTEXT;

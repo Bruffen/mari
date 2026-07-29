@@ -221,11 +221,16 @@ namespace mari {
 
     void Gui::imGuiInspector(Node &g) {
         ImGui::Text(("ID: " + std::to_string(g.getId())).c_str());
-        if (imGuiTransform(g.transform) && g.volume) {
-            if (g.transform.scale.x == 0.0) g.transform.scale.x = 0.00001f;
-            if (g.transform.scale.y == 0.0) g.transform.scale.y = 0.00001f;
-            if (g.transform.scale.z == 0.0) g.transform.scale.z = 0.00001f;
-            g.setVolumeTransform();
+        bool update = imGuiTransform(g.transform);
+        if (update) {
+            if (g.volume) {
+                if (g.transform.scale.x == 0.0) g.transform.scale.x = 0.00001f;
+                if (g.transform.scale.y == 0.0) g.transform.scale.y = 0.00001f;
+                if (g.transform.scale.z == 0.0) g.transform.scale.z = 0.00001f;
+                g.setVolumeTransform();
+            } else {
+                system.needsUpdate = true;
+            }
         }
         if (g.mesh) {
             imGuiMesh(*g.mesh);
@@ -337,6 +342,10 @@ namespace mari {
     }
 
     void Gui::imGuiMedium(Medium &medium) {
+        if (system.getIntegrator() == Integrator::PATH_TRACING) {
+            return;
+        }
+
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
         ImGui::ColorEdit3("Albedo", (float*)&medium.albedo, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
         ImGui::SliderFloat("Absorption", (float*)&medium.absorption, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
@@ -389,12 +398,47 @@ namespace mari {
             ImGui::Indent(10.0f);
             ImGui::SliderFloat("Thickness", (float*)&material.data.constants.thickness, 0.0f, 1.0f, "%1.0f", silderFlags);
             ImGui::SliderFloat("Refraction Index", (float*)&material.data.constants.ior, 1.0f, 3.0f, "%.3f", silderFlags);
+            bool dnc = material.data.constants.dielectricNeeCheat;
+            ImGui::Checkbox("NEE Cheat", &dnc);
+            material.data.constants.dielectricNeeCheat = dnc;
             imGuiMedium(material.data.constants.medium);
             ImGui::Indent(-10.0f);
         }
         ImGui::Indent(-10.0f);
         ImGui::PopID();
 
+        if (material.data.constants.albedo.a != mc.albedo.a) {
+            // Is now opaque
+            if (material.data.constants.albedo.a == 1.0f) { 
+                system.needsRebuild = true;
+            }
+            // Was opaque and is now transparent
+            else if (mc.albedo.a == 1.0f) {                  
+                system.needsRebuild = true;
+            }
+        }
+
+        // Is now a volume boundary
+        if (material.data.constants.ior == 1.0 && mc.ior > 1.0f) {
+            if (!material.data.constants.dielectricNeeCheat) {
+                system.needsRebuild = true;
+            }
+        }
+        
+        // Is no longer a volume boundary
+        if (material.data.constants.ior > 1.0 && mc.ior == 1.0f) {
+            if (!material.data.constants.dielectricNeeCheat) {
+                system.needsRebuild = true;
+            }
+        }
+
+        if (material.data.constants.dielectricNeeCheat != mc.dielectricNeeCheat) {
+            system.needsRebuild = true;
+        }
+
+        if (material.data.constants.thickness != mc.thickness) {
+            system.needsRebuild = true;
+        }
 
         if (mc != material.data.constants) {
             inputChanged = true;
@@ -429,6 +473,10 @@ namespace mari {
     }
 
     void Gui::imGuiVolume(Volume &volume) {
+        if (system.getIntegrator() == Integrator::PATH_TRACING) {
+            return;
+        }
+
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
         Medium m = volume.medium;
@@ -493,7 +541,7 @@ namespace mari {
 
             // Tonemapping
             ImGui::DragFloat("Exposure", &system.exposure, 0.01f, 0.0f, 10000.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
-            const char* tonemappers[] = { "None", "ACES", "AgX" };
+            const char* tonemappers[] = { "None", "Gamma", "ACES", "AgX" };
             const char* selectedTonemapper = tonemappers[system.tonemapper];
     
             if (ImGui::BeginCombo("Tonemapper", selectedTonemapper, 0)) {

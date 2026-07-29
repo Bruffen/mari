@@ -31,11 +31,10 @@ namespace mari {
     }
 
     void RayTracingSystem::buildScene(const Scene &scene) {
-        // TODO reuse the same blas if the object's geometry is the same
-        for (auto const &[id, object] : scene.nodes) {
-            if (object->mesh) {
-                VkTransformMatrixKHR transformMatrix = vkhelper::glmToVkMatrix(object->worldMatrix);
-                buildBLAS(*object->mesh, transformMatrix, scene.materialDataBuffer->deviceAddress());
+        // TODO reuse the same blas if the node's geometry is the same
+        for (auto const &[id, node] : scene.nodes) {
+            if (node->mesh) {
+                buildBLAS(node, scene.materialDataBuffer->deviceAddress());
             }
         }
         
@@ -76,41 +75,51 @@ namespace mari {
         createAreaLights(scene);
     }
 
-    void RayTracingSystem::buildBLAS(const Mesh &mesh, VkTransformMatrixKHR transformMatrix, uint64_t materialBufferDeviceAddress) {
+    void RayTracingSystem::buildBLAS(const std::shared_ptr<Node> node, uint64_t materialBufferDeviceAddress) {
         auto blas = std::make_unique<AccelerationStructure>(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
-        blas->transformMatrix = transformMatrix;
+        blas->node = node;
 
         std::vector<uint32_t> triangleCounts{};
         std::vector<VkAccelerationStructureGeometryKHR> geometries{};
         std::vector<VkAccelerationStructureBuildRangeInfoKHR> buildRangeInfos{};
         std::vector<VkAccelerationStructureBuildRangeInfoKHR *> pBuildRangeInfos{};
 
-        triangleCounts.reserve(mesh.primMeshes.size());
-        geometries.reserve(mesh.primMeshes.size());
-        buildRangeInfos.reserve(mesh.primMeshes.size());
-        pBuildRangeInfos.reserve(mesh.primMeshes.size());
+        triangleCounts.reserve(node->mesh->primMeshes.size());
+        geometries.reserve(node->mesh->primMeshes.size());
+        buildRangeInfos.reserve(node->mesh->primMeshes.size());
+        pBuildRangeInfos.reserve(node->mesh->primMeshes.size());
 
         // Create geometries per primMesh so we can index materials by gl_GeometryIndexEXT
-        for (const PrimMesh &primMesh : mesh.primMeshes) {
+        for (const PrimMesh &primMesh : node->mesh->primMeshes) {
             // Set device adresses for buffers
             VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
             VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
             
-            vertexBufferDeviceAddress.deviceAddress = mesh.vertexBuffer->deviceAddress();
-            indexBufferDeviceAddress.deviceAddress  = mesh.indexBuffer->deviceAddress() + primMesh.start * sizeof(uint32_t);
+            vertexBufferDeviceAddress.deviceAddress = node->mesh->vertexBuffer->deviceAddress();
+            indexBufferDeviceAddress.deviceAddress  = node->mesh->indexBuffer->deviceAddress() + primMesh.start * sizeof(uint32_t);
+
+            // Optimize geometry flags for the material
+            VkGeometryFlagsKHR geometryFlags;
+            if ((primMesh.material->data.constants.thickness == 1.0f && 
+                    (primMesh.material->data.constants.ior == 1.0f || primMesh.material->data.constants.dielectricNeeCheat)) ||
+                (primMesh.material->transparent || primMesh.material->data.constants.albedo.a < 1.0f)) {
+                geometryFlags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
+            } else {
+                geometryFlags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+            }
 
             // Set geometry info
             VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
-            accelerationStructureGeometry.sType                            = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-            accelerationStructureGeometry.flags                            = primMesh.material->transparent ? 0 : VK_GEOMETRY_OPAQUE_BIT_KHR;
-            accelerationStructureGeometry.geometryType                     = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-            accelerationStructureGeometry.geometry.triangles.sType         = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-            accelerationStructureGeometry.geometry.triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
-            accelerationStructureGeometry.geometry.triangles.vertexData    = vertexBufferDeviceAddress;
-            accelerationStructureGeometry.geometry.triangles.vertexStride  = sizeof(Mesh::Vertex);
-            accelerationStructureGeometry.geometry.triangles.maxVertex     = mesh.vertexCount - 1;
-            accelerationStructureGeometry.geometry.triangles.indexType     = VK_INDEX_TYPE_UINT32;
-            accelerationStructureGeometry.geometry.triangles.indexData     = indexBufferDeviceAddress;            
+            accelerationStructureGeometry.sType                           = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+            accelerationStructureGeometry.flags                           = geometryFlags;
+            accelerationStructureGeometry.geometryType                    = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+            accelerationStructureGeometry.geometry.triangles.sType        = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+            accelerationStructureGeometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+            accelerationStructureGeometry.geometry.triangles.vertexData   = vertexBufferDeviceAddress;
+            accelerationStructureGeometry.geometry.triangles.vertexStride = sizeof(Mesh::Vertex);
+            accelerationStructureGeometry.geometry.triangles.maxVertex    = node->mesh->vertexCount - 1;
+            accelerationStructureGeometry.geometry.triangles.indexType    = VK_INDEX_TYPE_UINT32;
+            accelerationStructureGeometry.geometry.triangles.indexData    = indexBufferDeviceAddress;
 
             // Set build size info
             const uint32_t triangleCount = primMesh.count / 3;
@@ -146,7 +155,7 @@ namespace mari {
         int i = 0;
         for (auto& blas : blases) {
             VkAccelerationStructureInstanceKHR accelerationStructureInstance{};
-            accelerationStructureInstance.transform = blas->transformMatrix;
+            accelerationStructureInstance.transform = vkhelper::glmToVkMatrix(blas->node->worldMatrix);
             accelerationStructureInstance.instanceCustomIndex = 0;
             accelerationStructureInstance.mask = 0xFF;
             accelerationStructureInstance.instanceShaderBindingTableRecordOffset = 0;
@@ -156,17 +165,17 @@ namespace mari {
             asInstances.push_back(accelerationStructureInstance);
         }
 
-        Buffer instancesBuffer{
+        accelerationStructuresInstancesBuffer = std::make_unique<Buffer>(
             device,
             sizeof(VkAccelerationStructureInstanceKHR),
             static_cast<uint32_t>(asInstances.size()),
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        };
-        instancesBuffer.stageToBuffer((void*) asInstances.data());
+        );
+        accelerationStructuresInstancesBuffer->stageToBuffer((void*) asInstances.data());
 
         VkDeviceOrHostAddressConstKHR instancesBufferDeviceAddress{};
-        instancesBufferDeviceAddress.deviceAddress = instancesBuffer.deviceAddress();
+        instancesBufferDeviceAddress.deviceAddress = accelerationStructuresInstancesBuffer->deviceAddress();
 
         VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
         accelerationStructureGeometry.sType                              = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -188,10 +197,52 @@ namespace mari {
        tlas->build(&accelerationStructureGeometry, 1, &primitiveCount, pBuildRangeInfos.data());
     }
 
+    void RayTracingSystem::updateTLAS() { /* TODO code is the same as above except for buffer creation and tlas call, move everything else to a function*/
+        std::vector<VkAccelerationStructureInstanceKHR> asInstances;
+        asInstances.reserve(blases.size());
+
+        int i = 0;
+        for (auto& blas : blases) {
+            VkAccelerationStructureInstanceKHR accelerationStructureInstance{};
+            accelerationStructureInstance.transform = vkhelper::glmToVkMatrix(blas->node->worldMatrix);
+            accelerationStructureInstance.instanceCustomIndex = 0;
+            accelerationStructureInstance.mask = 0xFF;
+            accelerationStructureInstance.instanceShaderBindingTableRecordOffset = 0;
+            accelerationStructureInstance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+            accelerationStructureInstance.accelerationStructureReference = blas->deviceAddress;
+
+            asInstances.push_back(accelerationStructureInstance);
+        }
+        accelerationStructuresInstancesBuffer->stageToBuffer((void*) asInstances.data());
+        
+        VkDeviceOrHostAddressConstKHR instancesBufferDeviceAddress{};
+        instancesBufferDeviceAddress.deviceAddress = accelerationStructuresInstancesBuffer->deviceAddress();
+
+        VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
+        accelerationStructureGeometry.sType                              = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        accelerationStructureGeometry.geometryType                       = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+        accelerationStructureGeometry.flags                              = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        accelerationStructureGeometry.geometry.instances.sType           = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+        accelerationStructureGeometry.geometry.instances.arrayOfPointers = VK_FALSE;
+        accelerationStructureGeometry.geometry.instances.data            = instancesBufferDeviceAddress;
+
+        const uint32_t primitiveCount = static_cast<uint32_t>(asInstances.size());
+
+        VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
+        accelerationStructureBuildRangeInfo.primitiveCount  = primitiveCount;
+        accelerationStructureBuildRangeInfo.primitiveOffset = 0;
+        accelerationStructureBuildRangeInfo.firstVertex     = 0;
+        accelerationStructureBuildRangeInfo.transformOffset = 0;
+        std::vector<VkAccelerationStructureBuildRangeInfoKHR*> pBuildRangeInfos = { &accelerationStructureBuildRangeInfo };
+
+        tlas->update(&accelerationStructureGeometry, pBuildRangeInfos.data());
+    }
+
     void RayTracingSystem::buildPipeline(VkDescriptorSetLayout descriptorSetLayout, Integrator integrator) {
         auto descriptorSetLayouts = std::vector<VkDescriptorSetLayout>{descriptorSetLayout};
         pipelineLayout = std::make_unique<PipelineLayout>(device, &descriptorSetLayouts);
         pipeline = std::make_unique<Pipeline>(device);
+        this->integrator = integrator;
         
         std::vector<std::string> shadersRayGeneration{};
         std::vector<std::string> shadersClosestHit{};
@@ -269,6 +320,24 @@ namespace mari {
         );
 
         lightsBuffer->stageToBuffer(lights.data());
+    }
+
+    void RayTracingSystem::update(const Scene &scene) {
+        if (needsRebuild) {
+            blases.clear();
+            for (auto const &[id, node] : scene.nodes) {
+                if (node->mesh) {
+                    buildBLAS(node, scene.materialDataBuffer->deviceAddress());
+                }
+            }
+            buildTLAS();
+            needsRebuild = false;
+        }
+
+        if (needsUpdate) {
+            updateTLAS();
+            needsUpdate = false;
+        }
     }
 
     void RayTracingSystem::render(FrameInfo &frameInfo, Swapchain &swapchain) {

@@ -31,14 +31,12 @@ namespace mari {
             void render();
 
             const uint32_t                              getId() { return id; }
-            static Node                                 makePointLight(float intensity = 10.0f, float radius = 0.1f, glm::vec3 color = glm::vec3(1.0f));
             void                                        setVolumeTransform() { volume->setTransform(transform); }
 
             std::string                                 name        = "";
-            glm::vec3                                   color       {};         // TODO delete
             glm::mat4                                   worldMatrix {1.0f};     // World values
             Transform                                   transform   {};         // local values
-            bool                                        isStatic    {true};
+            bool                                        isStatic    {false};
 
             // Optional pointer components
             std::weak_ptr<Node>                         parent;
@@ -47,8 +45,6 @@ namespace mari {
             std::shared_ptr<Camera>                     camera;
             std::shared_ptr<Light>                      light;
             std::unique_ptr<Volume>                     volume;
-            std::unique_ptr<PointLightComponent>        pointLight = nullptr;
-
         private:
             uint32_t id;
     };

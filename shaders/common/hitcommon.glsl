@@ -115,18 +115,18 @@ Hit process_hit(Payload payload) {
     // Interpolate data with barycentric coordinates
     hit.position   = vertices[0].position * payload.barycentrics.x + vertices[1].position * payload.barycentrics.y + vertices[2].position * payload.barycentrics.z;
     hit.normal_s   = vertices[0].normal   * payload.barycentrics.x + vertices[1].normal   * payload.barycentrics.y + vertices[2].normal   * payload.barycentrics.z;
-    vec4 tangent   = vertices[0].tangent  * payload.barycentrics.x + vertices[1].tangent  * payload.barycentrics.y + vertices[2].tangent  * payload.barycentrics.z;
+    //vec4 tangent   = vertices[0].tangent  * payload.barycentrics.x + vertices[1].tangent  * payload.barycentrics.y + vertices[2].tangent  * payload.barycentrics.z;
     vec4 hit_color = vertices[0].color    * payload.barycentrics.x + vertices[1].color    * payload.barycentrics.y + vertices[2].color    * payload.barycentrics.z;
     vec2 hit_uv    = vertices[0].uv       * payload.barycentrics.x + vertices[1].uv       * payload.barycentrics.y + vertices[2].uv       * payload.barycentrics.z;
     hit.normal_g   = normalize(cross(vertices[1].position - vertices[0].position, vertices[2].position - vertices[0].position));
     hit.normal_s   = normalize(hit.normal_s);
-    hit.tangent    = normalize(tangent.xyz);
-    float fsign    = sign(tangent.w);
+    //hit.tangent    = normalize(tangent.xyz);
+    //float fsign    = sign(tangent.w);
 
     // Alternative to mikktspace tangents
-    //vec3 up = abs(hit.normal_s.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
-    //hit.tangent = normalize(cross(up, hit.normal_s));
-    //float fsign = 1.0;
+    vec3 up = abs(hit.normal_s.z) < 0.99999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    hit.tangent = normalize(cross(up, hit.normal_s));
+    float fsign = 1.0;
 
     // Transform information into world space
     hit.position  = vec3(payload.object_to_world * vec4(hit.position, 1.0));

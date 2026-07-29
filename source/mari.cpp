@@ -5,8 +5,6 @@
 #include "buffer.hpp"
 #include "components/camera.hpp"
 #include "keyboard_controller.hpp"
-#include "systems/simple_render_system.hpp"
-#include "systems/point_light_system.hpp"
 #include "systems/ray_tracing_system.hpp"
 
 #include "components/volume.hpp"
@@ -34,10 +32,7 @@ namespace mari {
         gui->set(scene);
 
         globalPool = DescriptorPool::Builder(device)
-            .setMaxSets(Swapchain::MAX_FRAMES_IN_FLIGHT * 2)
-            // Rasterization
-            .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT)
-            // Ray Tracing
+            .setMaxSets(Swapchain::MAX_FRAMES_IN_FLIGHT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, Swapchain::MAX_FRAMES_IN_FLIGHT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, Swapchain::MAX_FRAMES_IN_FLIGHT)
             .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Swapchain::MAX_FRAMES_IN_FLIGHT * 3)
@@ -47,19 +42,12 @@ namespace mari {
             .build();
     }
 
-    Mari::~Mari() {
-        DefaultObjects::cleanup(device);
-    }
-
     void Mari::run() { 
-        std::vector<std::unique_ptr<Buffer>> rasterizationUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         std::vector<std::unique_ptr<Buffer>> rayTracingUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         std::vector<std::unique_ptr<Buffer>> infiniteLightUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         std::vector<std::unique_ptr<Buffer>> lightUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         std::vector<std::unique_ptr<Buffer>> volumeUboBuffers{Swapchain::MAX_FRAMES_IN_FLIGHT};
         for (int i = 0; i < Swapchain::MAX_FRAMES_IN_FLIGHT; i++) {
-            rasterizationUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(RasterizationUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-            rasterizationUboBuffers[i]->map();
             rayTracingUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(RayTracingUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             rayTracingUboBuffers[i]->map();
             infiniteLightUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(InfiniteLightUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
@@ -69,10 +57,6 @@ namespace mari {
             volumeUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(VolumeUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             volumeUboBuffers[i]->map();
         }
-
-        DescriptorSetLayout rasterizationSetLayout = DescriptorSetLayout::Builder(device)
-            .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS)
-            .build();
 
         /* TODO create different descriptor set for stuff that doesn't change every frame
          * 0 -> Top-Level Acceleration Structure
@@ -99,16 +83,6 @@ namespace mari {
                             // TODO if image count == 1, call VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER instead of variable descriptor
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
-
-        std::vector<VkDescriptorSet> rasterizationDescriptorSets(Swapchain::MAX_FRAMES_IN_FLIGHT);
-        for (int i = 0; i < rasterizationDescriptorSets.size(); i++) {
-            DescriptorWriter(rasterizationSetLayout, *globalPool)
-                .writeBuffer(0, rasterizationUboBuffers[i]->descriptorInfo())
-                .build(rasterizationDescriptorSets[i]);
-        }
-
-        SimpleRenderSystem simpleRenderSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout.handle()};
-        PointLightSystem pointLightSystem{device, renderer.getSwapchainRenderPass(), rasterizationSetLayout.handle()};
         
         rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC);
 
@@ -173,6 +147,23 @@ namespace mari {
             controller.update(window.getGLFWwindow(), deltaTime, *scene->currentCamera);
             scene->update();
 
+            bool rebuild = rayTracingSystem.needsRebuild;
+            // Wait until the trace rays command is over before rebuilding the acceleration structure in use
+            if (rebuild) {
+                // TODO implementation actual synchronization or double buffering the acceleration struture
+                vkDeviceWaitIdle(device.handle()); 
+            }
+
+            rayTracingSystem.update(*scene);
+
+            if (rebuild) {
+                for (int i = 0; i < rayTracingDescriptorSets.size(); i++) {
+                    DescriptorWriter(rayTracingSetLayout, *globalPool)
+                        .writeAccelerationStructure(0, rayTracingSystem.tlas->descriptor())
+                        .overwrite(rayTracingDescriptorSets[i]);
+                }
+            }
+
             if (auto commandBuffer = renderer.beginFrame()) {
                 int frameIndex = renderer.getFrameIndex();
                 frameCounter = controller.checkFrameAccumulationReset() ? 0 : frameCounter;
@@ -183,88 +174,68 @@ namespace mari {
                     elapsedTime,
                     commandBuffer,
                     *scene->currentCamera,
-                    controller.isRayTracingOn() ? rayTracingDescriptorSets[frameIndex] : rasterizationDescriptorSets[frameIndex],
+                    rayTracingDescriptorSets[frameIndex],
                     scene->nodes
                 };
 
-                if (controller.isRayTracingOn()) {
-                    // update
-                    RayTracingUbo ubo{};
-                    ubo.viewInverse         = scene->currentCamera->camera->getInverseView();
-                    ubo.projInverse         = scene->currentCamera->camera->getInverseProjection();
-                    ubo.frameCount          = frameCounter;
-                    ubo.maxDepth            = rayTracingSystem.maxDepth;
-                    ubo.frameAccumulation   = static_cast<VkBool32>(rayTracingSystem.frameAccumulation);
-                    ubo.russianRoulette     = static_cast<VkBool32>(rayTracingSystem.russianRoulette);
-                    ubo.nextEventEstimation = static_cast<VkBool32>(rayTracingSystem.nextEventEstimation);
-                    ubo.exposure            = rayTracingSystem.exposure;
-                    ubo.tonemapper          = rayTracingSystem.tonemapper;
-                    ubo.samplesPerPixel     = rayTracingSystem.samplesPerPixel;
-                    rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
-                    rayTracingUboBuffers[frameIndex]->flush();
+                // update
+                RayTracingUbo ubo{};
+                ubo.viewInverse         = scene->currentCamera->camera->getInverseView();
+                ubo.projInverse         = scene->currentCamera->camera->getInverseProjection();
+                ubo.frameCount          = frameCounter;
+                ubo.maxDepth            = rayTracingSystem.maxDepth;
+                ubo.frameAccumulation   = static_cast<VkBool32>(rayTracingSystem.frameAccumulation);
+                ubo.russianRoulette     = static_cast<VkBool32>(rayTracingSystem.russianRoulette);
+                ubo.nextEventEstimation = static_cast<VkBool32>(rayTracingSystem.nextEventEstimation);
+                ubo.exposure            = rayTracingSystem.exposure;
+                ubo.tonemapper          = rayTracingSystem.tonemapper;
+                ubo.samplesPerPixel     = rayTracingSystem.samplesPerPixel;
+                rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
+                rayTracingUboBuffers[frameIndex]->flush();
 
-                    const int lightID = scene->environmentID - static_cast<int>(scene->images.size());
-                    const InfiniteAreaLight* currentInfiniteLight = std::dynamic_pointer_cast<InfiniteAreaLight>(scene->lightObjects[lightID]->light).get();
-                    InfiniteLightUbo infiniteLight = { // TODO diferent descriptor set
-                        scene->environmentID,
-                        rayTracingSystem.environmentRotation,
-                        currentInfiniteLight->sampler.getMarginal()->getIntegral(),
-                        glm::uvec2(currentInfiniteLight->textureSize, currentInfiniteLight->textureSize),
-                        currentInfiniteLight->sampler.getMarginal()->getFunctionBuffer()->deviceAddress(),
-                        currentInfiniteLight->sampler.getMarginal()->getCdfBuffer()->deviceAddress(),
-                        currentInfiniteLight->sampler.conditionalIntegralsBuffer->deviceAddress(),
-                        currentInfiniteLight->sampler.conditionalFunctionsBuffer->deviceAddress(),
-                        currentInfiniteLight->sampler.conditionalCdfsBuffer->deviceAddress()
+                const int lightID = scene->environmentID - static_cast<int>(scene->images.size());
+                const InfiniteAreaLight* currentInfiniteLight = std::dynamic_pointer_cast<InfiniteAreaLight>(scene->lightObjects[lightID]->light).get();
+                InfiniteLightUbo infiniteLight = { // TODO diferent descriptor set
+                    scene->environmentID,
+                    rayTracingSystem.environmentRotation,
+                    currentInfiniteLight->sampler.getMarginal()->getIntegral(),
+                    glm::uvec2(currentInfiniteLight->textureSize, currentInfiniteLight->textureSize),
+                    currentInfiniteLight->sampler.getMarginal()->getFunctionBuffer()->deviceAddress(),
+                    currentInfiniteLight->sampler.getMarginal()->getCdfBuffer()->deviceAddress(),
+                    currentInfiniteLight->sampler.conditionalIntegralsBuffer->deviceAddress(),
+                    currentInfiniteLight->sampler.conditionalFunctionsBuffer->deviceAddress(),
+                    currentInfiniteLight->sampler.conditionalCdfsBuffer->deviceAddress()
+                };
+
+                infiniteLightUboBuffers[frameIndex]->writeToBuffer(&infiniteLight);
+                infiniteLightUboBuffers[frameIndex]->flush();
+
+                LightUbo lightUbo = {
+                    rayTracingSystem.lightsBuffer->deviceAddress(),
+                    rayTracingSystem.lightsSampler.getFunctionBuffer()->deviceAddress(),
+                    rayTracingSystem.lightsSampler.getCdfBuffer()->deviceAddress(),
+                    rayTracingSystem.lightsSampler.getIntegral(),
+                    static_cast<int>(rayTracingSystem.lights.size())
+                };
+
+                lightUboBuffers[frameIndex]->writeToBuffer(&lightUbo);
+                lightUboBuffers[frameIndex]->flush();
+
+                if (scene->volumeObject) {
+                    VolumeUbo volumeUbo = {
+                        scene->volumeObject->volume->getDensityDeviceAddress(),
+                        scene->volumeObject->volume->getTemperatureDeviceAddress(),
+                        scene->volumeObject->volume->medium,
+                        scene->volumeObject->volume->temperatureMultiplier,
+                        scene->volumeObject->volume->emissivenessMultiplier,
+                        scene->volumeObject->volume->jitteringAmount
                     };
-
-                    infiniteLightUboBuffers[frameIndex]->writeToBuffer(&infiniteLight);
-                    infiniteLightUboBuffers[frameIndex]->flush();
-
-                    LightUbo lightUbo = {
-                        rayTracingSystem.lightsBuffer->deviceAddress(),
-                        rayTracingSystem.lightsSampler.getFunctionBuffer()->deviceAddress(),
-                        rayTracingSystem.lightsSampler.getCdfBuffer()->deviceAddress(),
-                        rayTracingSystem.lightsSampler.getIntegral(),
-                        static_cast<int>(rayTracingSystem.lights.size())
-                    };
-
-                    lightUboBuffers[frameIndex]->writeToBuffer(&lightUbo);
-                    lightUboBuffers[frameIndex]->flush();
-
-                    if (scene->volumeObject) {
-                        VolumeUbo volumeUbo = {
-                            scene->volumeObject->volume->getDensityDeviceAddress(),
-                            scene->volumeObject->volume->getTemperatureDeviceAddress(),
-                            scene->volumeObject->volume->medium,
-                            scene->volumeObject->volume->temperatureMultiplier,
-                            scene->volumeObject->volume->emissivenessMultiplier,
-                            scene->volumeObject->volume->jitteringAmount
-                        };
-                        volumeUboBuffers[frameIndex]->writeToBuffer(&volumeUbo);
-                        volumeUboBuffers[frameIndex]->flush();
-                    }
-
-                    // render
-                    rayTracingSystem.render(frameInfo, renderer.getSwapchain());
+                    volumeUboBuffers[frameIndex]->writeToBuffer(&volumeUbo);
+                    volumeUboBuffers[frameIndex]->flush();
                 }
-                /*
-                else {
-                    // update
-                    RasterizationUbo ubo{};
-                    ubo.projection  = currentCamera->camera->getProjection();
-                    ubo.view        = currentCamera->camera->getView();
-                    ubo.inverseView = currentCamera->camera->getInverseView();
-                    pointLightSystem.update(frameInfo, ubo);
-                    rasterizationUboBuffers[frameIndex]->writeToBuffer(&ubo);
-                    rasterizationUboBuffers[frameIndex]->flush();
-                    
-                    // render
-                    renderer.beginSwapchainRenderPass(commandBuffer);
-                    simpleRenderSystem.render(frameInfo);
-                    pointLightSystem.render(frameInfo);
-                    renderer.endSwapchainRenderPass(commandBuffer);
-                }
-                */
+
+                // render
+                rayTracingSystem.render(frameInfo, renderer.getSwapchain());
 
                 // GUI
                 if (gui->isActive) {
@@ -274,7 +245,8 @@ namespace mari {
                     renderer.endSwapchainRenderPass(commandBuffer);
                 }
 
-                renderer.endFrame();
+                renderer.endFrame();        
+
 /*
                 if (frameCounter == 32) {
                     vkDeviceWaitIdle(device.handle());
@@ -335,12 +307,14 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/statues/hosmer-zenobia_in_chains.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/statues/lucy-stanford-repository.glb");
                 break;
             case 7:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/UE4_SunTemple.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/UE4_SunTemple.glb");
                 break;
             case 8:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
@@ -354,18 +328,19 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/cube.glb");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/plane.glb");
-                scene->nodes.at("plane")->transform.localMatrix *= 0.00001f;
+                scene->nodes.at("plane")->transform.scale *= 0.00001f;
                 break;
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ganesha_comparison.glb");
                 break;
             case 11:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-MediumLight.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-BigLight.glb");
@@ -377,6 +352,7 @@ namespace mari {
             case 13:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/landscapes/snowy_mountain_landscape.glb");
                 break;
+                // TODO oriental lantern scene
         }
         scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
         //scene->transform.position.y -= 1000.0f;
@@ -419,7 +395,7 @@ namespace mari {
             node->light = l;
             scene->lightObjects.emplace_back(node);
         }
-/*
+
         scene->volumeObject = std::make_shared<Node>("volume");
         scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_sixteenth.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
@@ -430,18 +406,13 @@ namespace mari {
         scene->volumeObject->volume->medium.scattering *= 80.0f;
         scene->volumeObject->volume->jitteringAmount = 0.0f;
         scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
-        scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;
-        // cornell box transformation
-        //scene->volumeObject->transform.position = glm::vec3(0.05f, -0.47f, 0.2f);
-        //scene->volumeObject->transform.scale = glm::vec3(0.017f, 0.024f, 0.013f);
-        //scene->volumeObject->volume->sigma_s = 20.0f;
-        //scene->volumeObject->volume->jitteringAmount = 1.6f;
-        
+        scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;        
         scene->addNode(scene->volumeObject);
-*/
-        
-
 
         scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
+    }
+
+    Mari::~Mari() {
+        DefaultObjects::cleanup(device);
     }
 }

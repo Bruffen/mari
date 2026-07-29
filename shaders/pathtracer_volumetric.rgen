@@ -90,7 +90,9 @@ void main() {
             // Compute rescaled path probability for absorption at path vertex
             //float r_e = r_u * 
 
-            // Medium interaction
+            /********************************
+             * Medium interaction
+             ********************************/
             if (medium_event.terminated) {
                 break; // TODO THESIS can emission be added in both absorption and scattering events with MIS?
             }
@@ -114,7 +116,9 @@ void main() {
                 //continue;
                 // TODO null scatters have to update tracking variables
             } 
-            // Surface interaction
+            /********************************
+             * Surface interaction
+             ********************************/
             else if (hit_surface) {
 
                 // Hit a volume boundary. Keep going without interacting.
@@ -172,10 +176,10 @@ void main() {
                 origin = offset_position(hit.position, going_inside ? -hit.normal_g : hit.normal_g);
 
                 // Add or remove medium in stack when entering or exiting dielectric
-                if (bxdf_sample.is_transmission) {
+                if (bxdf_sample.is_transmission) { // TODO only if medium majorant > 0.0
                     if (going_inside) {
                         medium_push(hit.material.medium);
-                        inside_dielectric = true;
+                        inside_dielectric = !hit.material.dielectric_nee_cheat;
                     } else {
                         medium_remove();
                         inside_dielectric = false;
@@ -185,9 +189,12 @@ void main() {
                 }
             }
 
-            // Sample direct light
+            /********************************
+             * Next Event Estimation
+             * Sample direct light
+             ********************************/
             LiSample li_sample;
-            if ((hit_surface || medium_event.scattered) && !is_dirac_delta && /*!inside_dielectric &&*/ properties.next_event_estimation) {
+            if ((hit_surface || medium_event.scattered) && !is_dirac_delta /*&& !inside_dielectric*/ && properties.next_event_estimation) {
                 float piecewise_pdf = 1.0;
 
                 LightInfo light = sample_light(random1D(prd.seed), piecewise_pdf);
@@ -226,24 +233,26 @@ void main() {
                         if (shadow_prd.visibility) {
                             vec3 li_transmittance = vec3(1.0);
 
-                            // Volume Boundary Meshes
+                            float stmin = 0.0;
+                            float stmax = shadow_tmax;
+
+                            /********************************
+                             * Volume Boundary Meshes
+                             ********************************/
                             if (shadow_prd.hit_count > 0) {
                                 sort_hits(shadow_prd.hits, shadow_prd.hit_count);
 
-                                // If amount of boundary hits is even, it means the ray starts outside of a medium
+                                // If amount of boundary hits is even, it means the ray starts outside of a medium (ignoring when the light is inside the medium)
                                 // therefore skip the first section of the ray for transmittance calculation
-                                int   start = shadow_prd.hit_count % 2 == 0 ? 1 : 0;
-                                float stmin = 0.0;
-                                float stmax = shadow_tmax;
-
+                                int start = shadow_prd.hit_count % 2 == 0 ? 1 : 0;
                                 for (int i = start; i < shadow_prd.hit_count; i += 2) {
                                     medium_push(get_material(shadow_prd.hits[i].material_bda).constants.medium);
 
                                     if (i == 0) {
                                         stmax = shadow_prd.hits[i].t;
                                     } else {
-                                        stmax = shadow_prd.hits[i].t;
                                         stmin = shadow_prd.hits[i - 1].t;
+                                        stmax = shadow_prd.hits[i].t;
                                     }
 
                                     if (stmax - stmin > 0.0) {
@@ -252,8 +261,17 @@ void main() {
                                     medium_remove();
                                 }
                             }
-                            // NanoVDB
-                            //li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, 0.0, shadow_tmax, prd.seed);
+                            /********************************
+                             * NanoVDB
+                             ********************************/
+                            stmin = 0.0;
+                            stmax = shadow_tmax;
+
+                            if (test_intersection_volume_nano(origin, li_sample.wi, stmin, stmax)) {
+                                medium_push(volume.medium);
+                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed);
+                                medium_remove();
+                            }
 
                             float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;
@@ -261,8 +279,9 @@ void main() {
                     }
                 }
             }
-
-            // Apply bounce throughput for next ray
+            /********************************
+             * Apply bounce throughput for next ray
+            /********************************/
             if (medium_event.scattered) {
                 // Phase Function
                 throughput *= medium_event.pf.p / medium_event.pf.pdf;
@@ -277,7 +296,9 @@ void main() {
                 }
             }
 
-            // Miss. Sample environment map
+            /********************************
+             * Miss. Sample environment map
+             ********************************/
             if (!hit_surface) {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
@@ -289,8 +310,9 @@ void main() {
                 if (!isnan(mis_weight)) radiance += throughput * le * mis_weight;
                 break;            
             }
-
-            // Russian roulette
+            /********************************
+             * Russian roulette
+             ********************************/
             float probability = max(max(throughput.r, throughput.g), throughput.b) * eta_scale;
             if (properties.russian_roulette && probability < 1.0 && depth > 3) {
                 

@@ -84,7 +84,7 @@ endif()
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 target_compile_options(${PROJECT_NAME} PUBLIC
     $<$<CONFIG:Debug>: /Zi /DEBUG /W3>
-    $<$<CONFIG:Release>: /O3>
+    $<$<CONFIG:Release>: /O2>
 )
 add_compile_definitions("$<$<CONFIG:DEBUG>:MARI_DEBUG>")
 #set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG") # use for release mode debugging

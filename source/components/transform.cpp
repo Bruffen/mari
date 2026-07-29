@@ -1,6 +1,8 @@
 #pragma once
 
 #include "transform.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/euler_angles.hpp>
 
 namespace mari {
     // Matrix corrsponds to Translate * Ry * Rz * Rx * Scale
@@ -43,6 +45,9 @@ namespace mari {
     }
 
     glm::mat3 Transform::matrixRotation() const {
+        return glm::mat4(glm::quat(rotation)); // glm is in XYZ order
+
+        // TODO fix
         const float cy = glm::cos(rotation.x);
         const float sy = glm::sin(rotation.x);
         const float cb = glm::cos(rotation.z);

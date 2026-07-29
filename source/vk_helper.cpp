@@ -11,7 +11,6 @@ namespace mari {
     PFN_vkGetAccelerationStructureBuildSizesKHR    vkGetAccelerationStructureBuildSizesKHR;
     PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
     PFN_vkCmdBuildAccelerationStructuresKHR        vkCmdBuildAccelerationStructuresKHR;
-    PFN_vkBuildAccelerationStructuresKHR           vkBuildAccelerationStructuresKHR;
     PFN_vkCmdTraceRaysKHR                          vkCmdTraceRaysKHR;
     PFN_vkGetRayTracingShaderGroupHandlesKHR       vkGetRayTracingShaderGroupHandlesKHR;
     PFN_vkCreateRayTracingPipelinesKHR             vkCreateRayTracingPipelinesKHR;
@@ -21,8 +20,6 @@ namespace mari {
             vkGetDeviceProcAddr(device, "vkGetBufferDeviceAddressKHR"));
         vkCmdBuildAccelerationStructuresKHR         = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
             vkGetDeviceProcAddr(device, "vkCmdBuildAccelerationStructuresKHR"));
-        vkBuildAccelerationStructuresKHR            = reinterpret_cast<PFN_vkBuildAccelerationStructuresKHR>(
-            vkGetDeviceProcAddr(device, "vkBuildAccelerationStructuresKHR"));
         vkCreateAccelerationStructureKHR            = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(
             vkGetDeviceProcAddr(device, "vkCreateAccelerationStructureKHR"));
         vkDestroyAccelerationStructureKHR           = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
