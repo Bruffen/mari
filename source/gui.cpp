@@ -221,6 +221,7 @@ namespace mari {
 
     void Gui::imGuiInspector(Node &g) {
         ImGui::Text(("ID: " + std::to_string(g.getId())).c_str());
+        glm::vec3 oldScale = g.transform.scale;
         bool update = imGuiTransform(g.transform);
         if (update) {
             if (g.volume) {
@@ -230,6 +231,17 @@ namespace mari {
                 g.setVolumeTransform();
             } else {
                 system.needsUpdate = true;
+
+                for (auto &primMesh : g.mesh->primMeshes) {
+                    if (primMesh.material->isEmissive()) {
+                        // Adjust emissiveness automatically with the scale change so that power is equal
+                        if (oldScale != g.transform.scale) {
+                            primMesh.material->data.constants.emission.a *= glm::pow(glm::length(oldScale) / glm::length(g.transform.scale), 2.0f); // TODO incorrect
+                        }
+                        system.needsLightsRebuild = true;
+                        break;
+                    }
+                }
             }
         }
         if (g.mesh) {
@@ -440,6 +452,11 @@ namespace mari {
             system.needsRebuild = true;
         }
 
+        // Emission has changed
+        if (material.data.constants.emission != mc.emission) {
+            system.needsLightsRebuild = true;
+        }
+
         if (mc != material.data.constants) {
             inputChanged = true;
             scene->materialDataBuffer->update(material.index * sizeof(MaterialData), sizeof(MaterialConstants), &material.data.constants);
@@ -558,6 +575,28 @@ namespace mari {
                 ImGui::EndCombo();
             }
 
+            // Transmittance algorithm
+            if (system.getIntegrator() != Integrator::PATH_TRACING) {
+                const char* algorithms[] = { "Delta tracking", "Ray marching" };
+                const char* selectedAlgorithm = algorithms[system.transmittanceAlgo];
+                
+                if (ImGui::BeginCombo("Transmittance algorithm", selectedAlgorithm, 0)) {
+                    for (int n = 0; n < IM_ARRAYSIZE(algorithms); n++) {
+                        const bool isSelected = (system.transmittanceAlgo == n);
+                        if (ImGui::Selectable(algorithms[n], isSelected)) {
+                            system.transmittanceAlgo = n;
+                            inputChanged = true;
+                            break;
+                        }
+                        
+                        if (isSelected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+
             // Camera
             std::vector<char*> cameraNames;
             for (const auto& camera : scene->cameraObjects) {
@@ -601,6 +640,7 @@ namespace mari {
                             if (environment->name == environmentNames[n]) {
                                 scene->environmentID = n + offset;
                                 inputChanged = true;
+                                system.needsLightsRebuild = true;
                                 break;
                             }
                         }

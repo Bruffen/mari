@@ -100,6 +100,13 @@ namespace mari {
         MaterialData                data;
         MaterialTextures            textures;
         bool                        transparent = false;
+
+        bool                        isEmissive() const { 
+            return glm::length(
+                data.constants.emission.a * 
+                glm::vec3(data.constants.emission)
+            ) > 0.0f; 
+        }
     };
 
     struct PrimMesh {

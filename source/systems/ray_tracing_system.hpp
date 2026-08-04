@@ -39,6 +39,7 @@ namespace mari {
             glm::vec2                               environmentRotation{};
             bool                                    needsUpdate         = false;
             bool                                    needsRebuild        = false;
+            bool                                    needsLightsRebuild  = false;
             
             int                                     maxDepth            = 100;
             bool                                    frameAccumulation   = true;
@@ -46,10 +47,11 @@ namespace mari {
             bool                                    nextEventEstimation = false;
             float                                   exposure            = 1.0f;
             int                                     tonemapper          = 3;
+            int                                     transmittanceAlgo   = 0;
             int                                     samplesPerPixel     = 1;
         private:
             void                                    createImages(uint32_t width, uint32_t height);
-            void                                    createAreaLights(const Scene &scene);
+            void                                    buildAreaLights(const Scene &scene);
             void                                    buildBLAS(std::shared_ptr<Node> node, uint64_t materialBufferDeviceAddress);
             void                                    buildTLAS();
             void                                    updateTLAS();

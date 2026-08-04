@@ -189,6 +189,7 @@ namespace mari {
                 ubo.nextEventEstimation = static_cast<VkBool32>(rayTracingSystem.nextEventEstimation);
                 ubo.exposure            = rayTracingSystem.exposure;
                 ubo.tonemapper          = rayTracingSystem.tonemapper;
+                ubo.transmittanceAlgo   = rayTracingSystem.transmittanceAlgo;
                 ubo.samplesPerPixel     = rayTracingSystem.samplesPerPixel;
                 rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                 rayTracingUboBuffers[frameIndex]->flush();
@@ -277,7 +278,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  6  ) {
+        switch (  11  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -328,7 +329,7 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/cube.glb");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/plane.glb");
-                scene->nodes.at("plane")->transform.scale *= 0.00001f;
+                //scene->nodes.at("plane")->transform.scale *= 0.00001f;
                 break;
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
@@ -351,6 +352,9 @@ namespace mari {
                 break;
             case 13:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/landscapes/snowy_mountain_landscape.glb");
+                break;
+            case 14:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/ocean.glb");
                 break;
                 // TODO oriental lantern scene
         }
@@ -395,9 +399,9 @@ namespace mari {
             node->light = l;
             scene->lightObjects.emplace_back(node);
         }
-
+/*
         scene->volumeObject = std::make_shared<Node>("volume");
-        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_sixteenth.vdb");
+        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
         //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/fire.vdb"); 
@@ -408,7 +412,7 @@ namespace mari {
         scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
         scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;        
         scene->addNode(scene->volumeObject);
-
+*/
         scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
     }
 

@@ -1,35 +1,10 @@
 #version 460
-#extension GL_GOOGLE_include_directive                      : require
-//#ifdef MARI_DEBUG 
-#extension GL_EXT_debug_printf                              : enable
-//#endif
+#extension GL_GOOGLE_include_directive : require
 
-#include "common/material.glsl"
-MaterialConstants material;
-#include "common/sampling.glsl"
-#include "common/tonemapping.glsl"
-#include "common/light.glsl"
-#include "common/medium.glsl"
-
-layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
-layout(binding = 1, set = 0, rgba32f) uniform image2D image;
-layout(binding = 2, set = 0, rgba8) uniform image2D present_image;
-layout(binding = 8, set = 0) uniform sampler2D textures[];
+#include "common/raygencommon.glsl"
 
 layout(location = 0) rayPayloadEXT Payload prd;
-
-layout(binding = 3, set = 0, scalar) uniform Properties {
-    mat4  view_inverse;
-    mat4  proj_inverse;
-    int   frame_count;
-    int   max_depth;
-    float exposure;
-    int   tonemapper;
-    bool  frame_accumulation;
-    bool  russian_roulette;
-    bool  next_event_estimation;
-    int   samples_per_pixel;
-} properties;
+layout(location = 1) rayPayloadEXT ShadowVolumetricPayload shadow_prd;
 
 void main() {
     prd.seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, properties.frame_count);

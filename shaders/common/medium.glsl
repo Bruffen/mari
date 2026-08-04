@@ -158,6 +158,39 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
     return medium_event;
 }
 
+MediumEvent ray_marching(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium = medium_get();
+    medium_event.majorant = medium_event.medium.absorption + medium_event.medium.scattering;
+    float t;
+    float step_size = (tmax - tmin) * 0.01;
+
+    for (int i = 0; i < 200; i++) {
+    //while (true) {
+        t = tmin + step_size;// + step_size * (random1D(seed) * 0.5 - 1.0);
+        if (t < tmax) {
+            vec3 position = origin + direction * t;
+
+            vec3 jitter = vec3(0.0); //TODO (2.0 * random3D(seed) - vec3(1.0)) * volume.jittering_amount;
+            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant);
+            medium_event.transmittance *= get_transmittance((t - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
+            tmin = t;
+        }
+        else {
+            // Reached end of ray
+            vec3 position = origin + direction * tmax;
+
+            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant);
+            medium_event.transmittance *= get_transmittance((tmax - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
+            medium_event.t = tmax;
+            break;
+        }
+    }
+
+    return medium_event;
+}
+
+
 MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium = medium_get();
@@ -189,12 +222,19 @@ MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
     return medium_event;
 }
 
-vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed, int transmittance_algo) {
     vec3 transmittance = vec3(1.0);
 
     if (current_medium >= 0) {
         if (medium_get().heterogeneous) {
-            transmittance = delta_tracking(origin, direction, tmin, tmax, seed).transmittance;
+            switch(transmittance_algo) {
+                case 0: 
+                    transmittance = delta_tracking(origin, direction, tmin, tmax, seed).transmittance;
+                    break;
+                case 1:
+                    transmittance = ray_marching(origin, direction, tmin, tmax, seed).transmittance;
+                    break;
+            }
         } else {
             transmittance = get_transmittance(medium_get(), tmax - tmin);
         }

@@ -72,7 +72,7 @@ namespace mari {
         pPrimMeshesInfosBuffer->stageToBuffer((void*) pPrimMeshesAdresses.data());
 
         buildTLAS();
-        createAreaLights(scene);
+        buildAreaLights(scene);
     }
 
     void RayTracingSystem::buildBLAS(const std::shared_ptr<Node> node, uint64_t materialBufferDeviceAddress) {
@@ -285,12 +285,13 @@ namespace mari {
     }
 
     // TODO handle case where no lights exist, specially on gpu side
-    void RayTracingSystem::createAreaLights(const Scene &scene) {
+    void RayTracingSystem::buildAreaLights(const Scene &scene) {
+        lights.clear();
+        
         for (const auto& [id, node] : scene.nodes) {
             if (node->mesh) {
                 for (const auto& p : node->mesh->primMeshes) {
-                    bool isEmissive = glm::length(p.material->data.constants.emission.a * glm::vec3(p.material->data.constants.emission)) > 0.0f;
-                    if (isEmissive) {
+                    if (p.material->isEmissive()) {
                         assert(p.count % 3 == 0 && "PrimMesh count is not a multiple of 3 so it can't make an AreaLight!");
                         for (uint32_t i = 0; i < p.count; i += 3) {
                             auto light = std::make_unique<AreaLight>(device, *node, p, i);
@@ -309,16 +310,20 @@ namespace mari {
             powers.push_back(light.power);
         }
 
+        vkDeviceWaitIdle(device.handle()); // TODO actual synchronization with the last trace rays queue submit
+
         lightsSampler = PiecewiseConstant1D(powers, 0.0f, 1.0f, &device);
 
-        lightsBuffer = std::make_unique<Buffer>(
-            device,
-            sizeof(LightInfo),
-            static_cast<uint32_t>(lights.size()),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        );
-
+        if (!lightsBuffer || lightsBuffer->getBufferSize() < lights.size() * sizeof(LightInfo)) {
+            lightsBuffer = std::make_unique<Buffer>(
+                device,
+                sizeof(LightInfo),
+                static_cast<uint32_t>(lights.size()),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            );
+        }
+            
         lightsBuffer->stageToBuffer(lights.data());
     }
 
@@ -333,10 +338,15 @@ namespace mari {
             buildTLAS();
             needsRebuild = false;
         }
-
+        
         if (needsUpdate) {
             updateTLAS();
             needsUpdate = false;
+        }
+
+        if (needsLightsRebuild) {
+            buildAreaLights(scene);
+            needsLightsRebuild = false;
         }
     }
 
