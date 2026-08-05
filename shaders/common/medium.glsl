@@ -51,7 +51,7 @@ void medium_remove() {
 }
 
 // Beer's law directly
-vec3 get_transmittance(Medium medium, float distance) {
+vec3 get_transmittance(Medium medium, float distance) { // TODO attenuate with albedo
     float attenuation = medium.absorption + medium.scattering;
     if (attenuation <= 0.0) return vec3(1.0);
 

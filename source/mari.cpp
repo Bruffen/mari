@@ -278,7 +278,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  11  ) {
+        switch (  15  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -355,6 +355,9 @@ namespace mari {
                 break;
             case 14:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/ocean.glb");
+                break;
+            case 15:
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/opal.glb");
                 break;
                 // TODO oriental lantern scene
         }

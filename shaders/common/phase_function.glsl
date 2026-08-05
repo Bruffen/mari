@@ -40,9 +40,31 @@ PhaseFunctionSample pf_isotropic_sample(vec2 random) {
 /****************************************************************
  * Rayleigh
  ****************************************************************
+ * Penndorf approximation
+ * Weakly anisotropic, so no importance sampling here
  */
 
-// TODO
+float pf_rayleigh(float cos_theta) {
+    return 0.7629 * (1.0 + 0.932 * cos_theta * cos_theta) * M_1_4PI;
+}
+
+float pf_rayleigh_p(vec3 wo, vec3 wi) {
+    return pf_rayleigh(dot(wo, wi));
+}
+
+float pf_rayleigh_pdf(vec3 wo, vec3 wi) {
+    return pdf_uniform_sphere();
+}
+
+PhaseFunctionSample pf_rayleigh_sample(vec3 wo, vec2 random) {
+    vec3 wi = sample_uniform_sphere(random.x, random.y);
+
+    return PhaseFunctionSample(
+        wi,
+        pf_rayleigh_p(wo, wi),
+        pf_rayleigh_pdf(wo, wi)
+    );
+}
 
 /****************************************************************
  * Henyey-Greenstein
@@ -217,6 +239,8 @@ float pf_eval_p(PhaseFunction pf, vec3 wo, vec3 wi, float random) {
     switch (pf.type) {
         default:
             return pf_isotropic_p();
+        case PhaseFunctionType_Rayleigh:
+            return pf_rayleigh_p(wo, wi);
         case PhaseFunctionType_HenyeyGreenstein:
             return pf_henyey_greenstein_p(wo, wi, pf.anisotropy);
         case PhaseFunctionType_Mie_Approximation:
@@ -228,6 +252,8 @@ float pf_eval_pdf(PhaseFunction pf, vec3 wo, vec3 wi, float random) {
     switch (pf.type) {
         default:
             return pf_isotropic_pdf();
+        case PhaseFunctionType_Rayleigh:
+            return pf_rayleigh_pdf(wo, wi);
         case PhaseFunctionType_HenyeyGreenstein:
             return pf_henyey_greenstein_pdf(wo, wi, pf.anisotropy);
         case PhaseFunctionType_Mie_Approximation:
@@ -241,6 +267,8 @@ PhaseFunctionSample pf_sample(PhaseFunction pf, vec3 wo, inout uint seed) {
     switch (pf.type) {
         default:
             return pf_isotropic_sample(random);
+        case PhaseFunctionType_Rayleigh:
+            return pf_rayleigh_sample(wo, random);
         case PhaseFunctionType_HenyeyGreenstein:
             return pf_henyey_greenstein_sample(wo, pf.anisotropy, random);
         case PhaseFunctionType_Mie_Approximation:
