@@ -109,12 +109,13 @@ float pdf_light_area(vec3 positions[3], vec3 wi, float distance, vec3 emission, 
 
     float ndotl = dot(normal_g, -wi);
 
-    if (!double_sided && ndotl < 0.0) {
-        return 0.0;
-    }
+    // It seems this breaks MIS, not sure why
+    //if (!double_sided && ndotl < 0.0) {
+    //    return 0.0;
+    //}
 
     // Area cancels out
-    //float area = normal_g_length * 0.5f * ; 
+    //float area = normal_g_length * 0.5f;
     float power = length(emission) * /*area **/ (double_sided ? 2.0f : 1.0f) * M_PI;
     float total_power = lights.integral * lights.size;
 

@@ -64,7 +64,7 @@ void main() {
 
             // Sample indirect light
             if (is_emissive) {
-                if (is_dirac_delta || properties.next_event_estimation) {
+                if (is_dirac_delta || !properties.next_event_estimation) {
                     radiance += throughput * hit.material.emission.rgb;
                 }
                 else {
@@ -116,16 +116,16 @@ void main() {
                     vec3 wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
 
                     float material_random = random1D(prd.seed);
-                    float bxdf_f = bxdf_f(hit.material_type, wo, wi, material_random);
+                    float bxdf_f   = bxdf_f  (hit.material_type, wo, wi, material_random) * abs_cos_theta(wi);
                     float bxdf_pdf = bxdf_pdf(hit.material_type, wo, wi, material_random);
 
                     if (bxdf_f > 0.0 && bxdf_pdf > 0.0) {
                         shadow_prd.visibility = false;
-                        traceRayEXT(tlas, shadow_flags, 0xff, 1, 32 /*TODO bring SBT stride from host*/, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
+                        traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
 
                         if (shadow_prd.visibility) {
-                            float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf);
-                            radiance += throughput * li_sample.radiance * mis_weight * bxdf_f * abs_cos_theta(wi) / li_sample.pdf;
+                            float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf); // TODO li_sample.pdf is area sampled. Does it need to be solid angle to match bxdf?
+                            radiance += throughput * li_sample.radiance * mis_weight * bxdf_f / li_sample.pdf;
                         }
                     }
                 }

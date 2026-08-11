@@ -84,7 +84,7 @@ namespace mari {
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING);
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -280,7 +280,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  10  ) {
+        switch (  11  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -340,9 +340,9 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ganesha_comparison.glb");
                 break;
             case 11:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                 scene->currentCamera = scene->nodes.at("Camera");
                 window.resizeWindow(1024, 1024);
                 break;

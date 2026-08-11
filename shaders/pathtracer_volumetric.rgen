@@ -46,7 +46,7 @@ void main() {
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             float t = tmax;
-            traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, tmax, 0);
+            traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
 
             Hit hit;
             bool hit_surface = false;
@@ -126,13 +126,13 @@ void main() {
 
                 // Sample indirect light
                 if (is_emissive) {
-                    if (is_dirac_delta || properties.next_event_estimation) {
+                    if (is_dirac_delta || !properties.next_event_estimation) {
                         radiance += throughput * hit.material.emission.rgb;
                     }                 
                     else {
                         float light_mis = pdf_light_area(hit.vertices, direction, t, hit.material.emission.rgb, hit.material.double_sided_emission);
-                        float bxdf_mis = previous_pdf;
-                        radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
+                        float scatter_mis = previous_pdf;
+                        radiance += throughput * hit.material.emission.rgb * power_heuristic(scatter_mis, light_mis);
                     }
                 }
 
@@ -201,14 +201,14 @@ void main() {
                         scatter_pdf = pf_eval_pdf(medium_event.medium.phase_function, wo, wi, lobe_random);
                     } else {
                         wi = to_local(hit.tangent, hit.bitangent, hit.normal_s, li_sample.wi);
-                        scatter_f   = bxdf_f(hit.material_type, wo, wi, lobe_random) * abs_cos_theta(wi);
+                        scatter_f   = bxdf_f  (hit.material_type, wo, wi, lobe_random) * abs_cos_theta(wi);
                         scatter_pdf = bxdf_pdf(hit.material_type, wo, wi, lobe_random);
                     }
 
                     if (scatter_f > 0.0 && scatter_pdf > 0.0) {
                         shadow_prd.visibility = false;
                         shadow_prd.hit_count = 0;
-                        const float shadow_tmax = li_sample.distance - 1e-6;
+                        const float shadow_tmax = li_sample.distance  * 0.99999;
 
                         traceRayEXT(tlas, shadow_flags, 0xff, 1, 32 /*TODO bring SBT stride from host*/, 1, origin, tmin, li_sample.wi, shadow_tmax, 1);
 
@@ -255,7 +255,7 @@ void main() {
                                 medium_remove();
                             }
 
-                            float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
+                            float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf); // TODO li_sample.pdf is area sampled. Does it need to be solid angle to match scatter_pdf?
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;
                         }
                     }

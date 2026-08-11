@@ -237,6 +237,7 @@ namespace mari {
                         // Adjust emissiveness automatically with the scale change so that power is equal
                         if (oldScale != g.transform.scale) {
                             primMesh.material->data.constants.emission.a *= glm::pow(glm::length(oldScale) / glm::length(g.transform.scale), 2.0f); // TODO incorrect
+                            scene->materialDataBuffer->update(primMesh.material->index * sizeof(MaterialData), sizeof(MaterialConstants), &primMesh.material->data.constants);
                         }
                         system.needsLightsRebuild = true;
                         break;
@@ -345,6 +346,7 @@ namespace mari {
 
                 // TODO currently material is indexed directly with its device address in the material buffer
                 // have an intermediary material index buffer that points to the materials in the material buffer
+                // to allow changing materials in runtime
             }
             ImGui::EndCombo();
         }
