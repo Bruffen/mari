@@ -20,7 +20,7 @@ namespace mari {
         
         info.type = LightType::AREA;
         info.emission = glm::vec3(color.r, color.g, color.b) * color.a;
-        info.doubleSided = 1; // TODO implement double or single sided light in material
+        info.doubleSided = primMesh.material->data.constants.doubleSidedEmission;
         info.area = glm::length(glm::cross(info.positions[1] - info.positions[0], info.positions[2] - info.positions[0])) * 0.5f;
         info.power = glm::length(info.emission) * info.area * (info.doubleSided ? 2.0f : 1.0f) * static_cast<float>(std::numbers::pi);
     }

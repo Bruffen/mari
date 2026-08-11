@@ -13,6 +13,9 @@ struct Payload {
     mat4x3 world_to_object;
     mat4x3 object_to_world;
     uint seed;
+#ifdef SPECTRAL
+    vec3 wavelengths;
+#endif
 };
 
 struct ShadowPayload {

@@ -44,7 +44,7 @@ namespace mari {
             int                                     maxDepth            = 100;
             bool                                    frameAccumulation   = true;
             bool                                    russianRoulette     = true;
-            bool                                    nextEventEstimation = false;
+            bool                                    nextEventEstimation = true;
             float                                   exposure            = 1.0f;
             int                                     tonemapper          = 3;
             int                                     transmittanceAlgo   = 0;

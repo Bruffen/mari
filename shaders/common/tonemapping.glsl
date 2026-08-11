@@ -114,9 +114,9 @@ vec3 tone_AgX(vec3 linear_color, float exposure) {
 vec3 apply_tonemapping(int tonemapper, vec3 color, float exposure) {
     vec3 tonemapped_color = color;
     switch (tonemapper) {
-        case 1: tonemapped_color = pow(color * exposure, vec3(1.0/2.2));
-        case 2: tonemapped_color = tone_ACES(tonemapped_color, exposure); break;
-        case 3: tonemapped_color = tone_AgX(tonemapped_color, exposure); break;
+        case 1: tonemapped_color = pow(color * exposure, vec3(1.0/2.2)); break;
+        case 2: tonemapped_color = tone_ACES(color, exposure);           break;
+        case 3: tonemapped_color = tone_AgX(color, exposure);            break;
     }
     return tonemapped_color;
 }

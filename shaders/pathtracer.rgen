@@ -28,7 +28,7 @@ void main() {
         
         float eta_scale         = 1.0;
         float previous_pdf      = 1.0;
-        bool  is_dirac_delta    = false;
+        bool  is_dirac_delta    = true;
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
             traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, tmax, 0);
@@ -50,22 +50,25 @@ void main() {
             Hit hit = process_hit(prd);
             material = hit.material; // TODO remove global material
             const float distance = length(hit.position - origin);
+            const bool is_backface = dot(direction, hit.normal_g) > 0.0;
 
             // Render backfaces
-            if (dot(direction, hit.normal_g) > 0.0 && hit.material_type != MaterialType_Dielectric) {
+            if (is_backface && hit.material_type != MaterialType_Dielectric) {
                 flip_orientation(hit);
             }
 
-            const bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
+            bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
+            if (is_emissive && !hit.material.double_sided_emission) {
+                is_emissive = !is_backface;
+            }
 
             // Sample indirect light
             if (is_emissive) {
-                if (depth == 0 || is_dirac_delta || properties.next_event_estimation) {
-                    // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
+                if (is_dirac_delta || properties.next_event_estimation) {
                     radiance += throughput * hit.material.emission.rgb;
                 }
                 else {
-                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.rgb, true); // TODO double sided parameter in material
+                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.rgb, hit.material.double_sided_emission);
                     float bxdf_mis = previous_pdf;
                     radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
                 }

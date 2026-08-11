@@ -34,11 +34,11 @@ struct LightInfo {
     vec3     emission;
     float    power;
     float    area;
-    int      double_sided;
+    bool     double_sided;
 };
 
-const uint Light_Type_Area     = 2;
-const uint Light_Type_Infinite = 3;
+#define Light_Type_Area     2
+#define Light_Type_Infinite 3
 
 layout(buffer_reference, scalar) readonly buffer LightsBuffer { LightInfo l[]; };
 
@@ -89,9 +89,9 @@ LiSample sample_Li_area(vec3 origin, vec2 random, LightInfo light) {
 
     // Ensure pdf is zero when backface is sampled on a single sided light
     float ndotl = dot(normal_g, -li_sample.wi);
-    float correct_side = 1.0;
-    if (light.double_sided == 0 && ndotl < 0.0) {
-        correct_side = 0.0;
+    int correct_side = 1;
+    if (!light.double_sided && ndotl < 0.0) {
+        correct_side = 0;
     }
 
     li_sample.radiance = light.emission;
@@ -105,20 +105,20 @@ LiSample sample_Li_area(vec3 origin, vec2 random, LightInfo light) {
 float pdf_light_area(vec3 positions[3], vec3 wi, float distance, vec3 emission, bool double_sided) {
     vec3  normal_g = cross(positions[1] - positions[0], positions[2] - positions[0]);
     float normal_g_length = length(normal_g); 
-    float area = normal_g_length * 0.5f;
     normal_g /= normal_g_length;
 
     float ndotl = dot(normal_g, -wi);
 
-    float correct_side = 1.0;
     if (!double_sided && ndotl < 0.0) {
-        correct_side = 0.0;
+        return 0.0;
     }
 
-    float power = length(emission) * /*area */ (double_sided ? 2.0f : 1.0f) * M_PI;
+    // Area cancels out
+    //float area = normal_g_length * 0.5f * ; 
+    float power = length(emission) * /*area **/ (double_sided ? 2.0f : 1.0f) * M_PI;
     float total_power = lights.integral * lights.size;
 
-    return sqr(distance) * power / (/*area */ abs(ndotl) * total_power); // Areas cancel out
+    return sqr(distance) * power / (/*area **/ abs(ndotl) * total_power); 
 }
 
 /*****************************************************************

@@ -1,8 +1,8 @@
 #include "sampling.glsl"
 #include "math.glsl"
 
-const uint Transport_Mode_Radiance   = 0; // Camera paths
-const uint Transport_Mode_Importance = 1; // Light paths
+#define Transport_Mode_Radiance   0 // Camera paths
+#define Transport_Mode_Importance 1 // Light paths
 
 /****************************************************************
  * Trowbridge-Reitz Model functions

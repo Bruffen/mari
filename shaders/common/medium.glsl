@@ -128,9 +128,9 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant
     return medium_sample;
 }
 
-MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
+MediumEvent sample_medium_event(vec3 position, vec3 wo, Medium medium, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
-    medium_event.medium      = medium_get();
+    medium_event.medium      = medium; // TODO does medium event need medium?
     medium_event.majorant    = medium_event.medium.absorption + medium_event.medium.scattering;
     medium_event.sampl       = sample_medium(position, wo, medium_event.medium, medium_event.majorant);
     medium_event.n_a         = medium_event.sampl.sigma_a / medium_event.majorant;
@@ -148,7 +148,6 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, inout uint seed) {
     else if (event < medium_event.n_a + medium_event.n_s) {
         medium_event.pf = pf_sample(medium_event.medium.phase_function, wo, seed);
         medium_event.scattered = true;
-        medium_event.transmittance = vec3(0.0);
     } 
     // Null
     else {
@@ -165,8 +164,7 @@ MediumEvent ray_marching(vec3 origin, vec3 direction, float tmin, float tmax, in
     float t;
     float step_size = (tmax - tmin) * 0.01;
 
-    for (int i = 0; i < 200; i++) {
-    //while (true) {
+    while (true) {
         t = tmin + step_size;// + step_size * (random1D(seed) * 0.5 - 1.0);
         if (t < tmax) {
             vec3 position = origin + direction * t;
@@ -203,7 +201,7 @@ MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
             vec3 position = origin + direction * t;
 
             vec3 jitter = vec3(0.0); //TODO (2.0 * random3D(seed) - vec3(1.0)) * volume.jittering_amount;
-            medium_event = sample_medium_event(position + jitter, -direction, seed);
+            medium_event = sample_medium_event(position + jitter, -direction, medium_event.medium, seed);
 
             if (medium_event.terminated || medium_event.scattered) {
                 medium_event.t = t;
@@ -229,14 +227,22 @@ vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, flo
         if (medium_get().heterogeneous) {
             switch(transmittance_algo) {
                 case 0: 
-                    transmittance = delta_tracking(origin, direction, tmin, tmax, seed).transmittance;
+                    MediumEvent e = delta_tracking(origin, direction, tmin, tmax, seed);
+                    if (e.terminated || e.scattered) {
+                        transmittance = vec3(0.0);
+                    }
                     break;
                 case 1:
                     transmittance = ray_marching(origin, direction, tmin, tmax, seed).transmittance;
                     break;
             }
         } else {
-            transmittance = get_transmittance(medium_get(), tmax - tmin);
+            // TODO: could we separate transmittance for absorption and scattering and multiply scattering's transmittance 
+            // with the phase function p / pdf of continuing in the same direction?
+            // A: apparently there is a similar idea called the reduced scattering coefficient 
+            // https://pbr-book.org/3ed-2018/Light_Transport_II_Volume_Rendering/Subsurface_Scattering_Using_the_Diffusion_Equation
+            // but nothing describes removing direction perserving paths from delta tracking to beer's law
+            transmittance = get_transmittance(medium_get(), tmax - tmin); 
         }
     }
     return transmittance;

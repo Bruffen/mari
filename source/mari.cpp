@@ -84,7 +84,7 @@ namespace mari {
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC);
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -122,7 +122,9 @@ namespace mari {
         freeCamera->isStatic = false;
         scene->addNode(freeCamera);
         scene->cameraObjects.emplace_back(freeCamera);
-        scene->currentCamera = freeCamera;
+        if (!scene->currentCamera) {
+            scene->currentCamera = freeCamera;
+        }
         
         KeyboardController controller{*gui};
         
@@ -278,7 +280,7 @@ namespace mari {
     };
 
     void Mari::loadScene() {
-        switch (  15  ) {
+        switch (  10  ) {
             case 0:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                 scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -334,18 +336,15 @@ namespace mari {
             case 10:
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/veach_mis_remake.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ganesha_comparison.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/veach_mis_remake.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ganesha_comparison.glb");
                 break;
             case 11:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/cornell_dragons2.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-MediumLight.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume-NoWall-BigLight.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/ship_zoom.glb");
+                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
+                scene->currentCamera = scene->nodes.at("Camera");
+                window.resizeWindow(1024, 1024);
                 break;
             case 12:
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Bruff_Lightning.glb");
@@ -354,10 +353,10 @@ namespace mari {
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/landscapes/snowy_mountain_landscape.glb");
                 break;
             case 14:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/ocean.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ocean.glb");
                 break;
             case 15:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/opal.glb");
+                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/opal.glb");
                 break;
                 // TODO oriental lantern scene
         }
@@ -367,7 +366,7 @@ namespace mari {
         std::vector<std::shared_ptr<InfiniteAreaLight>> lights{};
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageWhite32f(), 1));
         lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/citrus_orchard_road_puresky_1k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "citrus_orchard_road_puresky_1k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/citrus_orchard_road_puresky_1k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "citrus_orchard_road_puresky_1k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
@@ -381,7 +380,7 @@ namespace mari {
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rosendal_park_sunset_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rosendal_park_sunset_puresky_4k")));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rustig_koppie_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rustig_koppie_puresky_4k")));
+        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rustig_koppie_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rustig_koppie_puresky_4k")));
         //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sun_only.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sun_only")));
 
         //gui->saveImageFromData((void *)lights[0]->imageBuffer->getMappedMemory(), 4096, 4096, 4, true);

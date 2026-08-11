@@ -23,6 +23,7 @@ struct MaterialConstants {
     float  thickness;
     Medium medium;
     vec4   emission;   // rgb for color, a for strength
+    bool   double_sided_emission;
     bool   dielectric_nee_cheat;
 };
 
@@ -41,10 +42,10 @@ struct MaterialData {
     TextureIndices    indices;
 };
 
-#define MaterialType_Boundary -1
-#define MaterialType_Diffuse 0
+#define MaterialType_Boundary  -1
+#define MaterialType_Diffuse    0
 #define MaterialType_Dielectric 1
-#define MaterialType_Conductor 2
+#define MaterialType_Conductor  2
 
 int get_material_type(MaterialConstants m) {
     if (m.thickness > 0.0) {

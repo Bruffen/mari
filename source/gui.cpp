@@ -229,7 +229,7 @@ namespace mari {
                 if (g.transform.scale.y == 0.0) g.transform.scale.y = 0.00001f;
                 if (g.transform.scale.z == 0.0) g.transform.scale.z = 0.00001f;
                 g.setVolumeTransform();
-            } else {
+            } else if (g.mesh) {
                 system.needsUpdate = true;
 
                 for (auto &primMesh : g.mesh->primMeshes) {
@@ -404,6 +404,9 @@ namespace mari {
             ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
             imGuiImage(*material.textures.metallicRoughness);
             ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+            bool dse = material.data.constants.doubleSidedEmission;
+            ImGui::Checkbox("Double sided emission", &dse);
+            material.data.constants.doubleSidedEmission = dse;
             ImGui::Indent(-10.0f);
         }
         if (ImGui::CollapsingHeader("Dielectric", a_ptr)) {
@@ -453,7 +456,8 @@ namespace mari {
         }
 
         // Emission has changed
-        if (material.data.constants.emission != mc.emission) {
+        if (material.data.constants.emission != mc.emission ||
+            material.data.constants.doubleSidedEmission != mc.doubleSidedEmission) {
             system.needsLightsRebuild = true;
         }
 

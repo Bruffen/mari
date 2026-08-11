@@ -3,6 +3,8 @@
 
 #include "common/raygencommon.glsl"
 
+//#define SPECTRAL
+
 layout(location = 0) rayPayloadEXT Payload prd;
 layout(location = 1) rayPayloadEXT ShadowVolumetricPayload shadow_prd;
 
@@ -14,6 +16,12 @@ void main() {
     const float tmin = 0.0;
     const float tmax = 10000.0;
     const uint  shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+
+#ifdef SPECTRAL
+    float wavelength_min = 360.0f;
+    float wavelength_max = 830.0f;
+    prd.wavelengths = random3D(prd.seed) * (wavelength_max - wavelength_min) + wavelength_min; 
+#endif
 
     initialize_participating_media(); // TODO make it a #define so non volumetric path tracer does not need to allocate media stuff
 
@@ -33,7 +41,7 @@ void main() {
         bool regularize = false;
         float r_u = 1.0;
         float r_l = 1.0;
-        bool is_dirac_delta = false;
+        bool is_dirac_delta = true;
         bool inside_dielectric = false;
 
         for (uint depth = 0; depth < properties.max_depth; depth++) {
@@ -91,10 +99,11 @@ void main() {
              * Surface interaction
              ********************************/
             else if (hit_surface) {
+                const bool is_backface = dot(direction, hit.normal_g) > 0.0;
 
                 // Hit a volume boundary. Keep going without interacting.
                 if (hit.material_type == MaterialType_Boundary) {
-                    bool entering = dot(direction, -hit.normal_g) > 0.0;
+                    const bool entering = !is_backface;
 
                     origin = offset_position(hit.position, entering ? -hit.normal_g : hit.normal_g);
                     if (entering) {
@@ -106,20 +115,22 @@ void main() {
                 }
                 
                 // Render backfaces
-                if (dot(direction, hit.normal_g) > 0.0 && hit.material_type != MaterialType_Dielectric) {
+                if (is_backface && hit.material_type != MaterialType_Dielectric) {
                     flip_orientation(hit);
                 }
 
-                const bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
+                bool is_emissive = length_squared(hit.material.emission.rgb) > 0.0;
+                if (is_emissive && !hit.material.double_sided_emission) {
+                    is_emissive = !is_backface;
+                }
 
                 // Sample indirect light
                 if (is_emissive) {
-                    if (depth == 0 || is_dirac_delta || properties.next_event_estimation) {
-                        // TODO if single side -> if dot(normal_g, -prd.direction) > 0.0
+                    if (is_dirac_delta || properties.next_event_estimation) {
                         radiance += throughput * hit.material.emission.rgb;
                     }                 
                     else {
-                        float light_mis = pdf_light_area(hit.vertices, direction, t, hit.material.emission.rgb, true); // TODO double sided parameter in material
+                        float light_mis = pdf_light_area(hit.vertices, direction, t, hit.material.emission.rgb, hit.material.double_sided_emission);
                         float bxdf_mis = previous_pdf;
                         radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
                     }
@@ -274,7 +285,7 @@ void main() {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
                 float mis_weight = 1.0;
-                if (!is_dirac_delta && depth != 0 && properties.next_event_estimation) {
+                if (!is_dirac_delta && properties.next_event_estimation) {
                     mis_weight = power_heuristic(previous_pdf, pdf_light_infinite(uv));
                 }
 

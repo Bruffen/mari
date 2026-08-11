@@ -72,7 +72,8 @@ namespace mari {
         //float                       anisotropyRotation = 0.0f; 
 
         // rgb color, a strength
-        glm::vec4                   emission;                       
+        glm::vec4                   emission;
+        VkBool32                    doubleSidedEmission = false;
         
         // Allows shadow rays to pass through dielectric surfaces unaffected
         VkBool32                    dielectricNeeCheat = false;

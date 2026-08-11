@@ -26,9 +26,9 @@ namespace mari {
         // TODO uvs for sampling emissive texture
         // TODO texture id for emissive texture, potentially also usable with envmap?
         glm::vec3 emission;
-        float power;
-        float area;
-        int doubleSided;
+        float     power;
+        float     area;
+        VkBool32  doubleSided;
     };
 
     class Light {
