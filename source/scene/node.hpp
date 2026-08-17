@@ -43,7 +43,7 @@ namespace mari {
             std::vector<std::shared_ptr<Node>>          children;
             std::shared_ptr<Mesh>                       mesh;
             std::shared_ptr<Camera>                     camera;
-            std::shared_ptr<Light>                      light;
+            std::shared_ptr<Light>                      light; // Only for infinite area lights currently
             std::unique_ptr<Volume>                     volume;
         private:
             uint32_t id;

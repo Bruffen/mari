@@ -16,6 +16,20 @@ float safe_sqrt(float x) {
     return sqrt(max(0.0, x));
 }
 
+float safe_asin(float x) {
+    return asin(clamp(x, -1.0, 1.0));
+}
+
+float safe_acos(float x) {
+    return acos(clamp(x, -1.0, 1.0));
+}
+
+float angle_between(vec3 v1, vec3 v2) {
+    if (dot(v1, v2) < 0.0)
+        return M_PI - 2.0 * safe_asin(length(v1 + v2) / 2.0);
+    return 2.0 * safe_asin(length(v2 - v1) / 2.0);
+}
+
 float length_squared(vec3 w) {
     return w.x * w.x + w.y * w.y + w.z * w.z;
 }
@@ -71,6 +85,10 @@ vec3 spherical_direction(float sin_theta, float cos_theta, float phi) {
         clamp(sin_theta, -1.0, 1.0) * sin(phi),
         clamp(cos_theta, -1.0, 1.0)
     );
+}
+
+vec3 gram_schmidt(vec3 v, vec3 w) {
+    return v - dot(v, w) * w;
 }
 
 /* 

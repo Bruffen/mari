@@ -295,6 +295,7 @@ namespace mari {
                         assert(p.count % 3 == 0 && "PrimMesh count is not a multiple of 3 so it can't make an AreaLight!");
                         for (uint32_t i = 0; i < p.count; i += 3) {
                             auto light = std::make_unique<AreaLight>(device, *node, p, i);
+                            light->info.insideMedia = p.material->insideMedia;
                             lights.push_back(light->info);
                         }
                     }

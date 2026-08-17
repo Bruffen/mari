@@ -344,6 +344,7 @@ namespace mari {
                 //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
                 scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                 scene->currentCamera = scene->nodes.at("Camera");
+                std::ranges::find(scene->materials, "light", [](const auto& m) { return m->name; })->get()->insideMedia = true;
                 window.resizeWindow(1024, 1024);
                 break;
             case 12:

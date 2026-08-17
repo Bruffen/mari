@@ -208,7 +208,7 @@ void main() {
                     if (scatter_f > 0.0 && scatter_pdf > 0.0) {
                         shadow_prd.visibility = false;
                         shadow_prd.hit_count = 0;
-                        const float shadow_tmax = li_sample.distance  * 0.99999;
+                        float shadow_tmax = li_sample.distance  * 0.99999;
 
                         traceRayEXT(tlas, shadow_flags, 0xff, 1, 32 /*TODO bring SBT stride from host*/, 1, origin, tmin, li_sample.wi, shadow_tmax, 1);
 
@@ -224,9 +224,18 @@ void main() {
                             if (shadow_prd.hit_count > 0) {
                                 sort_hits(shadow_prd.hits, shadow_prd.hit_count);
 
-                                // If amount of boundary hits is even, it means the ray starts outside of a medium (ignoring when the light is inside the medium)
+                                // If amount of boundary hits is even, it means the ray starts outside of a medium
                                 // therefore skip the first section of the ray for transmittance calculation
+                                // If the light happens to be inside a medium, then the opposite is true
+                                // breaks if there's volumes inside of volumes
                                 int start = shadow_prd.hit_count % 2 == 0 ? 1 : 0;
+                                if (light.inside_media) {
+                                    start == 0 ? 1 : 0;
+                                    shadow_prd.hits[shadow_prd.hit_count].t = shadow_tmax;
+                                    shadow_prd.hits[shadow_prd.hit_count].material_bda = shadow_prd.hits[shadow_prd.hit_count - 1].material_bda;
+                                    shadow_prd.hit_count++; // TODO find a cleaner way to handle this
+                                }
+
                                 for (int i = start; i < shadow_prd.hit_count; i += 2) {
                                     medium_push(get_material(shadow_prd.hits[i].material_bda).constants.medium);
 
@@ -243,6 +252,10 @@ void main() {
                                     medium_remove();
                                 }
                             }
+                            // The scattered point and the light are both inside the same volumetric boundary 
+                            else if (light.inside_media) {
+                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, 0.0, shadow_tmax, prd.seed, properties.transmittance_algo);
+                            }
                             /********************************
                              * NanoVDB
                              ********************************/
@@ -255,7 +268,7 @@ void main() {
                                 medium_remove();
                             }
 
-                            float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf); // TODO li_sample.pdf is area sampled. Does it need to be solid angle to match scatter_pdf?
+                            float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;
                         }
                     }

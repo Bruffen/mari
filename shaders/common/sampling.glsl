@@ -206,6 +206,32 @@ vec3 sample_uniform_triangle(vec2 random) {
     return b;
 }
 
+vec3 sample_spherical_triangle(vec3 v[3], vec3 p, vec2 random, inout float pdf) {
+    vec3 a = normalize(v[0] - p);
+    vec3 b = normalize(v[1] - p);
+    vec3 c = normalize(v[2] - p);
+
+    vec3 n_ab = cross(a, b);
+    vec3 n_bc = cross(b, c);
+    vec3 n_ca = cross(c, a);
+
+    //if (length(n_ab) == 0 || length(n_bc) == 0 || length(n_ca) == 0) {
+    //    return vec3(0);
+    //}
+
+    float alpha = angle_between(n_ab, -n_ca);
+    float beta  = angle_between(n_bc, -n_ab);
+    float gamma = angle_between(n_ca, -n_bc);
+
+    float A_pi = alpha + beta + gamma;
+    float Ap_pi = mix(M_PI, A_pi, random.x);
+    float A = A_pi - M_PI;
+    pdf = A <= 0 ? 0.0 : 1.0 / A;
+
+    // TODO unfinished method
+    return vec3(0.0);
+}
+
 /**
  * Samples a new diffuse direction with just a normal with no shading frame. Only for testing purposes
  */

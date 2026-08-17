@@ -29,6 +29,7 @@ namespace mari {
         float     power;
         float     area;
         VkBool32  doubleSided;
+        VkBool32  insideMedia = false;
     };
 
     class Light {

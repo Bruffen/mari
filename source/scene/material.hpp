@@ -101,6 +101,7 @@ namespace mari {
         MaterialData                data;
         MaterialTextures            textures;
         bool                        transparent = false;
+        bool                        insideMedia = false; // Only for lights, for transmittance calculation. // TODO Think of a better way
 
         bool                        isEmissive() const { 
             return glm::length(

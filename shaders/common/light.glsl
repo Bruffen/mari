@@ -35,6 +35,7 @@ struct LightInfo {
     float    power;
     float    area;
     bool     double_sided;
+    bool     inside_media;
 };
 
 #define Light_Type_Area     2
@@ -95,7 +96,9 @@ LiSample sample_Li_area(vec3 origin, vec2 random, LightInfo light) {
     }
 
     li_sample.radiance = light.emission;
-    li_sample.pdf      = sqr(li_sample.distance) / (light.area * abs(ndotl)) * correct_side;
+    li_sample.pdf      = 1.0 / light.area * correct_side;
+    // Convert area measure pdf to solid angle pdf
+    li_sample.pdf      *= sqr(li_sample.distance) / abs(ndotl);
 
     return li_sample;
 }
@@ -120,6 +123,14 @@ float pdf_light_area(vec3 positions[3], vec3 wi, float distance, vec3 emission, 
     float total_power = lights.integral * lights.size;
 
     return sqr(distance) * power / (/*area **/ abs(ndotl) * total_power); 
+
+    // Decomposed pdfs
+    /* 
+    float pdf_cdf = power / total_power;
+    float pdf_area = 1.0 / area;
+    float area_to_solid_angle = sqr(distance) / abs(ndotl);
+    return pdf_cdf * pdf_area * area_to_solid_angle;
+    */
 }
 
 /*****************************************************************

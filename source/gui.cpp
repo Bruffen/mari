@@ -406,9 +406,20 @@ namespace mari {
             ImGui::SliderFloat("Roughness", (float*)&material.data.constants.roughness, 0.0f, 1.0f, "%.3f", silderFlags);
             imGuiImage(*material.textures.metallicRoughness);
             ImGui::ColorEdit4("Emission", (float*)&material.data.constants.emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-            bool dse = material.data.constants.doubleSidedEmission;
-            ImGui::Checkbox("Double sided emission", &dse);
-            material.data.constants.doubleSidedEmission = dse;
+
+            if (material.isEmissive()) {
+                bool dse = material.data.constants.doubleSidedEmission;
+                ImGui::Checkbox("Double sided emission", &dse);
+                material.data.constants.doubleSidedEmission = dse;
+
+                bool im = material.insideMedia;
+                ImGui::Checkbox("Inside media", &im);
+                if (material.insideMedia != im) {
+                    material.insideMedia = im;
+                    system.needsLightsRebuild = true;
+                    inputChanged = true;
+                }
+            }
             ImGui::Indent(-10.0f);
         }
         if (ImGui::CollapsingHeader("Dielectric", a_ptr)) {
