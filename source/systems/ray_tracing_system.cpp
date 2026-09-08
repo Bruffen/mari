@@ -276,7 +276,7 @@ namespace mari {
                 shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
                 shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");
                 break;
-            case Integrator::PATH_TRACING_VOLUMETRIC_AHIT:
+            case Integrator::PATH_TRACING_VOLUMETRIC_CHIT:
 
                 break;
             default:

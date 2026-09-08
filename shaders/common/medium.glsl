@@ -109,7 +109,7 @@ MediumEvent get_medium_event_empty() {
     );
 }
 
-MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant) {
+MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant, inout uint seed) {
     if (!medium.heterogeneous) {
         //if (length(position) < 0.1) {
         return MediumSample(medium.albedo, medium.absorption, medium.scattering, vec3(0.0));
@@ -119,7 +119,8 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant
         //}
     }
 
-    vec2  sample_data = sample_volume_nano(position);
+    vec3  jitter      = (2.0 * random3D(seed) - 1.0) * volume.jittering_amount; // TODO scale with voxel size -> pnanovdb_grid_get_voxel_size()
+    vec2  sample_data = sample_volume_nano(position + jitter);
 	float density     = sample_data.x;
 	float temperature = max(sample_data.y * volume.temperature_multiplier, 0.0);
     float intensity   = M_stefan_boltzmann * pow(temperature, 4) * volume.emissiveness_multiplier;
@@ -137,7 +138,7 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, Medium medium, inout uin
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium      = medium; // TODO does medium event need medium?
     medium_event.majorant    = medium_event.medium.absorption + medium_event.medium.scattering;
-    medium_event.sampl       = sample_medium(position, wo, medium_event.medium, medium_event.majorant);
+    medium_event.sampl       = sample_medium(position, wo, medium_event.medium, medium_event.majorant, seed);
     medium_event.p_a         = medium_event.sampl.sigma_a / medium_event.majorant;
     medium_event.p_s         = medium_event.sampl.sigma_s / medium_event.majorant;
     medium_event.p_n         = max(0.0, 1.0 - medium_event.p_a - medium_event.p_s);
@@ -175,8 +176,7 @@ MediumEvent ray_marching(vec3 origin, vec3 direction, float tmin, float tmax, in
         if (t < tmax) {
             vec3 position = origin + direction * t;
 
-            vec3 jitter = vec3(0.0); //TODO (2.0 * random3D(seed) - vec3(1.0)) * volume.jittering_amount;
-            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant);
+            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant, seed);
             medium_event.transmittance *= get_transmittance((t - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
             tmin = t;
         }
@@ -184,7 +184,7 @@ MediumEvent ray_marching(vec3 origin, vec3 direction, float tmin, float tmax, in
             // Reached end of ray
             vec3 position = origin + direction * tmax;
 
-            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant);
+            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant, seed);
             medium_event.transmittance *= get_transmittance((tmax - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
             medium_event.t = tmax;
             break;
@@ -205,9 +205,8 @@ MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
         t = tmin + sample_exponential(random1D(seed), medium_event.majorant);
         if (t < tmax) {
             vec3 position = origin + direction * t;
-
-            vec3 jitter = vec3(0.0); //TODO (2.0 * random3D(seed) - vec3(1.0)) * volume.jittering_amount; move jitter to sample_medium_event()
-            medium_event = sample_medium_event(position + jitter, -direction, medium_event.medium, seed);
+            
+            medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
 
             if (medium_event.terminated || medium_event.scattered) {
                 medium_event.t = t;

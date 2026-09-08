@@ -26,7 +26,7 @@ namespace mari {
         DefaultObjects::initialize(device);        
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
-        scene = TestScenes::loadScene(device, window, 5);
+        scene = TestScenes::loadScene(device, window, 9);
         scene->start();
 
         rayTracingSystem.buildScene(*scene);
@@ -86,7 +86,7 @@ namespace mari {
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC);
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC_AHIT);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {

@@ -76,6 +76,17 @@ namespace mari {
                         scene->currentCamera = scene->nodes.at("Camera");
                     }
                     window.resizeWindow(1024, 1024);
+
+                    scene->volumeObject = std::make_shared<Node>("volume");
+                    scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
+                    //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
+                    //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
+                    scene->volumeObject->transform.scale *= 0.005f;
+                    scene->volumeObject->volume->medium.scattering *= 80.0f;
+                    scene->volumeObject->volume->jitteringAmount = 0.0f;
+                    scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
+                    scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;
+                    scene->addNode(scene->volumeObject);
                     break;
                 case 10:
                     //scene->load("../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
@@ -166,7 +177,6 @@ namespace mari {
             scene->volumeObject->volume->medium.absorption = 1.0f;
             scene->volumeObject->volume->medium.scattering = 1.0f;
 
-            scene->addNode(scene->volumeObject);
     */
             scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
             return scene;
