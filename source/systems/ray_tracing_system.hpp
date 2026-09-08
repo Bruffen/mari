@@ -11,7 +11,8 @@ namespace mari {
     enum Integrator {
         PATH_TRACING,
         PATH_TRACING_VOLUME_ONLY,
-        PATH_TRACING_VOLUMETRIC
+        PATH_TRACING_VOLUMETRIC_AHIT,   // Shadow ray returns a list of any hits with media which are sorted after
+        PATH_TRACING_VOLUMETRIC_CHIT,   // Shadow ray is a loop of closest hits through media until light is reached
     };
 
     class RayTracingSystem {

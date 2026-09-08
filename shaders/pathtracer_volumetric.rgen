@@ -38,9 +38,6 @@ void main() {
 
         float previous_pdf = 1.0;
         float eta_scale = 1.0;
-        bool regularize = false;
-        float r_u = 1.0;
-        float r_l = 1.0;
         bool is_dirac_delta = true;
         bool inside_dielectric = false;
 
@@ -62,23 +59,28 @@ void main() {
             // TODO test intersections with every nanovdb bbox, get a list of results and sample them accordingly
             // Sample the participating medium
             MediumEvent medium_event = sample_medium_along_ray(origin, direction, t, prd.seed);
-
-            // Compute throughput' at new path vertex
-            //float pdf = 
-            // TODO is it spectral only?
-            // Compute rescaled path probability for absorption at path vertex
-            //float r_e = r_u * 
+            throughput *= medium_event.transmittance;
 
             /********************************
              * Medium interaction
              ********************************/
+
+            // Apply emission with MIS (for when emission is treated as directly related to absorption)
+            if (medium_event.terminated || medium_event.scattered) {
+                // Applying MIS algebra results in the scattered event algebra simplifying to equal the absorption event
+                // Therefore we can skip MIS altogether and do this instead for both events
+                float p_a = medium_event.sampl.sigma_a / (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s);
+                radiance += throughput * p_a * medium_event.sampl.emission;
+
+                // If emission is supposed to be independent of absorption density
+                //radiance += throughput * medium_event.sampl.emission / (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s);
+            }
+            
             if (medium_event.terminated) {
-                break; // TODO THESIS can emission be added in both absorption and scattering events with MIS?
+                //radiance += throughput * medium_event.sampl.emission;
+                break;
             }
             if (medium_event.scattered) {
-                // TODO why does emission only happen acording to the coefficient of absorption? Use MIS?
-                radiance += throughput * medium_event.medium.absorption * medium_event.sampl.emission; /* / r_e; */
-
                 if (medium_event.pf.pdf == 0.0) 
                     break;
 
@@ -87,14 +89,9 @@ void main() {
                 origin          = origin + direction * medium_event.t;
                 direction       = medium_event.pf.wi;
                 throughput     *= medium_event.sampl.albedo;
-                r_l             = r_u / medium_event.pf.pdf;
                 previous_pdf    = medium_event.pf.pdf;
                 is_dirac_delta  = false;
-
-                // TODO light sample context?
-                //continue;
-                // TODO null scatters have to update tracking variables
-            } 
+            }
             /********************************
              * Surface interaction
              ********************************/
@@ -280,21 +277,19 @@ void main() {
             if (medium_event.scattered) {
                 // Phase Function
                 throughput *= medium_event.pf.p / medium_event.pf.pdf;
-                continue;
             } else if (hit_surface) {
                 // Bxdf
-                if (bxdf_sample.pdf == 0.0) {
+                if (bxdf_sample.pdf <= 0.0) {
                     throughput *= 0.0;
                 } else {
                     throughput *= bxdf_sample.f * abs_cos_theta(bxdf_sample.wi) / bxdf_sample.pdf; // TODO conductors look a little darker
-                    r_l = r_u / bxdf_sample.pdf;
                 }
             }
 
             /********************************
              * Miss. Sample environment map
              ********************************/
-            if (!hit_surface) {
+            else if (!hit_surface) {
                 vec2 uv;
                 vec3 le = sample_Le_infinite(direction, uv);
                 float mis_weight = 1.0;
@@ -303,7 +298,7 @@ void main() {
                 }
 
                 if (!isnan(mis_weight)) radiance += throughput * le * mis_weight;
-                break;            
+                break;
             }
             /********************************
              * Russian roulette

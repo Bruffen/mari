@@ -47,7 +47,6 @@ void main() {
                 break;
             }
             if (medium_event.scattered) {
-                //radiance   += throughput * medium_event.sampl.emission * medium_event.medium.absorption; 
                 // Set values for next ray
                 origin     = origin + direction * medium_event.t;
                 direction  = medium_event.pf.wi;

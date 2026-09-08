@@ -123,7 +123,7 @@ namespace mari {
             ImGui::Text("========================");
 #endif
             imGuiFramerate(frameInfo.deltaTime);
-            ImGui::Text("Samples: %i", frameInfo.frameCounter + 1);
+            ImGui::Text("Samples: %i", frameInfo.frameCounter + 1); // TODO does not take into account multiple samples per frame
             ImGui::Text("Triangle count: %i", triangleCount);
 
             ImGui::BeginChild("TabChild", ImVec2(0, 0), ImGuiChildFlags_None);
@@ -594,7 +594,7 @@ namespace mari {
 
             // Transmittance algorithm
             if (system.getIntegrator() != Integrator::PATH_TRACING) {
-                const char* algorithms[] = { "Delta tracking", "Ray marching" };
+                const char* algorithms[] = { "Delta tracking", "Ray marching", "Ratio Tracking", "Residual Ratio Tracking" };
                 const char* selectedAlgorithm = algorithms[system.transmittanceAlgo];
                 
                 if (ImGui::BeginCombo("Transmittance algorithm", selectedAlgorithm, 0)) {

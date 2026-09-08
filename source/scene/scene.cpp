@@ -37,6 +37,10 @@ namespace mari {
         return pathStr.substr(0, recoverLastSeparatorPos(pathStr) + 1);
     }
 
+    Scene::Scene(Device &device) : device{device} {
+    
+    }
+
     std::shared_ptr<Node> Scene::getNode(const uint32_t id) {
         for (auto& node : nodes) {
             if (node.second->getId() == id) {
@@ -52,7 +56,7 @@ namespace mari {
         nodes[node->name] = node;
     }
 
-    Scene::Scene(Device &device, const std::string &path) : device{device} {
+    void Scene::load(const std::string &path) {
         constexpr auto gltfOptions = 
             fastgltf::Options::DontRequireValidAssetMember | 
             fastgltf::Options::AllowDouble | 
@@ -466,12 +470,12 @@ namespace mari {
                 assert(filePath.uri.isLocalPath());   // We're only capable of loading local files.
 
                 const std::string path(filePath.uri.path().begin(), filePath.uri.path().end());
-                newImage = loadImage((folder + path).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                newImage = loadImage(device, (folder + path).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
             },
             [&](fastgltf::sources::Array& vector) {
                 const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data());
                 data = stbi_load_from_memory(imgBytes, static_cast<int>(vector.bytes.size()), &width, &height, &nrChannels, 4);
-                newImage = extractImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
+                newImage = extractImage(device, data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
             },
             [&](fastgltf::sources::BufferView& view) {
                 auto& bufferView = asset.bufferViews[view.bufferViewIndex];
@@ -482,7 +486,7 @@ namespace mari {
                     [&](fastgltf::sources::Array& vector) {
                         const unsigned char* imgBytes = reinterpret_cast<const unsigned char*>(vector.bytes.data()) + bufferView.byteOffset;
                         data = stbi_load_from_memory(imgBytes, static_cast<int>(bufferView.byteLength), &width, &height, &nrChannels, 4);
-                        newImage = extractImage(data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
+                        newImage = extractImage(device, data, VK_FORMAT_R8G8B8A8_UNORM, width, height);
                     }},
                     buffer.data
                 );
@@ -492,9 +496,9 @@ namespace mari {
         return newImage;
     }
 
-    std::shared_ptr<Image> Scene::extractImage(void* data, VkFormat format, int width, int height) {
+    std::shared_ptr<Image> Scene::extractImage(Device &device, void* data, VkFormat format, int width, int height) {
         assert(data && "Null pointer to image data");
-        std::shared_ptr<Image> image;
+        std::shared_ptr<Image> image{};
 
         if (data) {
             image = std::make_shared<Image>(
@@ -515,7 +519,7 @@ namespace mari {
         }
     }
 
-    std::shared_ptr<Image> Scene::loadImage(const std::string &path, VkFormat format) {
+    std::shared_ptr<Image> Scene::loadImage(Device &device, const std::string &path, VkFormat format) {
         assert(format == VK_FORMAT_R8G8B8A8_UNORM || format == VK_FORMAT_R32G32B32A32_SFLOAT && "Only R8G8B8A8_UNORM and R32G32B32A32_SFLOAT are implemented");
 
         int width, height, nrChannels;
@@ -529,14 +533,14 @@ namespace mari {
         }
 
         if (data) {
-            return extractImage(data, format, width, height);
+            return extractImage(device, data, format, width, height);
         }
         throw std::runtime_error("Failed to load " + path);
         return {};
     }
 
-    std::shared_ptr<Image> Scene::loadImage(const std::string &path, VkFormat format, const std::string &name) {
-        std::shared_ptr<Image> img = loadImage(path, format);
+    std::shared_ptr<Image> Scene::loadImage(Device &device, const std::string &path, VkFormat format, const std::string &name) {
+        std::shared_ptr<Image> img = loadImage(device, path, format);
         if (img) {
             img->name = name;
         }

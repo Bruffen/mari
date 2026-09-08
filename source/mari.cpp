@@ -9,6 +9,8 @@
 
 #include "components/volume.hpp"
 
+#include "test_scenes.hpp"
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -24,7 +26,7 @@ namespace mari {
         DefaultObjects::initialize(device);        
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
-        loadScene();
+        scene = TestScenes::loadScene(device, window, 5);
         scene->start();
 
         rayTracingSystem.buildScene(*scene);
@@ -278,146 +280,6 @@ namespace mari {
 
         vkDeviceWaitIdle(device.handle());
     };
-
-    void Mari::loadScene() {
-        switch (  11  ) {
-            case 0:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
-                scene->transform.position = {0.0f, -0.01f, 0.0f};
-                break;
-            case 1:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/ABeautifulGame/glTF/ABeautifulGame.glTF"); // TODO this scene uses instancing
-                break;
-            case 2:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/mylivingroom.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/BreakfastRoom/BreakfastRoom.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/city-many-lights-package/city-many-lights-v3-smaller.gltf");
-                break;
-            case 3:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sportsCar.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sibenik.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/SanMiguel.glb");
-                break;
-            case 4:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/OrientationTest/glTF-Binary/OrientationTest.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/GearboxAssy/glTF-Binary/GearboxAssy.glb");
-                break;
-            case 5:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/IntelSponza/intelsponza_curtains_ivy.glb");
-                break;
-            case 6:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/box2.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/xyzrgb_dragon_floor.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/DragonAttenuation.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/statues/hosmer-zenobia_in_chains.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/statues/lucy-stanford-repository.glb");
-                break;
-            case 7:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/bistro_exterior.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/nvidia-attic.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/scandinavian-studio-main-room.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/UE4_SunTemple.glb");
-                break;
-            case 8:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/TextureLinearInterpolationTest/glTF-Binary/TextureLinearInterpolationTest.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/AttenuationTest/glTF-Binary/AttenuationTest.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/NormalTangentTest/glTF-Binary/NormalTangentTest.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/glTF-Sample-Models/2.0/MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb");
-                break;
-            case 9:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/deccer-cubes/SM_Deccer_Cubes_Textured_Complex.gltf");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sphere.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/cube.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/plane.glb");
-                //scene->nodes.at("plane")->transform.scale *= 0.00001f;
-                break;
-            case 10:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Scenes/mitsuba-knob.gltf");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/veach_mis_remake.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ganesha_comparison.glb");
-                break;
-            case 11:
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Boxes.glb");
-                //scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/CornellBox-Spheres-Improved.glb");
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
-                scene->currentCamera = scene->nodes.at("Camera");
-                std::ranges::find(scene->materials, "light", [](const auto& m) { return m->name; })->get()->insideMedia = true;
-                window.resizeWindow(1024, 1024);
-                break;
-            case 12:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/Bruff_Lightning.glb");
-                break;
-            case 13:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/landscapes/snowy_mountain_landscape.glb");
-                break;
-            case 14:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/ocean.glb");
-                break;
-            case 15:
-                scene = std::make_shared<Scene>(device, "../../../../_Models/gltf/_myScenes/opal.glb");
-                break;
-                // TODO oriental lantern scene
-        }
-        scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
-        //scene->transform.position.y -= 1000.0f;
-
-        std::vector<std::shared_ptr<InfiniteAreaLight>> lights{};
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageWhite32f(), 1));
-        lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/citrus_orchard_road_puresky_1k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "citrus_orchard_road_puresky_1k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../../../_Models/gltf/IntelSponza/main1_sponza/textures/kloppenheim_05_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloppenheim_05_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_late_afternoon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_late_afternoon_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_moonrise_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_moonrise_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_8k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_noon_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_noon_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_sunset_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_sunset_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/qwantani_dusk_2_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "qwantani_dusk_2_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/dikhololo_night_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "dikhololo_night_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/the_sky_is_on_fire_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "the_sky_is_on_fire_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sunny_vondelpark_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sunny_vondelpark_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/kloofendal_48d_partly_cloudy_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "kloofendal_48d_partly_cloudy_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rosendal_park_sunset_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rosendal_park_sunset_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/rustig_koppie_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rustig_koppie_puresky_4k")));
-        //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, scene->loadImage("../../models/sun_only.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "sun_only")));
-
-        //gui->saveImageFromData((void *)lights[0]->imageBuffer->getMappedMemory(), 4096, 4096, 4, true);
-
-        /*
-        std::vector<float> data;
-        for (const PiecewiseConstant1D& pie : lights[0]->sampler.pConditional) {
-            for (auto& f : pie.getFunction()) {
-                data.push_back(f);
-            }
-        }
-        gui->saveImageFromData(data.data(), 4096, 4096, 1, true);
-        */
-
-        for (std::shared_ptr<InfiniteAreaLight> l : lights) {
-            auto node = std::make_shared<Node>();
-            node->name = l->equalAreaImage->name;
-            node->light = l;
-            scene->lightObjects.emplace_back(node);
-        }
-/*
-        scene->volumeObject = std::make_shared<Node>("volume");
-        scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
-        //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
-        //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
-        //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/fire.vdb"); 
-        //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb");
-        scene->volumeObject->transform.scale *= 0.005f;
-        scene->volumeObject->volume->medium.scattering *= 80.0f;
-        scene->volumeObject->volume->jitteringAmount = 0.0f;
-        scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
-        scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;        
-        scene->addNode(scene->volumeObject);
-*/
-        scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
-    }
 
     Mari::~Mari() {
         DefaultObjects::cleanup(device);

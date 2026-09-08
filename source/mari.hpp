@@ -25,9 +25,8 @@ namespace mari {
             Mari &operator=(const Mari &) = delete;
 
             void run();
+            
         private:
-            void loadScene();
-
             Window              window{WIDTH, HEIGHT, "Mari"};
             Device              device{window};
             Renderer            renderer{window, device};
