@@ -60,6 +60,24 @@ namespace mari {
         uint64_t elementStride = sizeof(float); // because it's a FloatGrid
         uint64_t elementCount = byteSize / elementStride; 
 
+        auto bbox = densityGridData->transform().indexToWorld(densityGridData->evalActiveVoxelBoundingBox());
+
+        aabb.minX = static_cast<float>(-1 /*bbox.min().x()*/);
+        aabb.minY = static_cast<float>(-1 /*bbox.min().y()*/);
+        aabb.minZ = static_cast<float>(-1 /*bbox.min().z()*/);
+        aabb.maxX = static_cast<float>( 1 /*bbox.max().x()*/);
+        aabb.maxY = static_cast<float>( 1 /*bbox.max().y()*/);
+        aabb.maxZ = static_cast<float>( 1 /*bbox.max().z()*/);
+
+        aabbPositionsBuffer = std::make_unique<Buffer>(
+            device,
+            sizeof(VkAabbPositionsKHR),
+            1,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+        aabbPositionsBuffer->stageToBuffer(&aabb); // TODO update in setTransform()
+
         nanoDensityBuffer = std::make_unique<Buffer>(
             device, 
             elementStride, 

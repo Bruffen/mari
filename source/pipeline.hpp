@@ -54,6 +54,7 @@ namespace mari {
                                                 const std::vector<std::string> &shadersMiss,
                                                 const std::vector<std::string> &shadersClosestHit,
                                                 const std::vector<std::string> &shadersAnyHit,
+                                                const std::vector<std::string> &shadersIntersection,
                                                 const std::vector<std::string> &shadersCallable);
             void                            createComputePipeline(const std::string &compFilepath, const PipelineLayout& pipelineLayout);
             VkStridedDeviceAddressRegionKHR raygenSBTEntry, missSBTEntry, hitSBTEntry, callableSBTEntry; // TODO private?

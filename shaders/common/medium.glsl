@@ -317,13 +317,17 @@ vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, flo
 
 
 MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float t, inout uint seed) {
+    if (current_medium < 0) { 
+        return get_medium_event_empty(); 
+    }
+
     direction = normalize(direction);
 
     float tmin = 1e-6;
     float tmax = t;
     bool  done = false;
     bool  to_remove_medium = false;
-
+/*
     if (current_medium < 0) { // TODO replace with test_intersection_volume_nano() to ray gen shader
         float tmax_surface = tmax;
         bool hit = pnanovdb_hdda_ray_clip(
@@ -349,7 +353,7 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float t, inout 
         medium_push(volume.medium);
         to_remove_medium = true;
     }
-
+*/
     MediumEvent medium_event;
     if (medium_get().scattering > 0.0 || medium_get().heterogeneous) {
         medium_event = delta_tracking(origin, direction, tmin, tmax, seed);

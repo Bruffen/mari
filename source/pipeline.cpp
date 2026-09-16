@@ -217,6 +217,7 @@ namespace mari {
                                             const std::vector<std::string> &shadersMiss,
                                             const std::vector<std::string> &shadersClosestHit,
                                             const std::vector<std::string> &shadersAnyHit,
+                                            const std::vector<std::string> &shadersIntersection,
                                             const std::vector<std::string> &shadersCallable) {
         assert(pipelineLayout.handle() != VK_NULL_HANDLE && "Cannot create ray tracing pipeline: Null PipelineLayout");
         assert(shadersCallable.empty() && "TODO: Implement callable shader groups");
@@ -274,6 +275,24 @@ namespace mari {
             }
         }
 
+        {
+            //assert(shadersClosestHit.size() == shadersIntersection.size() && "Closest hit shader and intersection shader amount have to match for procedural hit groups.");
+            VkRayTracingShaderGroupCreateInfoKHR proceduralGroupCreateInfo{};
+            proceduralGroupCreateInfo.sType                 = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            proceduralGroupCreateInfo.type                  = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
+            proceduralGroupCreateInfo.anyHitShader          = VK_SHADER_UNUSED_KHR;
+            proceduralGroupCreateInfo.generalShader         = VK_SHADER_UNUSED_KHR;
+            for (int i = 0; i < shadersIntersection.size(); i++) { // TODO redo if specific chit for procedurals
+                shaderStages.push_back(loadShader(shadersClosestHit[i], VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
+                proceduralGroupCreateInfo.closestHitShader  = static_cast<uint32_t>(shaderStages.size() - 1);
+
+                shaderStages.push_back(loadShader(shadersIntersection[i], VK_SHADER_STAGE_INTERSECTION_BIT_KHR));
+                proceduralGroupCreateInfo.intersectionShader = static_cast<uint32_t>(shaderStages.size() - 1);
+
+                shaderGroups.push_back(proceduralGroupCreateInfo);
+            }
+        }
+
         VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCreateInfo{};
         rayTracingPipelineCreateInfo.sType                  = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
         rayTracingPipelineCreateInfo.stageCount             = static_cast<uint32_t>(shaderStages.size());
@@ -293,7 +312,7 @@ namespace mari {
         createShaderBindingTables(
             static_cast<uint32_t>(shadersRayGeneration.size()),
             static_cast<uint32_t>(shadersMiss.size()),
-            static_cast<uint32_t>(std::max(shadersClosestHit.size(), shadersAnyHit.size())),
+            static_cast<uint32_t>(std::max(shadersClosestHit.size(), shadersAnyHit.size()) + shadersIntersection.size()),
             static_cast<uint32_t>(shadersCallable.size())
         );
     }

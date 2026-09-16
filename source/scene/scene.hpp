@@ -37,7 +37,8 @@ namespace mari {
             std::vector<std::shared_ptr<Node>>      topNodes;
             std::vector<std::shared_ptr<Node>>      cameraObjects;
             std::vector<std::shared_ptr<Node>>      lightObjects; // currently this is actually just infinite area lights
-            std::shared_ptr<Node>                   volumeObject;
+            std::shared_ptr<Node>                   volumeObject; // TODO replace into volumeObjects
+            std::vector<std::shared_ptr<Node>>      volumeObjects;
             std::vector<std::shared_ptr<Material>>  materials;
             std::unique_ptr<Buffer>                 materialDataBuffer;
             std::shared_ptr<Node>                   currentCamera;

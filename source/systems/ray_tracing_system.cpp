@@ -36,6 +36,10 @@ namespace mari {
             if (node->mesh) {
                 buildBLAS(node, scene.materialDataBuffer->deviceAddress());
             }
+
+            if (node->volume) {
+                buildBLAS(node, scene.materialDataBuffer->deviceAddress() /* TODO volumeDataBuffer*/);
+            }
         }
         
         VkDeviceSize primMeshesAdressesBufferSize = sizeof(PrimMeshInfo) * primMeshesInfos.size();
@@ -79,70 +83,93 @@ namespace mari {
         auto blas = std::make_unique<AccelerationStructure>(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
         blas->node = node;
 
-        std::vector<uint32_t> triangleCounts{};
+        std::vector<uint32_t> primitiveCounts{};
         std::vector<VkAccelerationStructureGeometryKHR> geometries{};
         std::vector<VkAccelerationStructureBuildRangeInfoKHR> buildRangeInfos{};
         std::vector<VkAccelerationStructureBuildRangeInfoKHR *> pBuildRangeInfos{};
 
-        triangleCounts.reserve(node->mesh->primMeshes.size());
-        geometries.reserve(node->mesh->primMeshes.size());
-        buildRangeInfos.reserve(node->mesh->primMeshes.size());
-        pBuildRangeInfos.reserve(node->mesh->primMeshes.size());
-
-        // Create geometries per primMesh so we can index materials by gl_GeometryIndexEXT
-        for (const PrimMesh &primMesh : node->mesh->primMeshes) {
-            // Set device adresses for buffers
-            VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
-            VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
+        if (node->mesh) {
+            primitiveCounts.reserve(node->mesh->primMeshes.size());
+            geometries.reserve(node->mesh->primMeshes.size());
+            buildRangeInfos.reserve(node->mesh->primMeshes.size());
+            pBuildRangeInfos.reserve(node->mesh->primMeshes.size());
             
-            vertexBufferDeviceAddress.deviceAddress = node->mesh->vertexBuffer->deviceAddress();
-            indexBufferDeviceAddress.deviceAddress  = node->mesh->indexBuffer->deviceAddress() + primMesh.start * sizeof(uint32_t);
-
-            // Optimize geometry flags for the material
-            VkGeometryFlagsKHR geometryFlags;
-            if ((primMesh.material->data.constants.thickness == 1.0f && 
+            // Create geometries per primMesh so we can index materials by gl_GeometryIndexEXT
+            for (const PrimMesh &primMesh : node->mesh->primMeshes) {
+                // Set device adresses for buffers
+                VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
+                VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
+                
+                vertexBufferDeviceAddress.deviceAddress = node->mesh->vertexBuffer->deviceAddress();
+                indexBufferDeviceAddress.deviceAddress  = node->mesh->indexBuffer->deviceAddress() + primMesh.start * sizeof(uint32_t);
+                
+                // Optimize geometry flags for the material
+                VkGeometryFlagsKHR geometryFlags;
+                if ((primMesh.material->data.constants.thickness == 1.0f && 
                     (primMesh.material->data.constants.ior == 1.0f || primMesh.material->data.constants.dielectricNeeCheat)) ||
-                (primMesh.material->transparent || primMesh.material->data.constants.albedo.a < 1.0f)) {
-                geometryFlags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
-            } else {
-                geometryFlags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+                    (primMesh.material->transparent || primMesh.material->data.constants.albedo.a < 1.0f)) {
+                    geometryFlags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
+                } else {
+                    geometryFlags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+                }
+                
+                // Set geometry info
+                VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
+                accelerationStructureGeometry.sType                           = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+                accelerationStructureGeometry.flags                           = geometryFlags;
+                accelerationStructureGeometry.geometryType                    = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+                accelerationStructureGeometry.geometry.triangles.sType        = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+                accelerationStructureGeometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+                accelerationStructureGeometry.geometry.triangles.vertexData   = vertexBufferDeviceAddress;
+                accelerationStructureGeometry.geometry.triangles.vertexStride = sizeof(Mesh::Vertex);
+                accelerationStructureGeometry.geometry.triangles.maxVertex    = node->mesh->vertexCount - 1;
+                accelerationStructureGeometry.geometry.triangles.indexType    = VK_INDEX_TYPE_UINT32;
+                accelerationStructureGeometry.geometry.triangles.indexData    = indexBufferDeviceAddress;
+                
+                // Set build size info
+                const uint32_t triangleCount = primMesh.count / 3;
+                VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
+                accelerationStructureBuildRangeInfo.primitiveCount  = triangleCount;
+                accelerationStructureBuildRangeInfo.primitiveOffset = 0;
+                accelerationStructureBuildRangeInfo.firstVertex     = 0;
+                accelerationStructureBuildRangeInfo.transformOffset = 0;
+                
+                // Add data back to vectors
+                geometries.push_back(accelerationStructureGeometry);
+                primitiveCounts.push_back(triangleCount);
+                buildRangeInfos.push_back(accelerationStructureBuildRangeInfo);
+                pBuildRangeInfos.push_back(&buildRangeInfos.back());                // only works if .reserve() was called properly
+                
+                PrimMeshInfo primMeshAddresses{};
+                primMeshAddresses.vertexBufferDeviceAddress = vertexBufferDeviceAddress.deviceAddress;
+                primMeshAddresses.indexBufferDeviceAddress  = indexBufferDeviceAddress.deviceAddress;
+                primMeshAddresses.materialBufferDeviceAddress = materialBufferDeviceAddress + primMesh.material->index * sizeof(MaterialData);
+                primMeshesInfos.push_back(primMeshAddresses);
             }
-
-            // Set geometry info
+        }
+        else if (node->volume) {
             VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
-            accelerationStructureGeometry.sType                           = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-            accelerationStructureGeometry.flags                           = geometryFlags;
-            accelerationStructureGeometry.geometryType                    = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-            accelerationStructureGeometry.geometry.triangles.sType        = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-            accelerationStructureGeometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-            accelerationStructureGeometry.geometry.triangles.vertexData   = vertexBufferDeviceAddress;
-            accelerationStructureGeometry.geometry.triangles.vertexStride = sizeof(Mesh::Vertex);
-            accelerationStructureGeometry.geometry.triangles.maxVertex    = node->mesh->vertexCount - 1;
-            accelerationStructureGeometry.geometry.triangles.indexType    = VK_INDEX_TYPE_UINT32;
-            accelerationStructureGeometry.geometry.triangles.indexData    = indexBufferDeviceAddress;
+            accelerationStructureGeometry.sType                               = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+            accelerationStructureGeometry.flags                               = VK_GEOMETRY_OPAQUE_BIT_KHR;
+            accelerationStructureGeometry.geometryType                        = VK_GEOMETRY_TYPE_AABBS_KHR;
+            accelerationStructureGeometry.geometry.aabbs.sType                = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
+            accelerationStructureGeometry.geometry.aabbs.data.deviceAddress   = node->volume->getAabbPositionsDeviceAddress();
+            accelerationStructureGeometry.geometry.aabbs.stride               = sizeof(VkAabbPositionsKHR);
 
-            // Set build size info
-            const uint32_t triangleCount = primMesh.count / 3;
             VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
-            accelerationStructureBuildRangeInfo.primitiveCount  = triangleCount;
+            accelerationStructureBuildRangeInfo.primitiveCount  = 1;
             accelerationStructureBuildRangeInfo.primitiveOffset = 0;
             accelerationStructureBuildRangeInfo.firstVertex     = 0;
             accelerationStructureBuildRangeInfo.transformOffset = 0;
-
+            
             // Add data back to vectors
             geometries.push_back(accelerationStructureGeometry);
-            triangleCounts.push_back(triangleCount);
+            primitiveCounts.push_back(1);
             buildRangeInfos.push_back(accelerationStructureBuildRangeInfo);
-            pBuildRangeInfos.push_back(&buildRangeInfos.back());                // only works if .reserve() was called properly
-
-            PrimMeshInfo primMeshAddresses{};
-            primMeshAddresses.vertexBufferDeviceAddress = vertexBufferDeviceAddress.deviceAddress;
-            primMeshAddresses.indexBufferDeviceAddress  = indexBufferDeviceAddress.deviceAddress;
-            primMeshAddresses.materialBufferDeviceAddress = materialBufferDeviceAddress + primMesh.material->index * sizeof(MaterialData);
-            primMeshesInfos.push_back(primMeshAddresses);
+            pBuildRangeInfos.push_back(&buildRangeInfos.back());
         }
-
-        blas->build(geometries.data(), static_cast<uint32_t>(geometries.size()), triangleCounts.data(), pBuildRangeInfos.data());
+        
+        blas->build(geometries.data(), static_cast<uint32_t>(geometries.size()), primitiveCounts.data(), pBuildRangeInfos.data());
         blases.emplace_back(std::move(blas));
     }
 
@@ -158,7 +185,7 @@ namespace mari {
             accelerationStructureInstance.transform = vkhelper::glmToVkMatrix(blas->node->worldMatrix);
             accelerationStructureInstance.instanceCustomIndex = 0;
             accelerationStructureInstance.mask = 0xFF;
-            accelerationStructureInstance.instanceShaderBindingTableRecordOffset = 0;
+            accelerationStructureInstance.instanceShaderBindingTableRecordOffset = blas->node->volume ? 1 : 0;
             accelerationStructureInstance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
             accelerationStructureInstance.accelerationStructureReference = blas->deviceAddress;
 
@@ -248,6 +275,7 @@ namespace mari {
         std::vector<std::string> shadersClosestHit{};
         std::vector<std::string> shadersAnyHit{};
         std::vector<std::string> shadersMiss{};
+        std::vector<std::string> shadersIntersection{};
         std::vector<std::string> shadersCallable{};
 
         switch (integrator) {
@@ -277,14 +305,23 @@ namespace mari {
                 shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");
                 break;
             case Integrator::PATH_TRACING_VOLUMETRIC_CHIT:
+                shadersRayGeneration.push_back("../../shaders/spv/pathtracer_volumetric_chit.rgen.spv");
 
+                shadersClosestHit.push_back("../../shaders/spv/pathtracer.rchit.spv");
+                //shadersClosestHit.push_back("../../shaders/spv/shadow.rchit.spv"); // TODO will it be needed?
+                shadersAnyHit.push_back("../../shaders/spv/pathtracer.rahit.spv");
+
+                shadersIntersection.push_back("../../shaders/spv/volume.rint.spv");
+                
+                shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
+                shadersMiss.push_back("../../shaders/spv/shadow.rmiss.spv");
                 break;
             default:
                 throw std::runtime_error("No valid integrator selected!");
             break;
         }
 
-        pipeline->createRayTracingPipeline(*pipelineLayout, shadersRayGeneration, shadersMiss, shadersClosestHit, shadersAnyHit, shadersCallable);
+        pipeline->createRayTracingPipeline(*pipelineLayout, shadersRayGeneration, shadersMiss, shadersClosestHit, shadersAnyHit, shadersIntersection, shadersCallable);
     }
 
     // TODO handle case where no lights exist, specially on gpu side

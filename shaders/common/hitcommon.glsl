@@ -24,14 +24,15 @@ struct Vertex {
 };
 
 struct Hit {
-    vec3 vertices[3];
-    vec3 position;
-    vec3 normal_s;       // Shading normal from interpolated vertex normals and normal map
-    vec3 normal_g;       // Geometric normal indicating the direction the triangle is facing
-    vec3 tangent;
-    vec3 bitangent;
-    int  material_type;
-uint64_t material_bda;
+    vec3  vertices[3];
+    float t;
+    vec3  position;
+    vec3  normal_s;       // Shading normal from interpolated vertex normals and normal map
+    vec3  normal_g;       // Geometric normal indicating the direction the triangle is facing
+    vec3  tangent;
+    vec3  bitangent;
+    int   material_type;
+    uint64_t material_bda;
     MaterialConstants material;
 };
 
@@ -99,7 +100,14 @@ MaterialConstants process_material(MaterialData data, vec4 color, vec2 uv) {
 
 Hit process_hit(Payload payload) {
     Hit hit;
+    hit.t = payload.t;
 
+    /* Procedural hit group for NanoVDB */
+    if (payload.barycentrics.y < 0) { //nanovdb aabb TODO perhaps add a hitKind variable
+        return hit;
+    }
+
+    /* Triangle hit group */
     // Get necessary buffers to get triangle information 
     uint64_t mesh_bda  = pPrimMeshInfos.addresses[payload.instance_index];
     PrimMeshInfo prim_mesh = PrimMeshInfos(mesh_bda).p[payload.geometry_index];

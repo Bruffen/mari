@@ -9,6 +9,7 @@ struct Payload {
     int instance_index;         // BLAS
     int geometry_index;         // PrimMesh
     int primitive_index;        // Triangle
+    float t;
     vec3 barycentrics;
     mat4x3 world_to_object;
     mat4x3 object_to_world;
