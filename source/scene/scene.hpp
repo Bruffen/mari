@@ -41,7 +41,7 @@ namespace mari {
             std::vector<std::shared_ptr<Material>>  materials;
             std::unique_ptr<Buffer>                 materialDataBuffer;
             std::shared_ptr<Node>                   currentCamera;
-            int                                     environmentID = 0;
+            int                                     environmentID = -1;
         private:
             void                                    loadSamplers(const std::vector<fastgltf::Sampler> &gltfSamplers);
             std::shared_ptr<Image>                  loadImage(const std::string &folder, fastgltf::Asset& asset, fastgltf::Image& image);

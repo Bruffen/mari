@@ -46,6 +46,9 @@ void main() {
             traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, t, 0);
 
             Hit hit;
+            hit.material.medium.absorption = 0.0;
+            hit.material.medium.scattering = 0.0; // TODO zero valued hit object
+
             bool hit_surface = false;
             if (prd.instance_index >= 0) {
                 hit         = process_hit(prd);
@@ -55,6 +58,14 @@ void main() {
             }
             vec3 wo;
             BxdfSample bxdf_sample;
+
+            const bool is_backface = dot(direction, hit.normal_g) > 0.0;
+
+            // If the ray hits the backface of a volume boundary and the medium is not present, 
+            // then it means the camera is inside some medium that's not being accounted for, therefore add it retroactively
+            if ((hit.material.medium.scattering > 0.0 || hit.material.medium.absorption > 0.0) && current_medium < 0 && is_backface) {
+                medium_push(hit.material.medium);
+            }
 
             // TODO test intersections with every nanovdb bbox, get a list of results and sample them accordingly
             // Sample the participating medium
@@ -96,8 +107,6 @@ void main() {
              * Surface interaction
              ********************************/
             else if (hit_surface) {
-                const bool is_backface = dot(direction, hit.normal_g) > 0.0;
-
                 // Hit a volume boundary. Keep going without interacting.
                 if (hit.material_type == MaterialType_Boundary) {
                     const bool entering = !is_backface;
@@ -221,38 +230,38 @@ void main() {
                             if (shadow_prd.hit_count > 0) {
                                 sort_hits(shadow_prd.hits, shadow_prd.hit_count);
 
-                                // If amount of boundary hits is even, it means the ray starts outside of a medium
-                                // therefore skip the first section of the ray for transmittance calculation
-                                // If the light happens to be inside a medium, then the opposite is true
-                                // breaks if there's volumes inside of volumes
-                                int start = shadow_prd.hit_count % 2 == 0 ? 1 : 0;
-                                if (light.inside_media) {
-                                    start == 0 ? 1 : 0;
-                                    shadow_prd.hits[shadow_prd.hit_count].t = shadow_tmax;
-                                    shadow_prd.hits[shadow_prd.hit_count].material_bda = shadow_prd.hits[shadow_prd.hit_count - 1].material_bda;
-                                    shadow_prd.hit_count++; // TODO find a cleaner way to handle this
-                                }
+                                float st = 0.0;
+                                for (int i = 0; i < shadow_prd.hit_count; i++) {
+                                    bool entering = shadow_prd.hits[i].entering;
 
-                                for (int i = start; i < shadow_prd.hit_count; i += 2) {
-                                    medium_push(get_material(shadow_prd.hits[i].material_bda).constants.medium);
-
-                                    if (i == 0) {
-                                        stmax = shadow_prd.hits[i].t;
-                                    } else {
-                                        stmin = shadow_prd.hits[i - 1].t;
-                                        stmax = shadow_prd.hits[i].t;
+                                    if (!entering && current_medium < 0) {
+                                        Medium smedium = get_material(shadow_prd.hits[i].material_bda).constants.medium;
+                                        if (smedium.scattering > 0.0 || smedium.absorption > 0.0) {
+                                            medium_push(smedium);
+                                        }
                                     }
 
-                                    if (stmax - stmin > 0.0) {
-                                        li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed, properties.transmittance_algo);
+                                    li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, st, shadow_prd.hits[i].t, prd.seed, properties.transmittance_algo);
+
+                                    if (entering) {
+                                        Medium smedium = get_material(shadow_prd.hits[i].material_bda).constants.medium;
+                                        if (smedium.scattering > 0.0 || smedium.absorption > 0.0) {
+                                            medium_push(smedium);
+                                        }
                                     }
-                                    medium_remove();
+                                    
+                                    if (!entering) {
+                                        medium_remove();
+                                    }
+
+                                    st = shadow_prd.hits[i].t;
                                 }
                             }
+                            // TODO last boundary hit to light
                             // The scattered point and the light are both inside the same volumetric boundary 
-                            else if (light.inside_media) {
+                            //else if (light.inside_media) {
                                 li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, 0.0, shadow_tmax, prd.seed, properties.transmittance_algo);
-                            }
+                            //}
                             /********************************
                              * NanoVDB
                              ********************************/

@@ -25,6 +25,9 @@ namespace mari {
                     scene->load("../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
                     scene->currentCamera = scene->nodes.at("Camera");
                     std::ranges::find(scene->materials, "light", [](const auto& m) { return m->name; })->get()->insideMedia = true;
+                    window.resizeWindow(1024, 1024);
+                    scene->environmentID = 1;
+
                     break;
                 case 2:
                     scene->load("../../../../_Models/gltf/glTF-Sample-Models/2.0/ABeautifulGame/glTF/ABeautifulGame.glTF"); // TODO this scene uses instancing
@@ -75,14 +78,14 @@ namespace mari {
                         scene->cameraObjects.emplace_back(cam);
                         scene->currentCamera = scene->nodes.at("Camera");
                     }
-                    window.resizeWindow(1024, 1024);
+                    //window.resizeWindow(1024, 1024);
 
                     scene->volumeObject = std::make_shared<Node>("volume");
                     scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
                     //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
                     //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
-                    scene->volumeObject->transform.scale *= 0.005f;
-                    scene->volumeObject->volume->medium.scattering *= 80.0f;
+                    //scene->volumeObject->transform.scale *= 0.005f;
+                    scene->volumeObject->volume->medium.scattering *= 10.0f;
                     scene->volumeObject->volume->jitteringAmount = 0.0f;
                     scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
                     scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;
@@ -178,7 +181,9 @@ namespace mari {
             scene->volumeObject->volume->medium.scattering = 1.0f;
 
     */
-            scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
+            if (scene->environmentID == -1) {
+                scene->environmentID = static_cast<int>(scene->images.size() + scene->lightObjects.size() - 1);
+            }
             return scene;
         }
     };

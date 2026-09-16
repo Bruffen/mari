@@ -111,12 +111,7 @@ MediumEvent get_medium_event_empty() {
 
 MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant, inout uint seed) {
     if (!medium.heterogeneous) {
-        //if (length(position) < 0.1) {
         return MediumSample(medium.albedo, medium.absorption, medium.scattering, vec3(0.0));
-        //} else {
-        //    //return get_medium_sample_empty();
-        //    return MediumSample(medium.albedo, 0.0, 0.3, vec3(0.0));
-        //}
     }
 
     vec3  jitter      = (2.0 * random3D(seed) - 1.0) * volume.jittering_amount; // TODO scale with voxel size -> pnanovdb_grid_get_voxel_size()
@@ -258,7 +253,7 @@ MediumEvent residual_ratio_tracking(vec3 origin, vec3 direction, float tmin, flo
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium = medium_get();
     medium_event.majorant = medium_event.medium.absorption + medium_event.medium.scattering;
-    float majorant_control = medium_event.majorant * 0.1;
+    float majorant_control = medium_event.majorant * 0.1; // TODO GUI parameter
     vec3 transmittance_control = vec3(get_transmittance(majorant_control, tmax - tmin));
     float majorant_residual = medium_event.majorant - majorant_control;
     vec3 transmittance_residual = vec3(1.0);

@@ -134,6 +134,7 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/shaders/*.rgen"
     "${PROJECT_SOURCE_DIR}/shaders/*.rchit"
     "${PROJECT_SOURCE_DIR}/shaders/*.rahit"
+    "${PROJECT_SOURCE_DIR}/shaders/*.rint"
     "${PROJECT_SOURCE_DIR}/shaders/*.rmiss"
 )
 

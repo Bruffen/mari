@@ -31,6 +31,7 @@ struct Hit {
     vec3 tangent;
     vec3 bitangent;
     int  material_type;
+uint64_t material_bda;
     MaterialConstants material;
 };
 
@@ -139,6 +140,7 @@ Hit process_hit(Payload payload) {
     MaterialData material_data = get_material(prim_mesh.material_bda);
     hit.material = process_material(material_data, hit_color, hit_uv);
     hit.material_type = get_material_type(hit.material);
+    hit.material_bda = prim_mesh.material_bda;
 
     // Apply normal mapping
     if (material_data.indices.normal > -1) {

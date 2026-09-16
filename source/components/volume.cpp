@@ -91,7 +91,7 @@ namespace mari {
     }
 
     // This converts from openvdb to nanovdb, creates a staging buffer 
-    // and copies the whole nanovdb buffer to the device!!!
+    // and copies the whole nanovdb buffer to the device every time!!!
     // Very inefficient!!!
     // TODO Store the nanovdb grid instead, figure out how to modify its transform
     // and also where and how to copy only the transform to the device

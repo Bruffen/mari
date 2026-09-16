@@ -16,13 +16,24 @@ hitAttributeEXT vec2 attribs;
 void main() {
     uint64_t prim_mesh_bda = pPrimMeshInfos.addresses[gl_InstanceID];
     PrimMeshInfo primMeshInfo = PrimMeshInfos(prim_mesh_bda).p[gl_GeometryIndexEXT];
+    Indices indices = Indices(primMeshInfo.indices_bda);
+    Vertices vertices = Vertices(primMeshInfo.vertices_bda);
     MaterialData material = get_material(primMeshInfo.material_bda);
 
     uint material_type = get_material_type(material.constants);
     if (material_type == MaterialType_Boundary || (material_type == MaterialType_Dielectric && material.constants.dielectric_nee_cheat)) {
+        vec3 p0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].position;
+        vec3 p1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].position;
+        vec3 p2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].position;
+
+        vec3 normal;
+        normal = cross(p1 - p0, p2 - p0);
+        normal = normalize((normal * gl_WorldToObjectEXT).xyz);
+
         if (prd.hit_count < SHADOW_VOLUMETRIC_MAX_HITS) {
             prd.hits[prd.hit_count].t = gl_HitTEXT;
             prd.hits[prd.hit_count].material_bda = primMeshInfo.material_bda;
+            prd.hits[prd.hit_count].entering = dot(gl_WorldRayDirectionEXT, normal) < 0.0;
             prd.hit_count++;
         }
 
@@ -36,16 +47,12 @@ void main() {
         return;
     }
 
-    Indices indices   = Indices(primMeshInfo.indices_bda);
-    Vertices vertices = Vertices(primMeshInfo.vertices_bda);
-    vec3 barycentric_coords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-
-    vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
-    vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
-    vec2 uv2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].uv;
-
-    vec2 uv  = uv0 * barycentric_coords.x + uv1 * barycentric_coords.y + uv2 * barycentric_coords.z;
     if (material.indices.albedo > 0) {
+        vec3 barycentric_coords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+        vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
+        vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
+        vec2 uv2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].uv;
+        vec2 uv  = uv0 * barycentric_coords.x + uv1 * barycentric_coords.y + uv2 * barycentric_coords.z;
         alpha *= texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
     }
 

@@ -22,16 +22,16 @@ void main() {
         return;
     }
 
-    Indices indices   = Indices(primMeshInfo.indices_bda);
-    Vertices vertices = Vertices(primMeshInfo.vertices_bda);
-
-    vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
-    vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
-    vec2 uv2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].uv;
-    vec3 barycentric_coords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-
-    vec2 uv  = uv0 * barycentric_coords.x + uv1 * barycentric_coords.y + uv2 * barycentric_coords.z;
     if (material.indices.albedo > 0) {
+        Indices indices   = Indices(primMeshInfo.indices_bda);
+        Vertices vertices = Vertices(primMeshInfo.vertices_bda);
+
+        vec2 uv0 = vertices.v[indices.i[gl_PrimitiveID * 3 + 0]].uv;
+        vec2 uv1 = vertices.v[indices.i[gl_PrimitiveID * 3 + 1]].uv;
+        vec2 uv2 = vertices.v[indices.i[gl_PrimitiveID * 3 + 2]].uv;
+        vec3 barycentric_coords = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+
+        vec2 uv  = uv0 * barycentric_coords.x + uv1 * barycentric_coords.y + uv2 * barycentric_coords.z;
         alpha *= texture(textures[nonuniformEXT(material.indices.albedo)], uv).a;
     }
 

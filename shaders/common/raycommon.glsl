@@ -14,7 +14,7 @@ struct Payload {
     mat4x3 object_to_world;
     uint seed;
 #ifdef SPECTRAL
-    vec3 wavelengths;
+    vec3 wavelengths; // TODO move out of payload?
 #endif
 };
 
@@ -23,24 +23,25 @@ struct ShadowPayload {
     uint seed;
 };
 
-struct VolumeBoundaryHits {
+struct VolumeBoundaryHit {
     float t;
+    bool entering;
     uint64_t material_bda;
 };
 
-#define SHADOW_VOLUMETRIC_MAX_HITS 8
+#define SHADOW_VOLUMETRIC_MAX_HITS 6
 
 struct ShadowVolumetricPayload {
     bool visibility;
     uint seed;
     uint hit_count;
-    VolumeBoundaryHits hits[SHADOW_VOLUMETRIC_MAX_HITS];
+    VolumeBoundaryHit hits[SHADOW_VOLUMETRIC_MAX_HITS];
 };
 
 // Insertion sort
-void sort_hits(inout VolumeBoundaryHits hits[SHADOW_VOLUMETRIC_MAX_HITS], uint count) {
+void sort_hits(inout VolumeBoundaryHit hits[SHADOW_VOLUMETRIC_MAX_HITS], uint count) {
     for (int i = 0; i < count; i++) {
-        VolumeBoundaryHits k = hits[i];
+        VolumeBoundaryHit k = hits[i];
         int j = i - 1;
 
         while (j >= 0 && hits[j].t > k.t) {
