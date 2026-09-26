@@ -26,7 +26,7 @@ namespace mari {
         DefaultObjects::initialize(device);        
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
-        scene = TestScenes::loadScene(device, window, 9);
+        scene = TestScenes::loadScene(device, window);
         scene->start();
 
         rayTracingSystem.buildScene(*scene);

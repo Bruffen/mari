@@ -1,9 +1,9 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "common/raygencommon.glsl"
-
 //#define SPECTRAL
+
+#include "common/raygencommon.glsl"
 
 layout(location = 0) rayPayloadEXT Payload prd;
 layout(location = 1) rayPayloadEXT ShadowVolumetricPayload shadow_prd;
@@ -18,9 +18,10 @@ void main() {
     const uint  shadow_flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 
 #ifdef SPECTRAL
-    float wavelength_min = 360.0f;
-    float wavelength_max = 830.0f;
-    prd.wavelengths = random3D(prd.seed) * (wavelength_max - wavelength_min) + wavelength_min; 
+    wavelengths.x = random1D(prd.seed) * (WAVELENGTH_MAX - WAVELENGTH_MIN);
+    wavelengths.y = mod(wavelengths.x + WAVELENGTH_RANGE * 1.0 / 3.0, WAVELENGTH_RANGE);
+    wavelengths.z = mod(wavelengths.x + WAVELENGTH_RANGE * 2.0 / 3.0, WAVELENGTH_RANGE);
+    wavelengths  += WAVELENGTH_MIN;
 #endif
 
     initialize_participating_media(); // TODO make it a #define so non volumetric path tracer does not need to allocate media stuff
@@ -60,6 +61,7 @@ void main() {
             BxdfSample bxdf_sample;
 
             const bool is_backface = dot(direction, hit.normal_g) > 0.0;
+            // TODO move is_backface and is_emissive to process_hit()
 
             // If the ray hits the backface of a volume boundary and the medium is not present, 
             // then it means the camera is inside some medium that's not being accounted for, therefore add it retroactively
@@ -136,7 +138,7 @@ void main() {
                         radiance += throughput * hit.material.emission.rgb;
                     }                 
                     else {
-                        float light_mis = pdf_light_area(hit.vertices, direction, t, hit.material.emission.rgb, hit.material.double_sided_emission);
+                        float light_mis = pdf_light_area(hit.vertices, direction, t, hit.material.emission.a, hit.material.double_sided_emission);
                         float scatter_mis = previous_pdf;
                         radiance += throughput * hit.material.emission.rgb * power_heuristic(scatter_mis, light_mis);
                     }
@@ -322,6 +324,15 @@ void main() {
             }
 
         }
+
+#ifdef SPECTRAL
+        float wavelength_pdf = 1.0 / WAVELENGTH_RANGE;
+        vec3 r = vec3(0.0);
+        r += wavelength_to_rgb(wavelengths.x) * radiance.x;// / wavelength_pdf; // TODO divide by pdf?
+        //r += wavelength_to_rgb(wavelengths.y) * radiance.y;
+        //r += wavelength_to_rgb(wavelengths.z) * radiance.z;
+        radiance = r;
+#endif
 
         result += radiance;
     }

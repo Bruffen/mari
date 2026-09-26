@@ -68,7 +68,7 @@ void main() {
                     radiance += throughput * hit.material.emission.rgb;
                 }
                 else {
-                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.rgb, hit.material.double_sided_emission);
+                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.a, hit.material.double_sided_emission);
                     float bxdf_mis = previous_pdf;
                     radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
                 }

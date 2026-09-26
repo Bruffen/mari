@@ -68,6 +68,38 @@ file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp ${IMGUI_PATH}/backends/imgui_impl_gl
 # Get MikkTSpace source files
 file(GLOB MIKKTSPACE_SOURCES ${MIKKTSPACE_PATH}/*.c)
 
+# Get rgb2psec and build coefficient tables if needed
+if (DEFINED RGB2SPEC_PATH)
+    message(STATUS "Using rgb2spec path specified in .env")
+    add_subdirectory("${RGB2SPEC_PATH}")
+endif()
+if (NOT FASTGLTF_INCLUDE_DIRS)
+    message(FATAL_ERROR "Could not find fastgltf!")
+endif()
+
+#set(RGB2SPEC_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/data")
+#set(RGB2SPEC_GAMUT "srgb")
+#set(RGB2SPEC_COEFF "${RGB2SPEC_OUTPUT_DIR}/${RGB2SPEC_GAMUT}.coeff")
+
+#add_executable(rgb2spec_opt "${RGB2SPEC_PATH}/rgb2spec_opt.cpp")
+#target_include_directories(rgb2spec_opt PRIVATE "${RGB2SPEC_PATH}")
+#target_compile_options(rgb2spec_opt PRIVATE /wd4996)
+
+#add_custom_command(
+#    OUTPUT "${RGB2SPEC_COEFF}"
+#    COMMAND ${CMAKE_COMMAND} -E make_directory "${RGB2SPEC_OUTPUT_DIR}"
+#    COMMAND $<TARGET_FILE:rgb2spec_opt> 64 "${RGB2SPEC_COEFF}" "${RGB2SPEC_GAMUT}"
+#    DEPENDS rgb2spec_opt
+#    COMMENT "Generating rgb2spec coefficient table"
+#    VERBATIM
+#)
+
+#add_custom_target(
+#    rgb2spec_coeff
+#    DEPENDS "${RGB2SPEC_COEFF}"
+#)
+
+
 # Our project's source files
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/source/*.cpp)
 
@@ -99,6 +131,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${IMGUI_PATH}
     ${IMGUI_PATH}/backends
     ${OpenVDB_INCLUDE_DIRS}
+    ${RGB2SPEC_PATH}
 )
 
 target_link_directories(${PROJECT_NAME} PUBLIC
@@ -108,7 +141,7 @@ target_link_directories(${PROJECT_NAME} PUBLIC
     ${Tbb_LIB_COMPONENTS}
 )
 
-target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf OpenVDB::openvdb TBB::tbb)
+target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 fastgltf OpenVDB::openvdb TBB::tbb rgb2spec)
 
 
 ############## Build SHADERS #######################
@@ -160,4 +193,6 @@ add_custom_target(
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 
-add_dependencies(${NAME} shaders)
+add_dependencies(${NAME} shaders 
+#rgb2spec_coeff
+)

@@ -5,6 +5,10 @@
 #extension GL_EXT_debug_printf : enable
 //#endif
 
+#ifdef SPECTRAL
+vec3 wavelengths;
+#include "common/spectral.glsl"
+#endif
 #include "common/material.glsl"
 MaterialConstants material;
 #include "common/bxdf.glsl"

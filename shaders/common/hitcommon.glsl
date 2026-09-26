@@ -7,6 +7,7 @@
 #extension GL_EXT_nonuniform_qualifier                      : require
 
 #include "common/raycommon.glsl"
+#include "common/spectral.glsl"
 #include "common/material.glsl"
 
 struct PrimMeshInfo {
@@ -93,6 +94,12 @@ MaterialConstants process_material(MaterialData data, vec4 color, vec2 uv) {
     if (data.indices.emissive > -1) {
         mc.emission *= texture(textures[nonuniformEXT(data.indices.emissive)], uv);
     }
+
+#ifdef SPECTRAL
+    // Convert rbg2spec coefficients to spectral quantities of the wavelength triplet
+    mc.albedo.rgb = rgb2spec_eval(wavelengths, data.constants.albedo.rgb);
+    mc.emission.rgb = rgb2spec_eval(wavelengths, data.constants.emission.rgb) * data.constants.emission.a;
+#endif
 
     return mc;
 }

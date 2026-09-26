@@ -1,6 +1,7 @@
 #pragma once
 
 #include "scene.hpp"
+#include "../spectral.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -38,7 +39,7 @@ namespace mari {
     }
 
     Scene::Scene(Device &device) : device{device} {
-    
+        
     }
 
     std::shared_ptr<Node> Scene::getNode(const uint32_t id) {
@@ -311,10 +312,16 @@ namespace mari {
                 m->transparent = true;
 
             // PBR data
-            m->data.constants.albedo.x  = gltfMat.pbrData.baseColorFactor[0];
-            m->data.constants.albedo.y  = gltfMat.pbrData.baseColorFactor[1];
-            m->data.constants.albedo.z  = gltfMat.pbrData.baseColorFactor[2];
-            m->data.constants.albedo.w  = gltfMat.pbrData.baseColorFactor[3];
+            glm::vec4 albedo = glm::vec4(
+                gltfMat.pbrData.baseColorFactor[0],
+                gltfMat.pbrData.baseColorFactor[1],
+                gltfMat.pbrData.baseColorFactor[2],
+                gltfMat.pbrData.baseColorFactor[3]
+            );
+            if (Spectral::isOn()) {
+                albedo = glm::vec4(Spectral::instance().rgbToSpectral(glm::vec3(albedo)), albedo.a);
+            }
+            m->data.constants.albedo    = albedo;
             m->data.constants.metallic  = gltfMat.pbrData.metallicFactor;
             m->data.constants.roughness = gltfMat.pbrData.roughnessFactor;
 
@@ -357,7 +364,18 @@ namespace mari {
             }
             
             // Emission 
-            m->data.constants.emission = glm::vec4(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2], gltfMat.emissiveStrength);
+            glm::vec3 emissiveColor = glm::vec3(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1], gltfMat.emissiveFactor[2]);
+            float emissiveStrength = gltfMat.emissiveStrength;
+            // If emissive color is black, set strength to zero so it's not marked later as emissive
+            if (emissiveColor.x <= 0.0f && emissiveColor.y <= 0.0f && emissiveColor.z <= 0.0f) {
+                emissiveStrength = 0.0f;
+            }
+
+            if (Spectral::isOn()) {
+                m->data.constants.emission = glm::vec4(Spectral::instance().rgbToSpectral(emissiveColor), emissiveStrength);
+            } else {
+                m->data.constants.emission = glm::vec4(emissiveColor, emissiveStrength);
+            }
 
             if (gltfMat.emissiveTexture.has_value()) {
                 const fastgltf::Texture& texture = gltfTextures[gltfMat.emissiveTexture.value().textureIndex];
@@ -368,9 +386,11 @@ namespace mari {
 
                     // We multiply emission color by emissive texture,
                     // therefore, when there's a texture, set emission color to 1 if it's 0.
-                    if (glm::length(glm::vec3(m->data.constants.emission)) <= 0.0f) {
-                        m->data.constants.emission = glm::vec4{1.0f, 1.0f, 1.0f, m->data.constants.emission.a};
-                    }
+                    //
+                    // TODO This won't work for spectral
+                    //if (glm::length(glm::vec3(m->data.constants.emission)) <= 0.0f) {
+                    //    m->data.constants.emission = glm::vec4{1.0f, 1.0f, 1.0f, m->data.constants.emission.a};
+                    //}
                 }
                 if (texture.samplerIndex.has_value()) {
                     m->textures.emissive->sampler = samplers[texture.samplerIndex.value()];
@@ -378,7 +398,7 @@ namespace mari {
             }
 
             // KHR_materials_ior
-            if (gltfMat.ior != 1.5f) {
+            if (gltfMat.ior != 1.5f) { // TODO why do this check??
                 m->data.constants.ior = gltfMat.ior;
             }
 
@@ -386,11 +406,17 @@ namespace mari {
             if (gltfMat.volume) {
                 // Check material.hpp for info
                 m->data.constants.thickness = 1.0; // gltfMat.volume->thicknessFactor; 
-                m->data.constants.medium.albedo = glm::vec3(
+                glm::vec3 attenuationColor = glm::vec3(
                     gltfMat.volume->attenuationColor[0],
                     gltfMat.volume->attenuationColor[1],
                     gltfMat.volume->attenuationColor[2]
                 );
+
+                if (Spectral::isOn()) {
+                    attenuationColor = Spectral::instance().rgbToSpectral(attenuationColor);
+                }
+
+                m->data.constants.medium.albedo = attenuationColor;
                 m->data.constants.medium.absorption = 1.0f / gltfMat.volume->attenuationDistance;
 
                 // glTF KHR_materials_volume_scatter is an upcoming extension in 4.2

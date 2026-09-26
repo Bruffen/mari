@@ -6,7 +6,9 @@ namespace mari {
 
     void KeyboardController::update(GLFWwindow *window, float deltatime, Node &node) {
         moveCamera(window, deltatime, node);
-        rotateCamera(window, deltatime, node);
+        if (!gui.getIO()->WantCaptureMouse) {
+            rotateCamera(window, deltatime, node);
+        }
         handleInput(window);
     }
 

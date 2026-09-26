@@ -25,7 +25,7 @@ namespace mari {
         // TODO normals so we calculate the light's shading normal on the gpu
         // TODO uvs for sampling emissive texture
         // TODO texture id for emissive texture, potentially also usable with envmap?
-        glm::vec3 emission;
+        glm::vec4 emission;
         float     power;
         float     area;
         VkBool32  doubleSided;

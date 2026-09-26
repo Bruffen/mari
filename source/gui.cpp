@@ -10,6 +10,8 @@
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vk_enum_string_helper.h> 
 
+#include <rgb2spec/rgb2spec.h>
+
 #include <iomanip>
 #include <ctime>
 #include <sstream>
@@ -22,7 +24,7 @@ namespace mari {
         io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
         io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-        //io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         ImGui::StyleColorsDark();
 
         std::vector<VkDescriptorPoolSize> poolSizes = {{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }};
@@ -36,20 +38,20 @@ namespace mari {
 
         ImGui_ImplGlfw_InitForVulkan(window.getGLFWwindow(), true);
         ImGui_ImplVulkan_InitInfo initInfo{};
-        initInfo.Instance           = device.getInstance();
-        initInfo.PhysicalDevice     = device.getPhysicalDevice();
-        initInfo.Device             = device.handle();
-        initInfo.QueueFamily        = device.findPhysicalQueueFamilies().presentFamily;
-        initInfo.Queue              = device.presentQueue();
-        initInfo.PipelineCache      = nullptr;
-        initInfo.DescriptorPool     = descriptorPool;
-        initInfo.RenderPass         = renderer.getSwapchainRenderPass();
-        initInfo.Subpass            = 0;
-        initInfo.MinImageCount      = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
-        initInfo.ImageCount         = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
-        initInfo.MSAASamples        = VK_SAMPLE_COUNT_1_BIT;
-        initInfo.Allocator          = nullptr;
-        initInfo.CheckVkResultFn    = checkVkResult;
+        initInfo.Instance                       = device.getInstance();
+        initInfo.PhysicalDevice                 = device.getPhysicalDevice();
+        initInfo.Device                         = device.handle();
+        initInfo.QueueFamily                    = device.findPhysicalQueueFamilies().presentFamily;
+        initInfo.Queue                          = device.presentQueue();
+        initInfo.PipelineCache                  = nullptr;
+        initInfo.DescriptorPool                 = descriptorPool;
+        initInfo.MinImageCount                  = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
+        initInfo.ImageCount                     = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
+        initInfo.PipelineInfoMain.RenderPass    = renderer.getSwapchainRenderPass();
+        initInfo.PipelineInfoMain.Subpass       = 0;
+        initInfo.PipelineInfoMain.MSAASamples   = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.Allocator                      = nullptr;
+        initInfo.CheckVkResultFn                = checkVkResult;
         ImGui_ImplVulkan_Init(&initInfo);
 
         std::shared_ptr<Image> s = DefaultObjects::getImageWhite();
@@ -186,14 +188,16 @@ namespace mari {
             ImGui::EndChild();
             ImGui::End();
         }
-
         ImGui::Render();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
     }
 
     void Gui::render(VkCommandBuffer commandBuffer) {
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+
+        if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+        }
     }
 
     void Gui::imGuiFramerate(float duration) {
@@ -203,7 +207,7 @@ namespace mari {
         static double  refresh_time = 0.0;
         if (refresh_time == 0.0)
             refresh_time = ImGui::GetTime();
-        while (refresh_time < ImGui::GetTime()) { // Create data at fixed 60 Hz rate for the demo
+        while (refresh_time < ImGui::GetTime()) { // Create data at fixed 60 Hz rate
             values[values_offset] = duration * 1000.0f;
             values_offset = (values_offset + 1) % size;
             refresh_time += 1.0f / 60.0f;
@@ -391,6 +395,8 @@ namespace mari {
 
     void Gui::imGuiMaterial(Material &material) {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
+
+        // TODO spectral
 
         MaterialConstants mc = material.data.constants;
         bool a = true;
