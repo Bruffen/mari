@@ -16,7 +16,7 @@ namespace mari {
             lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, DefaultObjects::getImageBlack32f(), 1));
             lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, Scene::loadImage(device, "../../models/rustig_koppie_puresky_4k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "rustig_koppie_puresky_4k")));
 
-            switch (  2  ) {
+            switch (  9  ) {
                 case 0:
                     scene->load("../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
                     scene->transform.position = {0.0f, -0.01f, 0.0f};
@@ -81,11 +81,12 @@ namespace mari {
                     //window.resizeWindow(1024, 1024);
 
                     scene->volumeObject = std::make_shared<Node>("volume");
+                    scene->volumeObject->transform.position.y = -0.7f;
+                    scene->volumeObject->transform.scale *= 0.005f;
                     scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
                     //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
                     //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
-                    scene->volumeObject->transform.scale *= 0.005f;
-                    scene->volumeObject->volume->medium.scattering *= 10.0f;
+                    scene->volumeObject->volume->medium.scattering *= 40.0f;
                     scene->volumeObject->volume->jitteringAmount = 0.0f;
                     scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
                     scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;

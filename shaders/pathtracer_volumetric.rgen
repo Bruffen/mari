@@ -243,7 +243,7 @@ void main() {
                                         }
                                     }
 
-                                    li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, st, shadow_prd.hits[i].t, prd.seed, properties.transmittance_algo);
+                                    li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, st, shadow_prd.hits[i].t, prd.seed);
 
                                     if (entering) {
                                         Medium smedium = get_material(shadow_prd.hits[i].material_bda).constants.medium;
@@ -262,7 +262,7 @@ void main() {
                             // TODO last boundary hit to light
                             // The scattered point and the light are both inside the same volumetric boundary 
                             //else if (light.inside_media) {
-                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, 0.0, shadow_tmax, prd.seed, properties.transmittance_algo);
+                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, 0.0, shadow_tmax, prd.seed);
                             //}
                             /********************************
                              * NanoVDB
@@ -272,7 +272,7 @@ void main() {
 
                             if (test_intersection_volume_nano(origin, li_sample.wi, stmin, stmax)) {
                                 medium_push(volume.medium);
-                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed, properties.transmittance_algo);
+                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed);
                                 medium_remove();
                             }
 

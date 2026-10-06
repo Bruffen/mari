@@ -11,8 +11,8 @@ namespace mari {
     enum Integrator {
         PATH_TRACING,
         PATH_TRACING_VOLUME_ONLY,
-        PATH_TRACING_VOLUMETRIC_AHIT,   // Shadow ray returns a list of any hits with media which are sorted after
-        PATH_TRACING_VOLUMETRIC_CHIT,   // Shadow ray is a loop of closest hits through media until light is reached
+        PATH_TRACING_VOLUMETRIC_AHIT,   // Shadow ray is a single ray which returns a list of any hits with media which are sorted after
+        PATH_TRACING_VOLUMETRIC_CHIT,   // Shadow ray is a loop of rays with closest hits through media until light is reached
     };
 
     class RayTracingSystem {
@@ -38,18 +38,19 @@ namespace mari {
             std::unique_ptr<Buffer>                 lightsBuffer;
             PiecewiseConstant1D                     lightsSampler;
             glm::vec2                               environmentRotation{};
-            bool                                    needsUpdate         = false;
-            bool                                    needsRebuild        = false;
-            bool                                    needsLightsRebuild  = false;
+            bool                                    needsUpdate           = false;
+            bool                                    needsRebuild          = false;
+            bool                                    needsLightsRebuild    = false;
             
-            int                                     maxDepth            = 100;
-            bool                                    frameAccumulation   = true;
-            bool                                    russianRoulette     = true;
-            bool                                    nextEventEstimation = true;
-            float                                   exposure            = 1.0f;
-            int                                     tonemapper          = 3;
-            int                                     transmittanceAlgo   = 0;
-            int                                     samplesPerPixel     = 1;
+            int                                     maxDepth              = 100;
+            bool                                    frameAccumulation     = true;
+            bool                                    russianRoulette       = true;
+            bool                                    nextEventEstimation   = true;
+            float                                   exposure              = 1.0f;
+            int                                     tonemapper            = 3;
+            int                                     transmittanceAlgo     = 0;
+            int                                     mediumIntegrator      = false;
+            int                                     samplesPerPixel       = 1;
         private:
             void                                    createImages(uint32_t width, uint32_t height);
             void                                    buildAreaLights(const Scene &scene);

@@ -11,6 +11,8 @@ struct Medium {
     vec3  albedo;
     float absorption;
     float scattering;
+    float minorant;
+    float majorant;
     PhaseFunction phase_function;
     bool  heterogeneous;
 };

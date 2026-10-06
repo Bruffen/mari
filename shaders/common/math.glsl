@@ -300,7 +300,7 @@ vec2 equal_area_sphere_to_square(vec3 d) {
     return vec2(0.5 * (u + 1.0), 0.5 * (v + 1.0));
 }
 
-vec2 equal_area_wrap_square(vec2 uv) {
+vec2 wrap_equal_area_square(vec2 uv) {
     if (uv.x < 0) {
         uv.x = -uv.x;     // mirror across u = 0
         uv.y = 1 - uv.y;  // mirror across v = 0.5
