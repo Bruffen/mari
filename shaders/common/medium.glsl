@@ -12,11 +12,11 @@ Medium media[MAX_MEDIA];
 int current_medium = -1;
 
 Medium get_medium_empty() {
-    return Medium(vec3(0.0), 0.0, 0.0, PhaseFunction(0, 0.0, 0.0), false);
+    return Medium(vec3(0.0), 0.0, 0.0, 0.0, 0.0, PhaseFunction(0, 0.0, 0.0), false);
 }
 
 Medium get_medium_error() {
-    return Medium(ERROR_COLOR / 1000.0, 5.0, 5.0, PhaseFunction(0, 0.0, 0.0), false);
+    return Medium(ERROR_COLOR / 1000.0, 5.0, 5.0, 0.0, 0.0, PhaseFunction(0, 0.0, 0.0), false);
 }
 
 void initialize_participating_media() {
@@ -50,6 +50,12 @@ void medium_remove() {
     }
 }
 
+#define Media_Integrator_Delta_Tracking                   0
+#define Media_Integrator_Weighted_Delta_Tracking          1
+#define Media_Integrator_Single_Scattering                2
+#define Media_Integrator_Decomposition_Tracking           3
+#define Media_Integrator_Weighted_Decomposition_Tracking  4
+
 #define Transmittance_Delta_Tracking          0
 #define Transmittance_Ray_Marching            1
 #define Transmittance_Ratio_Tracking          2
@@ -76,7 +82,7 @@ struct MediumSample {
 };
 
 MediumSample get_medium_sample_empty() {
-    return MediumSample( vec3(0), 0, 0, vec3(0));
+    return MediumSample(vec3(0), 0, 0, vec3(0));
 }
 
 struct MediumEvent {
@@ -84,7 +90,6 @@ struct MediumEvent {
     MediumSample sampl;
     Medium medium;
     float t;
-    float majorant;
     float p_a;
     float p_s;
     float p_n;
@@ -102,14 +107,13 @@ MediumEvent get_medium_event_empty() {
         0.0,
         0.0,
         0.0,
-        0.0,
         vec3(1.0),
         false,
         false
     );
 }
 
-MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant, inout uint seed) {
+MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, inout uint seed) {
     if (!medium.heterogeneous) {
         return MediumSample(medium.albedo, medium.absorption, medium.scattering, vec3(0.0));
     }
@@ -121,8 +125,8 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant
     float intensity   = M_stefan_boltzmann * pow(temperature, 4) * volume.emissiveness_multiplier;
 
     MediumSample medium_sample;
-    medium_sample.sigma_a  = clamp(medium.absorption * density, 0.0, majorant);
-    medium_sample.sigma_s  = clamp(medium.scattering * density, 0.0, majorant);
+    medium_sample.sigma_a  = min(medium.absorption * density, medium.absorption);
+    medium_sample.sigma_s  = min(medium.scattering * density, medium.scattering);
     medium_sample.albedo   = medium.albedo;
     medium_sample.emission = blackbody(temperature) * intensity;
 
@@ -132,10 +136,10 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, float majorant
 MediumEvent sample_medium_event(vec3 position, vec3 wo, Medium medium, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium      = medium; // TODO does medium event need medium?
-    medium_event.majorant    = medium_event.medium.absorption + medium_event.medium.scattering;
-    medium_event.sampl       = sample_medium(position, wo, medium_event.medium, medium_event.majorant, seed);
-    medium_event.p_a         = medium_event.sampl.sigma_a / medium_event.majorant;
-    medium_event.p_s         = medium_event.sampl.sigma_s / medium_event.majorant;
+    float sigma_t            = medium.absorption + medium.scattering;
+    medium_event.sampl       = sample_medium(position, wo, medium, seed);
+    medium_event.p_a         = medium_event.sampl.sigma_a / sigma_t;
+    medium_event.p_s         = medium_event.sampl.sigma_s / sigma_t;
     medium_event.p_n         = max(0.0, 1.0 - medium_event.p_a - medium_event.p_s);
 
     float event = random1D(seed);
@@ -147,7 +151,7 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, Medium medium, inout uin
     } 
     // Scattering
     else if (event < medium_event.p_a + medium_event.p_s) {
-        medium_event.pf = pf_sample(medium_event.medium.phase_function, wo, seed);
+        medium_event.pf = pf_sample(medium.phase_function, wo, seed);
         medium_event.scattered = true;
     } 
     // Null
@@ -158,46 +162,50 @@ MediumEvent sample_medium_event(vec3 position, vec3 wo, Medium medium, inout uin
     return medium_event;
 }
 
-// TODO unbiased ray marching
-MediumEvent ray_marching(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+// Same as above but allows for negative null coefficients for majorant < attenuation coefficient
+MediumEvent weighted_sample_medium_event(vec3 position, vec3 wo, Medium medium, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
-    medium_event.medium = medium_get();
-    medium_event.majorant = medium_event.medium.absorption + medium_event.medium.scattering;
-    float t;
-    float step_size = (tmax - tmin) * 0.01;
+    medium_event.medium      = medium; // TODO does medium event need medium?
+    medium_event.sampl       = sample_medium(position, wo, medium, seed);
+    float sigma_t            = medium_event.sampl.sigma_a + medium_event.sampl.sigma_s;
+    float sigma_n            = abs(medium.majorant - sigma_t);
+    float denom              = 1.0 / (sigma_t + sigma_n);
+    medium_event.p_a         = medium_event.sampl.sigma_a * denom;
+    medium_event.p_s         = medium_event.sampl.sigma_s * denom;
+    medium_event.p_n         = sigma_n * denom;
 
-    for (int i = 0; i < 200; i++) { // TODO crashes with a while loop?
-        t = tmin + step_size;// + step_size * (random1D(seed) * 0.5 - 1.0); // TODO jitter
-        if (t < tmax) {
-            vec3 position = origin + direction * t;
+    float event = random1D(seed);
 
-            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant, seed);
-            medium_event.transmittance *= get_transmittance((t - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
-            tmin = t;
-        }
-        else {
-            // Reached end of ray
-            vec3 position = origin + direction * tmax;
+    // Absorption
+    if (event < medium_event.p_a) {                   
+        medium_event.terminated = true;
+        medium_event.transmittance = vec3(0.0);
+    } 
+    // Scattering
+    else if (event < medium_event.p_a + medium_event.p_s) {
+        medium_event.pf = pf_sample(medium.phase_function, wo, seed);
+        medium_event.scattered = true;
+    } 
+    // Null
+    else {
 
-            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, medium_event.majorant, seed);
-            medium_event.transmittance *= get_transmittance((tmax - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
-            medium_event.t = tmax;
-            break;
-        }
     }
 
     return medium_event;
 }
 
+/******************************************************************
+ * Free flight sampling methods
+ ******************************************************************/
 
 MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium = medium_get();
-    medium_event.majorant = medium_event.medium.absorption + medium_event.medium.scattering;
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
     float t;
 
     while (true) {
-        t = tmin + sample_exponential(random1D(seed), medium_event.majorant);
+        t = tmin + sample_exponential(random1D(seed), sigma_t);
         if (t < tmax) {
             vec3 position = origin + direction * t;
             
@@ -221,15 +229,222 @@ MediumEvent delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
     return medium_event;
 }
 
-MediumEvent ratio_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+MediumEvent weighted_delta_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+    MediumEvent medium_event = get_medium_event_empty();
+    Medium medium = medium_get();
+    float sigma_t = medium.absorption + medium.scattering;
+    medium.majorant *= sigma_t;
+    float t;
+    float w = 1.0;
+
+    while (true) {
+        t = tmin + sample_exponential(random1D(seed), medium.majorant);
+        if (t < tmax) {
+            vec3 position = origin + direction * t;
+            
+            medium_event = sample_medium_event(position, -direction, medium, seed);
+
+            if (medium_event.terminated) {
+                w *= medium_event.sampl.sigma_a / (medium.majorant * medium_event.p_a);
+            } 
+            else if (medium_event.scattered) {
+                w *= medium_event.sampl.sigma_s / (medium.majorant * medium_event.p_s);
+            } 
+            else {
+                w *= (medium.majorant - medium_event.sampl.sigma_a - medium_event.sampl.sigma_s) /
+                     (medium.majorant * medium_event.p_n);
+            }
+
+            if (medium_event.terminated || medium_event.scattered) {
+                medium_event.t = t;
+                break;
+            }
+            // Null scatter event
+            tmin = t;
+        }
+        else {
+            // Reached end of ray
+            medium_event.t = tmax;
+            break;
+        }
+    }
+    w = max(0, w);
+    medium_event.transmittance = vec3(w);
+    return medium_event;
+}
+
+MediumEvent single_scatter(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium = medium_get();
-    medium_event.majorant = medium_event.medium.absorption + medium_event.medium.scattering;
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
     float t;
     vec3 transmittance = vec3(1.0);
 
     while (true) {
-        t = tmin + sample_exponential(random1D(seed), medium_event.majorant);
+        t = tmin + sample_exponential(random1D(seed), sigma_t);
+        if (t < tmax) {
+            vec3 position = origin + direction * t;
+            
+            medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
+            transmittance *= get_transmittance((t - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
+
+            if (medium_event.terminated || medium_event.scattered) {
+                // Keep the ray going forward
+                medium_event.pf.wi = direction;
+                float r = random1D(seed);
+                medium_event.pf.p = pf_eval_p(medium_event.medium.phase_function, direction, medium_event.pf.wi, r); 
+                medium_event.pf.pdf = pf_eval_pdf(medium_event.medium.phase_function, direction, medium_event.pf.wi, r);
+                medium_event.t = t;
+                break;
+            }
+            tmin = t;
+        }
+        else {
+            // Reached end of ray
+            transmittance *= get_transmittance((t - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
+            medium_event.t = tmax;
+            break;
+        }
+    }
+
+    medium_event.transmittance = transmittance;
+    return medium_event;
+}
+
+MediumEvent decomposition_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium = medium_get();
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
+    float majorant_control = sigma_t * medium_event.medium.minorant;
+    float majorant_residual = sigma_t - majorant_control;
+
+    float t_control = sample_exponential(random1D(seed), majorant_control);
+    float t_residual;
+    while (true) {
+        t_residual = tmin + sample_exponential(random1D(seed), majorant_residual);
+        if (min(t_residual, t_control) < tmax) {
+            // Control medium finds first real collision
+            if (t_residual > t_control) {
+                vec3 position = origin + direction * t_control;
+                medium_event.medium.heterogeneous = false;
+                medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
+                medium_event.t = t_control;
+                break;
+            }
+            // Residual medium finds first real collision
+            else {
+                vec3 position = origin + direction * t_residual;
+                
+                medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
+
+                if (medium_event.terminated || medium_event.scattered) {
+                    medium_event.t = t_residual;
+                    break;
+                }
+                // Null scatter event
+                tmin = t_residual;
+            }
+        }
+        else {
+            // Reached end of ray
+            medium_event.t = tmax;
+            break;
+        }
+    }
+
+    return medium_event;
+}
+
+MediumEvent weighted_decomposition_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium = medium_get();
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
+    float majorant_control = sigma_t * medium_event.medium.minorant;
+    float majorant_residual = sigma_t - majorant_control;
+    float w = 1.0;
+
+    float t_control = sample_exponential(random1D(seed), majorant_control);
+    float t_residual;
+    while (true) {
+        t_residual = tmin + sample_exponential(random1D(seed), majorant_residual); // TODO implement weighted version
+        if (min(t_residual, t_control) < tmax) {
+            // Control medium finds first real collision
+            if (t_residual > t_control) {
+                vec3 position = origin + direction * t_control;
+                medium_event.medium.heterogeneous = false;
+                medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
+                medium_event.t = t_control;
+                break;
+            }
+            // Residual medium finds first real collision
+            else {
+                vec3 position = origin + direction * t_residual;
+                
+                medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
+
+                if (medium_event.terminated || medium_event.scattered) {
+                    medium_event.t = t_residual;
+                    break;
+                }
+                // Null scatter event
+                tmin = t_residual;
+            }
+        }
+        else {
+            // Reached end of ray
+            medium_event.t = tmax;
+            break;
+        }
+    }
+
+    medium_event.transmittance = vec3(w);
+    return medium_event;
+}
+
+/******************************************************************
+ * Transmittance evaluation specific methods
+ ******************************************************************/
+
+// TODO unbiased ray marching
+vec3 transmittance_ray_marching(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium = medium_get();
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
+    float t;
+    float step_size = (tmax - tmin) * 0.01;
+
+    for (int i = 0; i < 200; i++) { // TODO crashes with a while loop?
+        t = tmin + step_size;// + step_size * (random1D(seed) * 0.5 - 1.0); // TODO jitter
+        if (t < tmax) {
+            vec3 position = origin + direction * t;
+
+            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, seed);
+            medium_event.transmittance *= get_transmittance((t - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
+            tmin = t;
+        }
+        else {
+            // Reached end of ray
+            vec3 position = origin + direction * tmax;
+
+            medium_event.sampl = sample_medium(position, -direction, medium_event.medium, seed);
+            medium_event.transmittance *= get_transmittance((tmax - tmin), (medium_event.sampl.sigma_a + medium_event.sampl.sigma_s));
+            medium_event.t = tmax;
+            break;
+        }
+    }
+
+    return medium_event.transmittance;
+}
+
+vec3 transmittance_ratio_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+    MediumEvent medium_event = get_medium_event_empty();
+    medium_event.medium = medium_get();
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
+    float t;
+    vec3 transmittance = vec3(1.0);
+
+    while (true) {
+        t = tmin + sample_exponential(random1D(seed), sigma_t);
         if (t < tmax) {
             vec3 position = origin + direction * t;
 
@@ -245,17 +460,16 @@ MediumEvent ratio_tracking(vec3 origin, vec3 direction, float tmin, float tmax, 
         }
     }
 
-    medium_event.transmittance = transmittance;
-    return medium_event;
+    return transmittance;
 }
 
-MediumEvent residual_ratio_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
+vec3 transmittance_residual_ratio_tracking(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     MediumEvent medium_event = get_medium_event_empty();
     medium_event.medium = medium_get();
-    medium_event.majorant = medium_event.medium.absorption + medium_event.medium.scattering;
-    float majorant_control = medium_event.majorant * 0.1; // TODO GUI parameter
+    float sigma_t = medium_event.medium.absorption + medium_event.medium.scattering;
+    float majorant_control = sigma_t * medium_event.medium.minorant;
     vec3 transmittance_control = vec3(get_transmittance(majorant_control, tmax - tmin));
-    float majorant_residual = medium_event.majorant - majorant_control;
+    float majorant_residual = sigma_t - majorant_control;
     vec3 transmittance_residual = vec3(1.0);
 
     float t;
@@ -265,7 +479,7 @@ MediumEvent residual_ratio_tracking(vec3 origin, vec3 direction, float tmin, flo
             vec3 position = origin + direction * t;
 
             medium_event = sample_medium_event(position, -direction, medium_event.medium, seed);
-                
+
             transmittance_residual *= 1.0 - ((medium_event.sampl.sigma_a + medium_event.sampl.sigma_s) - majorant_control) / majorant_residual;
             tmin = t;
         }
@@ -276,17 +490,16 @@ MediumEvent residual_ratio_tracking(vec3 origin, vec3 direction, float tmin, flo
         }
     }
 
-    medium_event.transmittance = transmittance_control * transmittance_residual;
-    return medium_event;
+    return transmittance_control * transmittance_residual;
 }
 
-vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed, int transmittance_algo) {
+vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, float tmax, inout uint seed) {
     vec3 transmittance = vec3(1.0);
 
     if (current_medium >= 0) {
         Medium m = medium_get();
         if (m.heterogeneous) {
-            switch(transmittance_algo) {
+            switch(properties.transmittance_algo) {
                 case Transmittance_Delta_Tracking: 
                     MediumEvent e = delta_tracking(origin, direction, tmin, tmax, seed);
                     if (e.terminated || e.scattered) {
@@ -294,13 +507,13 @@ vec3 sample_transmittance_along_ray(vec3 origin, vec3 direction, float tmin, flo
                     }
                     break;
                 case Transmittance_Ray_Marching:
-                    transmittance = ray_marching(origin, direction, tmin, tmax, seed).transmittance;
+                    transmittance = transmittance_ray_marching(origin, direction, tmin, tmax, seed);
                     break;
                 case Transmittance_Ratio_Tracking:
-                    transmittance = ratio_tracking(origin, direction, tmin, tmax, seed).transmittance;
+                    transmittance = transmittance_ratio_tracking(origin, direction, tmin, tmax, seed);
                     break;
                 case Transmittance_Residual_Ratio_Tracking:
-                    transmittance = residual_ratio_tracking(origin, direction, tmin, tmax, seed).transmittance;
+                    transmittance = transmittance_residual_ratio_tracking(origin, direction, tmin, tmax, seed);
                     break;
             }
         } else {
@@ -355,11 +568,28 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float t, inout 
     }
 */
     MediumEvent medium_event;
-    if (medium_get().scattering > 0.0 || medium_get().heterogeneous) {
-        medium_event = delta_tracking(origin, direction, tmin, tmax, seed);
+    Medium medium = medium_get();
+    if (medium.scattering > 0.0 || medium.heterogeneous) {
+        switch (properties.medium_integrator) {
+            default: //Media_Integrator_Delta_Tracking
+                medium_event = delta_tracking(origin, direction, tmin, tmax, seed);
+            break;
+            case Media_Integrator_Weighted_Delta_Tracking:
+                medium_event = weighted_delta_tracking(origin, direction, tmin, tmax, seed);
+            break;
+            case Media_Integrator_Single_Scattering:
+                medium_event = single_scatter(origin, direction, tmin, tmax, seed);
+            break;
+            case Media_Integrator_Decomposition_Tracking:
+                medium_event = decomposition_tracking(origin, direction, tmin, tmax, seed);
+            break;
+            case Media_Integrator_Weighted_Decomposition_Tracking:
+                medium_event = weighted_decomposition_tracking(origin, direction, tmin, tmax, seed);
+            break;
+        }
     } else {
         medium_event = get_medium_event_empty();
-        medium_event.transmittance = get_transmittance(medium_get(), tmax - tmin); // TODO
+        medium_event.transmittance = get_transmittance(medium, tmax - tmin); // TODO
     }
 
     if (to_remove_medium) {

@@ -68,7 +68,7 @@ void main() {
                     radiance += throughput * hit.material.emission.rgb;
                 }
                 else {
-                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.rgb, hit.material.double_sided_emission);
+                    float light_mis = pdf_light_area(hit.vertices, direction, distance, hit.material.emission.a, hit.material.double_sided_emission);
                     float bxdf_mis = previous_pdf;
                     radiance += throughput * hit.material.emission.rgb * power_heuristic(bxdf_mis, light_mis);
                 }
@@ -124,7 +124,7 @@ void main() {
                         traceRayEXT(tlas, shadow_flags, 0xff, 0, 0, 1, origin, tmin, li_sample.wi, li_sample.distance * 0.99999, 1);
 
                         if (shadow_prd.visibility) {
-                            float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf); // TODO li_sample.pdf is area sampled. Does it need to be solid angle to match bxdf?
+                            float mis_weight = power_heuristic(li_sample.pdf, bxdf_pdf);
                             radiance += throughput * li_sample.radiance * mis_weight * bxdf_f / li_sample.pdf;
                         }
                     }

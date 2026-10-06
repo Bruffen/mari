@@ -176,8 +176,28 @@ float brdf_conductor_pdf(vec3 wo, vec3 wi) {
  ****************************************************************
  */
 
+// Formulas from https://refractiveindex.info
+float get_refractive_index(float lambda) {
+    lambda *= 0.001; // nanometers to micrometers
+    lambda *= lambda;
+
+    // Soda lime glass
+    // First value works nicely to input directly our ior parameter
+    return material.ior - 0.003169 * lambda + 0.003962 * (1.0 / lambda);
+
+    // Fused quartz
+    //float a = 0.6961663 * lambda / (lambda - sqr(0.0684043));
+    //float b = 0.4079426 * lambda / (lambda - sqr(0.1162414));
+    //float c = 0.8974794 * lambda / (lambda - sqr(9.8961610));
+    //return 1.0 + sqrt(a + b + c);
+}
+
 BxdfSample bsdf_dielectric_sample(vec3 wo, vec3 random, const uint mode) {
+#ifdef SPECTRAL
+    float eta = get_refractive_index(wavelengths.x);
+#else
     float eta = material.ior;
+#endif
 
     // Perfectly specular 
     if (eta == 1.0 || material.roughness == 0.0) {
@@ -240,8 +260,12 @@ BxdfSample bsdf_dielectric_sample(vec3 wo, vec3 random, const uint mode) {
 }
 
 float bsdf_dielectric_f(vec3 wo, vec3 wi, const uint mode) {
+#ifdef SPECTRAL
+    float eta = get_refractive_index(wavelengths.x);
+#else
     float eta = material.ior;
-    
+#endif
+
     if (eta == 1.0 || material.roughness == 0.0) {
         return 0.0;
     }
@@ -285,7 +309,11 @@ float bsdf_dielectric_f(vec3 wo, vec3 wi, const uint mode) {
 }
 
 float bsdf_dielectric_pdf(vec3 wo, vec3 wi) {
+#ifdef SPECTRAL
+    float eta = get_refractive_index(wavelengths.x);
+#else
     float eta = material.ior;
+#endif
 
     // Perfectly specular 
     if (eta == 1.0 || material.roughness == 0.0) {

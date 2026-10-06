@@ -26,7 +26,7 @@ namespace mari {
         DefaultObjects::initialize(device);        
 
         gui = std::make_unique<Gui>(device, window, renderer, rayTracingSystem);
-        scene = TestScenes::loadScene(device, window, 9);
+        scene = TestScenes::loadScene(device, window);
         scene->start();
 
         rayTracingSystem.buildScene(*scene);
@@ -184,17 +184,18 @@ namespace mari {
 
                 // update
                 RayTracingUbo ubo{};
-                ubo.viewInverse         = scene->currentCamera->camera->getInverseView();
-                ubo.projInverse         = scene->currentCamera->camera->getInverseProjection();
-                ubo.frameCount          = frameCounter;
-                ubo.maxDepth            = rayTracingSystem.maxDepth;
-                ubo.frameAccumulation   = static_cast<VkBool32>(rayTracingSystem.frameAccumulation);
-                ubo.russianRoulette     = static_cast<VkBool32>(rayTracingSystem.russianRoulette);
-                ubo.nextEventEstimation = static_cast<VkBool32>(rayTracingSystem.nextEventEstimation);
-                ubo.exposure            = rayTracingSystem.exposure;
-                ubo.tonemapper          = rayTracingSystem.tonemapper;
-                ubo.transmittanceAlgo   = rayTracingSystem.transmittanceAlgo;
-                ubo.samplesPerPixel     = rayTracingSystem.samplesPerPixel;
+                ubo.viewInverse           = scene->currentCamera->camera->getInverseView();
+                ubo.projInverse           = scene->currentCamera->camera->getInverseProjection();
+                ubo.frameCount            = frameCounter;
+                ubo.maxDepth              = rayTracingSystem.maxDepth;
+                ubo.frameAccumulation     = static_cast<VkBool32>(rayTracingSystem.frameAccumulation);
+                ubo.russianRoulette       = static_cast<VkBool32>(rayTracingSystem.russianRoulette);
+                ubo.nextEventEstimation   = static_cast<VkBool32>(rayTracingSystem.nextEventEstimation);
+                ubo.exposure              = rayTracingSystem.exposure;
+                ubo.tonemapper            = rayTracingSystem.tonemapper;
+                ubo.mediumIntegrator      = rayTracingSystem.mediumIntegrator;
+                ubo.transmittanceAlgo     = rayTracingSystem.transmittanceAlgo;
+                ubo.samplesPerPixel       = rayTracingSystem.samplesPerPixel;
                 rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                 rayTracingUboBuffers[frameIndex]->flush();
 

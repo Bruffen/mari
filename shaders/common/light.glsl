@@ -31,7 +31,7 @@ layout(binding = 5, set = 0, scalar) uniform Lights {
 struct LightInfo {
     int      type;
     vec3     positions[3];
-    vec3     emission;
+    vec4     emission;
     float    power;
     float    area;
     bool     double_sided;
@@ -95,7 +95,11 @@ LiSample sample_Li_area(vec3 origin, vec2 random, LightInfo light) {
         correct_side = 0;
     }
 
-    li_sample.radiance = light.emission;
+#ifdef SPECTRAL
+    light.emission.rgb = rgb2spec_eval(wavelengths, light.emission.rgb);
+#endif
+    li_sample.radiance = light.emission.rgb * light.emission.a;
+
     li_sample.pdf      = 1.0 / light.area * correct_side;
     // Convert area measure pdf to solid angle pdf
     li_sample.pdf      *= sqr(li_sample.distance) / abs(ndotl);
@@ -105,7 +109,7 @@ LiSample sample_Li_area(vec3 origin, vec2 random, LightInfo light) {
 
 // It would be nice to be able to index into the array of lights so as not to recalculate values.
 // Would potentially have to pass light id in the primitive info, however.
-float pdf_light_area(vec3 positions[3], vec3 wi, float distance, vec3 emission, bool double_sided) {
+float pdf_light_area(vec3 positions[3], vec3 wi, float distance, float emissiveness, bool double_sided) {
     vec3  normal_g = cross(positions[1] - positions[0], positions[2] - positions[0]);
     float normal_g_length = length(normal_g); 
     normal_g /= normal_g_length;
@@ -119,7 +123,7 @@ float pdf_light_area(vec3 positions[3], vec3 wi, float distance, vec3 emission, 
 
     // Area cancels out
     //float area = normal_g_length * 0.5f;
-    float power = length(emission) * /*area **/ (double_sided ? 2.0f : 1.0f) * M_PI;
+    float power = emissiveness * /*area **/ (double_sided ? 2.0f : 1.0f) * M_PI;
     float total_power = lights.integral * lights.size;
 
     return sqr(distance) * power / (/*area **/ abs(ndotl) * total_power); 
@@ -176,7 +180,7 @@ LiSample sample_Li_infinite(inout float pdf, vec2 random, LightInfo light) {
 
 vec3 sample_Le_infinite(vec3 direction, inout vec2 uv) {
     vec3 dir = vec3(-direction.x, direction.z, -direction.y);
-    dir = rotate_around_axis(dir, vec3(0.0f, 0.0f, 1.0f), -infinite_light.environment_rotation.x);
+    dir = rotate_around_axis(dir, vec3(0.0f, 0.0f, 1.0f),  infinite_light.environment_rotation.x);
     dir = rotate_around_axis(dir, vec3(0.0f, 1.0f, 0.0f), -infinite_light.environment_rotation.y);
     uv = equal_area_sphere_to_square(dir);
 

@@ -19,6 +19,8 @@ namespace mari {
         glm::vec3                   albedo = glm::vec3(1.0f);
         float                       absorption = 0.0f;
         float                       scattering = 0.0f;
+        float                       minorant = 0.1f;
+        float                       majorant = 1.0f;
         PhaseFunction               phaseFunction;
         VkBool32                    heterogeneous = false;
         auto operator<=>(const Medium&) const = default;

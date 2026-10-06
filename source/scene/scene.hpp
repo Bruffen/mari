@@ -30,7 +30,7 @@ namespace mari {
             static std::shared_ptr<Image>           loadImage(Device &device, const std::string &path, VkFormat format);
             static std::shared_ptr<Image>           loadImage(Device &device, const std::string &path, VkFormat format, const std::string &name);
 
-            Transform transform;
+            Transform                               transform;
 
             std::vector<std::shared_ptr<Image>>     images;
             std::unordered_map<std::string, std::shared_ptr<Node>> nodes;

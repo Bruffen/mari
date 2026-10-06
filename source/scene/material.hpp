@@ -104,10 +104,7 @@ namespace mari {
         bool                        insideMedia = false; // Only for lights, for transmittance calculation. // TODO Think of a better way
 
         bool                        isEmissive() const { 
-            return glm::length(
-                data.constants.emission.a * 
-                glm::vec3(data.constants.emission)
-            ) > 0.0f; 
+            return data.constants.emission.a > 0.0f; 
         }
     };
 

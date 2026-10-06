@@ -10,6 +10,8 @@
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vk_enum_string_helper.h> 
 
+#include <rgb2spec/rgb2spec.h>
+
 #include <iomanip>
 #include <ctime>
 #include <sstream>
@@ -22,7 +24,7 @@ namespace mari {
         io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
         io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-        //io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         ImGui::StyleColorsDark();
 
         std::vector<VkDescriptorPoolSize> poolSizes = {{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }};
@@ -36,20 +38,20 @@ namespace mari {
 
         ImGui_ImplGlfw_InitForVulkan(window.getGLFWwindow(), true);
         ImGui_ImplVulkan_InitInfo initInfo{};
-        initInfo.Instance           = device.getInstance();
-        initInfo.PhysicalDevice     = device.getPhysicalDevice();
-        initInfo.Device             = device.handle();
-        initInfo.QueueFamily        = device.findPhysicalQueueFamilies().presentFamily;
-        initInfo.Queue              = device.presentQueue();
-        initInfo.PipelineCache      = nullptr;
-        initInfo.DescriptorPool     = descriptorPool;
-        initInfo.RenderPass         = renderer.getSwapchainRenderPass();
-        initInfo.Subpass            = 0;
-        initInfo.MinImageCount      = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
-        initInfo.ImageCount         = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
-        initInfo.MSAASamples        = VK_SAMPLE_COUNT_1_BIT;
-        initInfo.Allocator          = nullptr;
-        initInfo.CheckVkResultFn    = checkVkResult;
+        initInfo.Instance                       = device.getInstance();
+        initInfo.PhysicalDevice                 = device.getPhysicalDevice();
+        initInfo.Device                         = device.handle();
+        initInfo.QueueFamily                    = device.findPhysicalQueueFamilies().presentFamily;
+        initInfo.Queue                          = device.presentQueue();
+        initInfo.PipelineCache                  = nullptr;
+        initInfo.DescriptorPool                 = descriptorPool;
+        initInfo.MinImageCount                  = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
+        initInfo.ImageCount                     = static_cast<uint32_t>(renderer.getSwapchain().imageCount());
+        initInfo.PipelineInfoMain.RenderPass    = renderer.getSwapchainRenderPass();
+        initInfo.PipelineInfoMain.Subpass       = 0;
+        initInfo.PipelineInfoMain.MSAASamples   = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.Allocator                      = nullptr;
+        initInfo.CheckVkResultFn                = checkVkResult;
         ImGui_ImplVulkan_Init(&initInfo);
 
         std::shared_ptr<Image> s = DefaultObjects::getImageWhite();
@@ -186,14 +188,16 @@ namespace mari {
             ImGui::EndChild();
             ImGui::End();
         }
-
         ImGui::Render();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
     }
 
     void Gui::render(VkCommandBuffer commandBuffer) {
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+
+        if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+        }
     }
 
     void Gui::imGuiFramerate(float duration) {
@@ -203,7 +207,7 @@ namespace mari {
         static double  refresh_time = 0.0;
         if (refresh_time == 0.0)
             refresh_time = ImGui::GetTime();
-        while (refresh_time < ImGui::GetTime()) { // Create data at fixed 60 Hz rate for the demo
+        while (refresh_time < ImGui::GetTime()) { // Create data at fixed 60 Hz rate
             values[values_offset] = duration * 1000.0f;
             values_offset = (values_offset + 1) % size;
             refresh_time += 1.0f / 60.0f;
@@ -364,6 +368,8 @@ namespace mari {
         ImGui::ColorEdit3("Albedo", (float*)&medium.albedo, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
         ImGui::SliderFloat("Absorption", (float*)&medium.absorption, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
         ImGui::SliderFloat("Scattering", (float*)&medium.scattering, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
+        ImGui::SliderFloat("Minorant", (float*)&medium.minorant, 0.0f, 1.0f  , "%.3f", silderFlags);
+        ImGui::SliderFloat("Majorant", (float*)&medium.majorant, 0.0f, 2.0f  , "%.3f", silderFlags);
         const char* phaseFunctions[] = { "Isotropic", "Rayleigh", "HenyeyGreenstein", "Mie Approximation" };
         const char* selectedPhaseFunction = phaseFunctions[medium.phaseFunction.type];
 
@@ -391,6 +397,8 @@ namespace mari {
 
     void Gui::imGuiMaterial(Material &material) {
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
+
+        // TODO spectral
 
         MaterialConstants mc = material.data.constants;
         bool a = true;
@@ -592,6 +600,27 @@ namespace mari {
                 ImGui::EndCombo();
             }
 
+            // Medium integrator algorithm
+            if (system.getIntegrator() != Integrator::PATH_TRACING) {
+                const char* algorithms[] = { "Delta Tracking", "Weighted Delta Tracking", "Single Scatter", "Decomposition Tracking", "Weighted Decomposition Tracking" };
+                const char* selectedAlgorithm = algorithms[system.mediumIntegrator];
+                
+                if (ImGui::BeginCombo("Medium integrator", selectedAlgorithm, 0)) {
+                    for (int n = 0; n < IM_ARRAYSIZE(algorithms); n++) {
+                        const bool isSelected = (system.mediumIntegrator == n);
+                        if (ImGui::Selectable(algorithms[n], isSelected)) {
+                            system.mediumIntegrator = n;
+                            inputChanged = true;
+                            break;
+                        }
+                        
+                        if (isSelected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
             // Transmittance algorithm
             if (system.getIntegrator() != Integrator::PATH_TRACING) {
                 const char* algorithms[] = { "Delta tracking", "Ray marching", "Ratio Tracking", "Residual Ratio Tracking" };
@@ -678,8 +707,22 @@ namespace mari {
             system.environmentRotation = glm::radians(newEnvRotation);
             if (system.environmentRotation != oldEnvRotation) inputChanged = true;
             
-            if (ImGui::Button("Save render")) {
+            if (ImGui::Button("Save current render")) {
                 saveImage(*system.presentImage);
+            }
+
+            ImGui::Spacing();
+            static bool started = false;
+            static int samplesTarget = 0;
+            ImGui::InputInt("Record samples", &samplesTarget);
+            if (started && frameInfo.frameCounter >= samplesTarget) {
+                saveImage(*system.presentImage);
+                started = false;
+            }
+            const char* name = started ? "Running..." : "Start";
+            if (ImGui::Button(name)) {
+                started = true;
+                inputChanged = true;
             }
 
             ImGui::EndTabItem();
