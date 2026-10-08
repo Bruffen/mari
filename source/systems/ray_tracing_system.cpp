@@ -38,15 +38,13 @@ namespace mari {
             }
 
             if (node->volume) {
-                buildBLAS(node, scene.materialDataBuffer->deviceAddress() /* TODO volumeDataBuffer*/);
+                buildBLAS(node, scene.materialDataBuffer->deviceAddress());
             }
         }
         
-        VkDeviceSize primMeshesAdressesBufferSize = sizeof(PrimMeshInfo) * primMeshesInfos.size();
-
         primMeshesInfosBuffer = std::make_unique<Buffer>(
             device,
-            primMeshesAdressesBufferSize,
+            sizeof(PrimMeshInfo) * primMeshesInfos.size(),
             1,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -63,17 +61,30 @@ namespace mari {
             start += sizeof(PrimMeshInfo) * blas->geometryCount;
         }
 
-        VkDeviceSize pPrimMeshesAdressesBufferSize = sizeof(uint64_t) * pPrimMeshesAdresses.size();
-
         pPrimMeshesInfosBuffer = std::make_unique<Buffer>(
             device,
-            pPrimMeshesAdressesBufferSize,
+            sizeof(uint64_t) * pPrimMeshesAdresses.size(),
             1,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
         pPrimMeshesInfosBuffer->stageToBuffer((void*) pPrimMeshesAdresses.data());
+
+        // Add dummy aabb to create an "empty" buffer
+        if (aabbBDAs.size() == 0) {
+            aabbBDAs.push_back(0);
+        }
+
+        aabbBDAsBuffer = std::make_unique<Buffer>(
+            device,
+            sizeof(uint64_t) * aabbBDAs.size(),
+            1,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+        aabbBDAsBuffer->stageToBuffer((void*) aabbBDAs.data());
 
         buildTLAS();
         buildAreaLights(scene);
@@ -167,6 +178,8 @@ namespace mari {
             primitiveCounts.push_back(1);
             buildRangeInfos.push_back(accelerationStructureBuildRangeInfo);
             pBuildRangeInfos.push_back(&buildRangeInfos.back());
+
+            aabbBDAs.push_back(node->volume->getAabbPositionsDeviceAddress());
         }
         
         blas->build(geometries.data(), static_cast<uint32_t>(geometries.size()), primitiveCounts.data(), pBuildRangeInfos.data());
@@ -234,7 +247,7 @@ namespace mari {
             accelerationStructureInstance.transform = vkhelper::glmToVkMatrix(blas->node->worldMatrix);
             accelerationStructureInstance.instanceCustomIndex = 0;
             accelerationStructureInstance.mask = 0xFF;
-            accelerationStructureInstance.instanceShaderBindingTableRecordOffset = 0;
+            accelerationStructureInstance.instanceShaderBindingTableRecordOffset = blas->node->volume ? 1 : 0;
             accelerationStructureInstance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
             accelerationStructureInstance.accelerationStructureReference = blas->deviceAddress;
 
@@ -373,6 +386,10 @@ namespace mari {
             blases.clear();
             for (auto const &[id, node] : scene.nodes) {
                 if (node->mesh) {
+                    buildBLAS(node, scene.materialDataBuffer->deviceAddress());
+                }
+
+                if (node->volume) {
                     buildBLAS(node, scene.materialDataBuffer->deviceAddress());
                 }
             }

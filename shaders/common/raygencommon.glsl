@@ -21,7 +21,6 @@ MaterialConstants material;
 layout(binding = 0, set = 0)            uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f)   uniform image2D image;
 layout(binding = 2, set = 0, rgba8)     uniform image2D present_image;
-layout(binding = 8, set = 0)            uniform sampler2D textures[];
 layout(binding = 3, set = 0, scalar)    uniform Properties {
     mat4  view_inverse;
     mat4  proj_inverse;

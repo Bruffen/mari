@@ -19,7 +19,7 @@ namespace mari {
             switch (  9  ) {
                 case 0:
                     scene->load("../../../../_Models/DOA/marie_rose_twinkle_rose/marie_rose_twinkle_rose_standing1.glb");
-                    scene->transform.position = {0.0f, -0.01f, 0.0f};
+                    scene->transform.position = {0.0f, 0.01f, 0.0f};
                     break;
                 case 1:
                     scene->load("../../../../_Models/gltf/CornellBox/Cornell-Volume.glb");
@@ -81,16 +81,24 @@ namespace mari {
                     //window.resizeWindow(1024, 1024);
 
                     scene->volumeObject = std::make_shared<Node>("volume");
-                    scene->volumeObject->transform.position.y = -0.7f;
+                    scene->volumeObject->transform.position.y = 0.7f;
                     scene->volumeObject->transform.scale *= 0.005f;
                     scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
                     //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
                     //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
-                    scene->volumeObject->volume->medium.scattering *= 40.0f;
+                    scene->volumeObject->volume->medium.scattering *= 6.0f;
                     scene->volumeObject->volume->jitteringAmount = 0.0f;
                     scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
                     scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;
                     scene->addNode(scene->volumeObject);
+                    //{
+                    //    std::shared_ptr<Node> volume2 = std::make_shared<Node>("volume2");
+                    //    volume2->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb");
+                    //    volume2->transform.scale *= 0.005f;
+                    //    volume2->volume->medium.absorption = 50.0f;
+                    //    volume2->volume->medium.scattering = 50.0f;
+                    //    scene->addNode(volume2);
+                    //}
                     break;
                 case 10:
                     //scene->load("../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
@@ -141,7 +149,7 @@ namespace mari {
                     scene->addNode(scene->volumeObject);
                     break;
             }
-            scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
+            //scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);
 
             //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, Scene::loadImage(device, "../../models/citrus_orchard_road_puresky_1k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "citrus_orchard_road_puresky_1k")));
             //lights.emplace_back(std::make_shared<InfiniteAreaLight>(device, Scene::loadImage(device, "../../models/solitude_interior_8k.hdr", VK_FORMAT_R32G32B32A32_SFLOAT, "solitude_interior_8k")));

@@ -40,6 +40,14 @@ namespace mari {
         }
     }
 
+#ifdef MARI_DEBUG
+    const bool enableValidationLayers = true;
+    const bool enableShaderRelaxed = true;
+#else
+    const bool enableValidationLayers = false;
+    const bool enableShaderRelaxed = false;
+#endif
+
     // class member functions
     Device::Device(Window &window) : window{window} {
         addShaderDebugPrintf();
@@ -76,7 +84,7 @@ namespace mari {
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Mari";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_MAKE_API_VERSION(0, 1, 3, 280);
+        appInfo.apiVersion = VK_MAKE_API_VERSION(0, 1, 4, 357);
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;

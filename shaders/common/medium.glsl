@@ -538,19 +538,12 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float t, inout 
 
     float tmin = 1e-6;
     float tmax = t;
-    bool  done = false;
     bool  to_remove_medium = false;
 /*
     if (current_medium < 0) { // TODO replace with test_intersection_volume_nano() to ray gen shader
         float tmax_surface = tmax;
-        bool hit = pnanovdb_hdda_ray_clip(
-            volume_nano.density.bbox_min,
-            volume_nano.density.bbox_max,
-            origin,
-            tmin,
-            direction,
-            tmax
-        );
+        bool hit = test_intersection_volume_nano(origin, direction, tmin, tmax);
+
         // Handling impossible cases
         if (tmax < 0.0)  hit = false;
         if (tmin < 1e-6) hit = false;
@@ -573,19 +566,19 @@ MediumEvent sample_medium_along_ray(vec3 origin, vec3 direction, float t, inout 
         switch (properties.medium_integrator) {
             default: //Media_Integrator_Delta_Tracking
                 medium_event = delta_tracking(origin, direction, tmin, tmax, seed);
-            break;
+                break;
             case Media_Integrator_Weighted_Delta_Tracking:
                 medium_event = weighted_delta_tracking(origin, direction, tmin, tmax, seed);
-            break;
+                break;
             case Media_Integrator_Single_Scattering:
                 medium_event = single_scatter(origin, direction, tmin, tmax, seed);
-            break;
+                break;
             case Media_Integrator_Decomposition_Tracking:
                 medium_event = decomposition_tracking(origin, direction, tmin, tmax, seed);
-            break;
+                break;
             case Media_Integrator_Weighted_Decomposition_Tracking:
                 medium_event = weighted_decomposition_tracking(origin, direction, tmin, tmax, seed);
-            break;
+                break;
         }
     } else {
         medium_event = get_medium_event_empty();

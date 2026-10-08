@@ -30,6 +30,8 @@ namespace mari {
         }
 
         file.close();
+
+        density->setTransform(openvdb::v12_1::math::Transform::createLinearTransform(openvdb::v12_1::math::Mat4d().identity()));
         
         const openvdb::FloatGrid::Ptr densityGridData = openvdb::gridPtrCast<openvdb::FloatGrid>(density);
 
@@ -59,15 +61,14 @@ namespace mari {
         uint64_t byteSize = densityGridHandle.bufferSize();
         uint64_t elementStride = sizeof(float); // because it's a FloatGrid
         uint64_t elementCount = byteSize / elementStride; 
-
-        auto bbox = densityGridData->transform().indexToWorld(densityGridData->evalActiveVoxelBoundingBox());
-
-        aabb.minX = static_cast<float>(-1 /*bbox.min().x()*/);
-        aabb.minY = static_cast<float>(-1 /*bbox.min().y()*/);
-        aabb.minZ = static_cast<float>(-1 /*bbox.min().z()*/);
-        aabb.maxX = static_cast<float>( 1 /*bbox.max().x()*/);
-        aabb.maxY = static_cast<float>( 1 /*bbox.max().y()*/);
-        aabb.maxZ = static_cast<float>( 1 /*bbox.max().z()*/);
+        
+        auto bbox = densityGridHandle.grid<float>()->worldBBox(); 
+        aabb.minX = static_cast<float>(bbox.min()[0]);
+        aabb.minY = static_cast<float>(bbox.min()[1]);
+        aabb.minZ = static_cast<float>(bbox.min()[2]);
+        aabb.maxX = static_cast<float>(bbox.max()[0]);
+        aabb.maxY = static_cast<float>(bbox.max()[1]);
+        aabb.maxZ = static_cast<float>(bbox.max()[2]);
 
         aabbPositionsBuffer = std::make_unique<Buffer>(
             device,
@@ -76,7 +77,7 @@ namespace mari {
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
-        aabbPositionsBuffer->stageToBuffer(&aabb); // TODO update in setTransform()
+        aabbPositionsBuffer->stageToBuffer(&aabb);
 
         nanoDensityBuffer = std::make_unique<Buffer>(
             device, 
@@ -118,7 +119,7 @@ namespace mari {
         vdbMat4.setIdentity();
 
         //vdbMat4.setToRotation();
-        vdbMat4.postScale(openvdb::v12_1::math::Vec3d(transform.scale.x, -transform.scale.y, transform.scale.z));
+        vdbMat4.postScale(openvdb::v12_1::math::Vec3d(transform.scale.x, transform.scale.y, transform.scale.z));
         vdbMat4.setTranslation(openvdb::v12_1::math::Vec3d(transform.position.x, transform.position.y, transform.position.z));
 
         density->setTransform(openvdb::v12_1::math::Transform::createLinearTransform(vdbMat4));

@@ -24,6 +24,11 @@ struct Vertex {
     vec2 uv;
 };
 
+struct AABB {
+    vec3 min;
+    vec3 max;
+};
+
 struct Hit {
     vec3  vertices[3];
     float t;
@@ -41,9 +46,11 @@ layout(buffer_reference, scalar) readonly buffer PrimMeshInfos { PrimMeshInfo p[
 layout(buffer_reference, scalar) readonly buffer Vertices      { Vertex v[];       };
 layout(buffer_reference, scalar) readonly buffer Indices       { uint i[];         };
 layout(buffer_reference, scalar) readonly buffer Materials     { MaterialData m[]; };
+layout(buffer_reference, scalar) readonly buffer AABBs         { AABB a[]; };
 
 layout(binding = 7, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
-layout(binding = 8, set = 0) uniform sampler2D textures[];
+layout(binding = 8, set = 0) buffer AABB_bdas { uint64_t addresses[]; } aabb_bdas;
+layout(binding = 9, set = 0) uniform sampler2D textures[];
 
 // Technique by Carsten Wächter and Nikolaus Binder 
 // "A Fast and Robust Method for Avoiding Self-Intersection"
@@ -110,7 +117,20 @@ Hit process_hit(Payload payload) {
     hit.t = payload.t;
 
     /* Procedural hit group for NanoVDB */
-    if (payload.barycentrics.y < 0) { //nanovdb aabb TODO perhaps add a hitKind variable
+    if (payload.barycentrics.x < 0) { //nanovdb aabb TODO perhaps add a hitKind variable
+        hit.material_type = MaterialType_Boundary;
+
+        int face = int(payload.barycentrics.z);
+        switch (face) {
+            case 1: hit.normal_g = vec3(-1.0, 0.0, 0.0); break;
+            case 2: hit.normal_g = vec3(0.0, -1.0, 0.0); break;
+            case 3: hit.normal_g = vec3(0.0, 0.0, -1.0); break;
+            case 4: hit.normal_g = vec3(1.0, 0.0, 0.0); break;
+            case 5: hit.normal_g = vec3(0.0, 1.0, 0.0); break;
+            case 6: hit.normal_g = vec3(0.0, 0.0, 1.0); break;
+        }
+        hit.normal_s = hit.normal_g;
+
         return hit;
     }
 

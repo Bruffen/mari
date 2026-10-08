@@ -34,6 +34,7 @@ namespace mari {
             std::unique_ptr<Image>                  presentImage;
             std::unique_ptr<Buffer>                 primMeshesInfosBuffer;
             std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
+            std::unique_ptr<Buffer>                 aabbBDAsBuffer;
             std::vector<LightInfo>                  lights;
             std::unique_ptr<Buffer>                 lightsBuffer;
             PiecewiseConstant1D                     lightsSampler;
@@ -65,6 +66,7 @@ namespace mari {
             std::unique_ptr<Pipeline>               pipeline{}; 
             std::unique_ptr<PipelineLayout>         pipelineLayout{};
             std::vector<PrimMeshInfo>               primMeshesInfos{};
+            std::vector<uint64_t>                   aabbBDAs{};
 
     };
 }

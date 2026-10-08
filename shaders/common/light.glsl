@@ -171,7 +171,7 @@ LiSample sample_Li_infinite(inout float pdf, vec2 random, LightInfo light) {
     dir = rotate_around_axis(dir, vec3(0.0f, 0.0f, 1.0f), -infinite_light.environment_rotation.x);
     dir = rotate_around_axis(dir, vec3(0.0f, 1.0f, 0.0f), -infinite_light.environment_rotation.y);
 
-    li_sample.wi = vec3(-dir.x, -dir.z, dir.y);
+    li_sample.wi = vec3(dir.x, dir.z, dir.y);
     li_sample.pdf = 1.0 / light.area;
     li_sample.distance = 10000.0;
 
@@ -179,7 +179,7 @@ LiSample sample_Li_infinite(inout float pdf, vec2 random, LightInfo light) {
 }
 
 vec3 sample_Le_infinite(vec3 direction, inout vec2 uv) {
-    vec3 dir = vec3(-direction.x, direction.z, -direction.y);
+    vec3 dir = vec3(direction.x, direction.z, direction.y);
     dir = rotate_around_axis(dir, vec3(0.0f, 0.0f, 1.0f),  infinite_light.environment_rotation.x);
     dir = rotate_around_axis(dir, vec3(0.0f, 1.0f, 0.0f), -infinite_light.environment_rotation.y);
     uv = equal_area_sphere_to_square(dir);

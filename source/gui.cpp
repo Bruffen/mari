@@ -233,9 +233,8 @@ namespace mari {
                 if (g.transform.scale.y == 0.0) g.transform.scale.y = 0.00001f;
                 if (g.transform.scale.z == 0.0) g.transform.scale.z = 0.00001f;
                 g.setVolumeTransform();
-            } else if (g.mesh) {
-                system.needsUpdate = true;
-
+            } 
+            else if (g.mesh) {
                 for (auto &primMesh : g.mesh->primMeshes) {
                     if (primMesh.material->isEmissive()) {
                         // Adjust emissiveness automatically with the scale change so that power is equal
@@ -248,6 +247,7 @@ namespace mari {
                     }
                 }
             }
+            system.needsUpdate = true;
         }
         if (g.mesh) {
             imGuiMesh(*g.mesh);

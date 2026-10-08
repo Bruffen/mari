@@ -69,7 +69,8 @@ namespace mari {
          * 5 -> Lights data uniform
          * 6 -> Volume data uniform
          * 7 -> Mesh information buffer
-         * 8 -> Textures buffer
+         * 8 -> AABB information buffer
+         * 9 -> Textures buffer
          */
         const uint32_t imageCount = static_cast<uint32_t>(scene->images.size() + scene->lightObjects.size());
         DescriptorSetLayout rayTracingSetLayout = DescriptorSetLayout::Builder(device)
@@ -81,12 +82,13 @@ namespace mari {
             .addBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
-            .addBinding(8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
+            .addBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR)
+            .addBinding(9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
                             // TODO if image count == 1, call VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER instead of variable descriptor
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC_CHIT);
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC_AHIT);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -107,7 +109,8 @@ namespace mari {
                 .writeBuffer(               5, lightUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               6, volumeUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               7, rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
-                .writeImages(               8, &textureDescriptors)
+                .writeBuffer(               8, rayTracingSystem.aabbBDAsBuffer->descriptorInfo())
+                .writeImages(               9, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
 
