@@ -78,27 +78,30 @@ namespace mari {
                         scene->cameraObjects.emplace_back(cam);
                         scene->currentCamera = scene->nodes.at("Camera");
                     }
+                    {
+                        std::shared_ptr<Node> cloud = std::make_shared<Node>("cloud");
+                        cloud->transform.position.y = 0.7f;
+                        cloud->transform.scale *= 0.005f;
+                        cloud->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
+                        //cloud->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
+                        //cloud->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
+                        cloud->volume->data.medium.scattering *= 6.0f;
+                        cloud->volume->data.jitteringAmount = 0.0f;
+                        cloud->volume->data.medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
+                        cloud->volume->data.medium.phaseFunction.particleSize = 20.0f;
+                        scene->addNode(cloud);
+                    }
+                    {
+                        std::shared_ptr<Node> fire = std::make_shared<Node>("fire");
+                        fire->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/fire.vdb");
+                        fire->transform.position.x = 1.0f;
+                        fire->transform.scale *= 0.005f;
+                        fire->volume->data.medium.absorption = 40.0f;
+                        fire->volume->data.medium.scattering = 10.0f;
+                        fire->volume->data.temperatureMultiplier = 1.5f;
+                        scene->addNode(fire);
+                    }
                     //window.resizeWindow(1024, 1024);
-
-                    scene->volumeObject = std::make_shared<Node>("volume");
-                    scene->volumeObject->transform.position.y = 0.7f;
-                    scene->volumeObject->transform.scale *= 0.005f;
-                    scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/wdas_cloud/wdas_cloud_eighth.vdb");
-                    //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/clouds_hr/cloud_cumulus_4_size_2.vdb");
-                    //scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/JangaFX - CloudPackVDB/CloudPack/CloudPackVDB/cloud_01_variant_0000.vdb");
-                    scene->volumeObject->volume->medium.scattering *= 6.0f;
-                    scene->volumeObject->volume->jitteringAmount = 0.0f;
-                    scene->volumeObject->volume->medium.phaseFunction.type = PhaseFunctionType::MieApproximation;
-                    scene->volumeObject->volume->medium.phaseFunction.particleSize = 20.0f;
-                    scene->addNode(scene->volumeObject);
-                    //{
-                    //    std::shared_ptr<Node> volume2 = std::make_shared<Node>("volume2");
-                    //    volume2->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb");
-                    //    volume2->transform.scale *= 0.005f;
-                    //    volume2->volume->medium.absorption = 50.0f;
-                    //    volume2->volume->medium.scattering = 50.0f;
-                    //    scene->addNode(volume2);
-                    //}
                     break;
                 case 10:
                     //scene->load("../../../../_Models/gltf/sketchfab/free_1975_porsche_911_930_turbo.glb");
@@ -141,12 +144,14 @@ namespace mari {
                     break;
                 case 18:
                     scene->load("../../../../_Models/gltf/thesis/smoke.glb");
-                    scene->volumeObject = std::make_shared<Node>("volume");
-                    scene->volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb");
-                    scene->volumeObject->transform.scale *= 0.005f;
-                    scene->volumeObject->volume->medium.absorption = 50.0f;
-                    scene->volumeObject->volume->medium.scattering = 50.0f;
-                    scene->addNode(scene->volumeObject);
+                    {
+                        std::shared_ptr<Node> volumeObject = std::make_shared<Node>("volume");
+                        volumeObject->volume = std::make_unique<Volume>(device, "../../../../_Models/volumes/explosion.vdb");
+                        volumeObject->transform.scale *= 0.005f;
+                        volumeObject->volume->data.medium.absorption = 50.0f;
+                        volumeObject->volume->data.medium.scattering = 50.0f;
+                        scene->addNode(volumeObject);
+                    }
                     break;
             }
             //scene->transform.rotation = glm::vec3(glm::radians(180.0f), 0.0f, 0.0f);

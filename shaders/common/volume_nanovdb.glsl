@@ -3,14 +3,17 @@
 
 #include "material.glsl"
 
-layout(binding = 6, set = 0, scalar) uniform Volume {
+struct Volume {
     uint64_t density_device_address;
     uint64_t temperature_device_address;
     Medium medium;
     float temperature_multiplier;
     float emissiveness_multiplier;
     float jittering_amount;
-} volume;
+};
+
+layout(buffer_reference, scalar) readonly buffer Volumes { Volume v[]; };
+layout(binding = 8, set = 0) buffer Volume_bdas { uint64_t addresses[]; } volume_bdas;
 
 layout(buffer_reference, scalar) readonly buffer PNanoVDBBuffer { uint p[]; };
 
@@ -27,6 +30,8 @@ struct VolumeNanoData {
 };
 
 struct VolumeNano {
+    uint64_t volume_bda;
+    Volume volume;
     VolumeNanoData density;
     VolumeNanoData temperature;
 } volume_nano;
@@ -58,18 +63,32 @@ VolumeNanoData initialize_volume_nano_data(uint64_t device_address) {
 }
 
 void initialize_volume_nano() {
-    if (volume.density_device_address > 0) {
-        volume_nano.density = initialize_volume_nano_data(volume.density_device_address);
+    // Get volume bda from aabb index
+    if (prd.instance_index - properties.volume_instance_offset < 0) return;
+    uint64_t volume_bda = volume_bdas.addresses[prd.instance_index - properties.volume_instance_offset];
+
+    // Check whether it's already cached
+    if (volume_nano.volume_bda == volume_bda) return;
+
+    volume_nano.volume_bda = volume_bda;
+    volume_nano.volume = Volumes(volume_nano.volume_bda).v[0 /*prd.primitive_index*/];
+
+    if (volume_nano.volume.density_device_address > 0) {
+        volume_nano.density = initialize_volume_nano_data(volume_nano.volume.density_device_address);
     }
-    if (volume.temperature_device_address > 0) {
-        volume_nano.temperature = initialize_volume_nano_data(volume.temperature_device_address);
+    if (volume_nano.volume.temperature_device_address > 0) {
+        volume_nano.temperature = initialize_volume_nano_data(volume_nano.volume.temperature_device_address);
     }
 }
 
-vec2 sample_volume_nano(vec3 position) {
+vec2 sample_volume_nano(vec3 position, vec3 jitter) {
+    initialize_volume_nano();
+    
     vec2 data = vec2(0.0);
 
-    if (volume.density_device_address > 0) {
+    position += jitter * volume_nano.volume.jittering_amount;  // TODO scale with voxel size -> pnanovdb_grid_get_voxel_size()
+
+    if (volume_nano.volume.density_device_address > 0) {
         vec3 index_space_position = pnanovdb_grid_world_to_indexf(volume_nano.density.buf, volume_nano.density.grid, position);
         pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(index_space_position);
         pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(
@@ -81,7 +100,7 @@ vec2 sample_volume_nano(vec3 position) {
         data.x = pnanovdb_read_float(volume_nano.density.buf, address);
     }
 
-    if (volume.temperature_device_address > 0) {
+    if (volume_nano.volume.temperature_device_address > 0) {
         vec3 index_space_position = pnanovdb_grid_world_to_indexf(volume_nano.temperature.buf, volume_nano.temperature.grid, position);
         pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(index_space_position);
         pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(

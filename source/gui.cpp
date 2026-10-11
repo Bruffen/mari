@@ -521,31 +521,39 @@ namespace mari {
 
         ImGuiSliderFlags silderFlags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange;
 
-        Medium m = volume.medium;
-        float temperature = volume.temperatureMultiplier;
-        float emissiveness = volume.emissivenessMultiplier;
-        float jittering = volume.jitteringAmount;
+        Medium m = volume.data.medium;
+        float temperature = volume.data.temperatureMultiplier;
+        float emissiveness = volume.data.emissivenessMultiplier;
+        float jittering = volume.data.jitteringAmount;
 
         ImGui::PushID("##volume");
         ImGui::Indent(20.0f);
 
-        imGuiMedium(volume.medium);
+        imGuiMedium(volume.data.medium);
         if (volume.hasTemperature()) {
-            ImGui::DragFloat("Temperature multiplier", (float*)&volume.temperatureMultiplier, 0.01f, 0.0f, 10000.0f);
-            ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.emissivenessMultiplier, 0.01f, 0.0f, 1000.0f);
+            ImGui::DragFloat("Temperature multiplier", (float*)&volume.data.temperatureMultiplier, 0.01f, 0.0f, 10000.0f);
+            ImGui::DragFloat("Emissiveness multiplier", (float*)&volume.data.emissivenessMultiplier, 0.01f, 0.0f, 1000.0f);
         }
-        ImGui::DragFloat("Jittering amount", (float*)&volume.jitteringAmount, 0.01f, 0.0f, 10000.0f);
+        ImGui::DragFloat("Jittering amount", (float*)&volume.data.jitteringAmount, 0.01f, 0.0f, 10000.0f);
 
 
         ImGui::Indent(-20.0f);
         ImGui::PopID();
 
-        if (m            != volume.medium                   ||
-            temperature  != volume.temperatureMultiplier    ||
-            emissiveness != volume.emissivenessMultiplier   ||
-            jittering    != volume.jitteringAmount
+        if (m            != volume.data.medium                   ||
+            temperature  != volume.data.temperatureMultiplier    ||
+            emissiveness != volume.data.emissivenessMultiplier   ||
+            jittering    != volume.data.jitteringAmount
         ) {
             inputChanged = true;
+
+            std::vector<VolumeData> volumes{};
+            for (auto const &[id, node] : scene->nodes) {
+                if (node->volume) {
+                    volumes.push_back(node->volume->data);
+                }
+            }
+            system.volumesBuffer->stageToBuffer((void*) volumes.data());
         }
     }
 

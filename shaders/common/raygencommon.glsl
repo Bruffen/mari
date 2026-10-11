@@ -18,6 +18,8 @@ MaterialConstants material;
 #include "common/tonemapping.glsl"
 #include "common/light.glsl"
 
+layout(location = 0) rayPayloadEXT Payload prd;
+
 layout(binding = 0, set = 0)            uniform accelerationStructureEXT tlas;
 layout(binding = 1, set = 0, rgba32f)   uniform image2D image;
 layout(binding = 2, set = 0, rgba8)     uniform image2D present_image;
@@ -34,6 +36,7 @@ layout(binding = 3, set = 0, scalar)    uniform Properties {
     bool  russian_roulette;
     bool  next_event_estimation;
     int   samples_per_pixel;
+    int   volume_instance_offset;
 } properties;
 
 #include "common/medium.glsl"

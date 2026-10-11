@@ -5,7 +5,6 @@
 
 //#define SPECTRAL
 
-layout(location = 0) rayPayloadEXT Payload prd;
 layout(location = 1) rayPayloadEXT ShadowVolumetricPayload shadow_prd;
 
 void main() {
@@ -21,8 +20,6 @@ void main() {
     float wavelength_max = 830.0f;
     prd.wavelengths = random3D(prd.seed) * (wavelength_max - wavelength_min) + wavelength_min; 
 #endif
-
-    initialize_participating_media(); // TODO make it a #define so non volumetric path tracer does not need to allocate media stuff
 
     for (int sample_count = 0; sample_count < properties.samples_per_pixel; sample_count++) {
         const vec2 pixel_jitter = random2D(prd.seed);
@@ -44,6 +41,7 @@ void main() {
             traceRayEXT(tlas, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, origin, tmin, direction, tmax, 0);
             
             Hit hit;
+            hit.material.medium.heterogeneous = false;
             hit.material.medium.absorption = 0;
             hit.material.medium.scattering = 0; // TODO zero valued hit object
             
@@ -52,9 +50,10 @@ void main() {
                 hit         = process_hit(prd);
                 material    = hit.material;
                 hit_surface = true;
-                if (prd.barycentrics.x < 0) { //TODO duplicate from process_hit
+                if (hit.hit_kind == HitKind_AABB) { //TODO duplicate from process_hit
+                    initialize_volume_nano();
                     hit.position = origin + direction * hit.t;
-                    hit.material.medium = volume.medium;
+                    hit.material.medium = volume_nano.volume.medium;
                 }
             }
             vec3 wo;
@@ -143,9 +142,6 @@ void main() {
                 if (bxdf_sample.failed) {
                     break;
                 }
-
-                // TODO directly multiply transmittance if not using a multiple scattering medium technique like delta tracking
-                // ie when absorption is higher than zero, but scattering is zero
 
                 // Set values for next ray
                 throughput    *= hit.material.albedo.rgb;

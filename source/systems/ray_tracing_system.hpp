@@ -35,6 +35,8 @@ namespace mari {
             std::unique_ptr<Buffer>                 primMeshesInfosBuffer;
             std::unique_ptr<Buffer>                 pPrimMeshesInfosBuffer;
             std::unique_ptr<Buffer>                 aabbBDAsBuffer;
+            std::unique_ptr<Buffer>                 volumesBuffer;
+            std::unique_ptr<Buffer>                 pVolumesBuffer;
             std::vector<LightInfo>                  lights;
             std::unique_ptr<Buffer>                 lightsBuffer;
             PiecewiseConstant1D                     lightsSampler;
@@ -52,6 +54,7 @@ namespace mari {
             int                                     transmittanceAlgo     = 0;
             int                                     mediumIntegrator      = false;
             int                                     samplesPerPixel       = 1;
+            int                                     volumeInstanceOffset  = 0;
         private:
             void                                    createImages(uint32_t width, uint32_t height);
             void                                    buildAreaLights(const Scene &scene);
@@ -67,6 +70,6 @@ namespace mari {
             std::unique_ptr<PipelineLayout>         pipelineLayout{};
             std::vector<PrimMeshInfo>               primMeshesInfos{};
             std::vector<uint64_t>                   aabbBDAs{};
-
+            std::vector<VolumeData>                 volumes;
     };
 }

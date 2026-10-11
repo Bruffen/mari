@@ -40,16 +40,18 @@ struct Hit {
     int   material_type;
     uint64_t material_bda;
     MaterialConstants material;
+    uint  hit_kind;
 };
+
+#define HitKind_Triangle 0
+#define HitKind_AABB     1
 
 layout(buffer_reference, scalar) readonly buffer PrimMeshInfos { PrimMeshInfo p[]; };
 layout(buffer_reference, scalar) readonly buffer Vertices      { Vertex v[];       };
 layout(buffer_reference, scalar) readonly buffer Indices       { uint i[];         };
 layout(buffer_reference, scalar) readonly buffer Materials     { MaterialData m[]; };
-layout(buffer_reference, scalar) readonly buffer AABBs         { AABB a[]; };
 
-layout(binding = 7, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
-layout(binding = 8, set = 0) buffer AABB_bdas { uint64_t addresses[]; } aabb_bdas;
+layout(binding = 6, set = 0) buffer PPrimMeshInfos { uint64_t addresses[]; } pPrimMeshInfos;
 layout(binding = 9, set = 0) uniform sampler2D textures[];
 
 // Technique by Carsten Wächter and Nikolaus Binder 
@@ -115,9 +117,10 @@ MaterialConstants process_material(MaterialData data, vec4 color, vec2 uv) {
 Hit process_hit(Payload payload) {
     Hit hit;
     hit.t = payload.t;
+    hit.hit_kind = payload.hit_kind;
 
     /* Procedural hit group for NanoVDB */
-    if (payload.barycentrics.x < 0) { //nanovdb aabb TODO perhaps add a hitKind variable
+    if (hit.hit_kind == HitKind_AABB) {
         hit.material_type = MaterialType_Boundary;
 
         int face = int(payload.barycentrics.z);

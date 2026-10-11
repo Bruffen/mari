@@ -56,8 +56,6 @@ namespace mari {
             infiniteLightUboBuffers[i]->map();
             lightUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(LightUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
             lightUboBuffers[i]->map();
-            volumeUboBuffers[i] = std::make_unique<Buffer>(device, sizeof(VolumeUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-            volumeUboBuffers[i]->map();
         }
 
         /* TODO create different descriptor set for stuff that doesn't change every frame
@@ -67,9 +65,9 @@ namespace mari {
          * 3 -> Path tracing properties uniform
          * 4 -> Environment map data uniform
          * 5 -> Lights data uniform
-         * 6 -> Volume data uniform
-         * 7 -> Mesh information buffer
-         * 8 -> AABB information buffer
+         * 6 -> Mesh information buffer
+         * 7 -> AABB information buffer
+         * 8 -> Volume information buffer
          * 9 -> Textures buffer
          */
         const uint32_t imageCount = static_cast<uint32_t>(scene->images.size() + scene->lightObjects.size());
@@ -77,18 +75,18 @@ namespace mari {
             .addBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE             , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .addBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR)
             .addBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .addBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-            .addBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
-            .addBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR)
+            .addBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
+            .addBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_INTERSECTION_BIT_KHR)
+            .addBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER            , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
             .addBinding(9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER    , VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 
                             // TODO if image count == 1, call VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER instead of variable descriptor
                             imageCount, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) 
             .build();
         
-        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC_AHIT);
+        rayTracingSystem.buildPipeline(rayTracingSetLayout.handle(), Integrator::PATH_TRACING_VOLUMETRIC_CHIT);
 
         std::vector<VkDescriptorImageInfo> textureDescriptors{};
         for (auto &image : scene->images) {
@@ -107,9 +105,9 @@ namespace mari {
                 .writeBuffer(               3, rayTracingUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               4, infiniteLightUboBuffers[i]->descriptorInfo())
                 .writeBuffer(               5, lightUboBuffers[i]->descriptorInfo())
-                .writeBuffer(               6, volumeUboBuffers[i]->descriptorInfo())
-                .writeBuffer(               7, rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
-                .writeBuffer(               8, rayTracingSystem.aabbBDAsBuffer->descriptorInfo())
+                .writeBuffer(               6, rayTracingSystem.pPrimMeshesInfosBuffer->descriptorInfo())
+                .writeBuffer(               7, rayTracingSystem.aabbBDAsBuffer->descriptorInfo())
+                .writeBuffer(               8, rayTracingSystem.pVolumesBuffer->descriptorInfo())
                 .writeImages(               9, &textureDescriptors)
                 .build(rayTracingDescriptorSets[i]);
         }
@@ -199,6 +197,7 @@ namespace mari {
                 ubo.mediumIntegrator      = rayTracingSystem.mediumIntegrator;
                 ubo.transmittanceAlgo     = rayTracingSystem.transmittanceAlgo;
                 ubo.samplesPerPixel       = rayTracingSystem.samplesPerPixel;
+                ubo.volumeInstanceOffset  = rayTracingSystem.volumeInstanceOffset;
                 rayTracingUboBuffers[frameIndex]->writeToBuffer(&ubo);
                 rayTracingUboBuffers[frameIndex]->flush();
 
@@ -230,19 +229,6 @@ namespace mari {
                 lightUboBuffers[frameIndex]->writeToBuffer(&lightUbo);
                 lightUboBuffers[frameIndex]->flush();
 
-                if (scene->volumeObject) {
-                    VolumeUbo volumeUbo = {
-                        scene->volumeObject->volume->getDensityDeviceAddress(),
-                        scene->volumeObject->volume->getTemperatureDeviceAddress(),
-                        scene->volumeObject->volume->medium,
-                        scene->volumeObject->volume->temperatureMultiplier,
-                        scene->volumeObject->volume->emissivenessMultiplier,
-                        scene->volumeObject->volume->jitteringAmount
-                    };
-                    volumeUboBuffers[frameIndex]->writeToBuffer(&volumeUbo);
-                    volumeUboBuffers[frameIndex]->flush();
-                }
-
                 // render
                 rayTracingSystem.render(frameInfo, renderer.getSwapchain());
 
@@ -256,12 +242,6 @@ namespace mari {
 
                 renderer.endFrame();        
 
-/*
-                if (frameCounter == 32) {
-                    vkDeviceWaitIdle(device.handle());
-                    gui->saveImage(*rayTracingSystem.presentImage);
-                }
-*/
                 if (window.wasWindowResized()) { // TODO make this cleaner
                     window.resetWindowsResizedFlag();
                     frameCounter = 0; // TODO put each one in one place;

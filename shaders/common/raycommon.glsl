@@ -11,6 +11,7 @@ struct Payload {
     int primitive_index;        // Triangle
     float t;
     vec3 barycentrics;
+    uint hit_kind;
     mat4x3 world_to_object;
     mat4x3 object_to_world;
     uint seed;

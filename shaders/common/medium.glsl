@@ -20,7 +20,7 @@ Medium get_medium_error() {
 }
 
 void initialize_participating_media() {
-    initialize_volume_nano();
+    //initialize_volume_nano();
 
     // Initialize stack with mediums that will show an error color if they get incorrectly sampled
     for (int i = 0; i < MAX_MEDIA; i++) {
@@ -118,11 +118,11 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, inout uint see
         return MediumSample(medium.albedo, medium.absorption, medium.scattering, vec3(0.0));
     }
 
-    vec3  jitter      = (2.0 * random3D(seed) - 1.0) * volume.jittering_amount; // TODO scale with voxel size -> pnanovdb_grid_get_voxel_size()
-    vec2  sample_data = sample_volume_nano(position + jitter);
+    vec3  jitter      = (2.0 * random3D(seed) - 1.0);
+    vec2  sample_data = sample_volume_nano(position, jitter);
 	float density     = sample_data.x;
-	float temperature = max(sample_data.y * volume.temperature_multiplier, 0.0);
-    float intensity   = M_stefan_boltzmann * pow(temperature, 4) * volume.emissiveness_multiplier;
+	float temperature = max(sample_data.y * volume_nano.volume.temperature_multiplier, 0.0);
+    float intensity   = M_stefan_boltzmann * pow(temperature, 4) * volume_nano.volume.emissiveness_multiplier;
 
     MediumSample medium_sample;
     medium_sample.sigma_a  = min(medium.absorption * density, medium.absorption);

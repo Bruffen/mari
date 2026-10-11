@@ -8,9 +8,9 @@ namespace mari {
     bool isOpenvdbInitialized = false; // TODO static member
 
     Volume::Volume(Device &device, std::string filepath) {
-        medium.absorption = 0.0f;
-        medium.scattering = 1.0f;
-        medium.heterogeneous = true;
+        data.medium.absorption = 0.0f;
+        data.medium.scattering = 1.0f;
+        data.medium.heterogeneous = true;
 
         if (!isOpenvdbInitialized) {
             openvdb::initialize(); 
@@ -45,8 +45,8 @@ namespace mari {
         } while (densityIter.next());
 
         // Adjust sigma values to correspond to density range
-        medium.absorption *= maxDensity;
-        medium.scattering *= maxDensity;
+        data.medium.absorption *= maxDensity;
+        data.medium.scattering *= maxDensity;
 
         // Normalize the density if needed
         if (maxDensity != 1.0f && maxDensity > 0.0f) {
@@ -88,6 +88,7 @@ namespace mari {
         );
 
         nanoDensityBuffer->stageToBuffer(densityGridHandle.buffer().data());
+        data.densityBufferBDA = nanoDensityBuffer->deviceAddress();
 
         if (temperature) {
             const openvdb::FloatGrid::Ptr temperatureGridData = openvdb::gridPtrCast<openvdb::FloatGrid>(temperature);
@@ -106,6 +107,7 @@ namespace mari {
             );
 
             nanoTemperatureBuffer->stageToBuffer(temperatureGridHandle.buffer().data());
+            data.temperatureBufferBDA = nanoTemperatureBuffer->deviceAddress();
         }
     }
 

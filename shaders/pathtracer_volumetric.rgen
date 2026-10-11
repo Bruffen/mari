@@ -5,7 +5,6 @@
 
 #include "common/raygencommon.glsl"
 
-layout(location = 0) rayPayloadEXT Payload prd;
 layout(location = 1) rayPayloadEXT ShadowVolumetricPayload shadow_prd;
 
 void main() {
@@ -270,11 +269,12 @@ void main() {
                             stmin = 0.0;
                             stmax = shadow_tmax;
 
-                            if (test_intersection_volume_nano(origin, li_sample.wi, stmin, stmax)) {
-                                medium_push(volume.medium);
-                                li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed);
-                                medium_remove();
-                            }
+                            // TODO
+                            //if (test_intersection_volume_nano(origin, li_sample.wi, stmin, stmax)) {
+                            //    medium_push(volume.medium);
+                            //    li_transmittance *= sample_transmittance_along_ray(origin, li_sample.wi, stmin, stmax, prd.seed);
+                            //    medium_remove();
+                            //}
 
                             float mis_weight = power_heuristic(li_sample.pdf, scatter_pdf);
                             radiance += throughput * li_transmittance * li_sample.radiance * mis_weight * scatter_f / li_sample.pdf;

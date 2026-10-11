@@ -31,10 +31,14 @@ namespace mari {
     }
 
     void RayTracingSystem::buildScene(const Scene &scene) {
+        volumeInstanceOffset = 0;
+
         // TODO reuse the same blas if the node's geometry is the same
         for (auto const &[id, node] : scene.nodes) {
             if (node->mesh) {
                 buildBLAS(node, scene.materialDataBuffer->deviceAddress());
+
+                volumeInstanceOffset++;
             }
 
             if (node->volume) {
@@ -63,7 +67,7 @@ namespace mari {
 
         pPrimMeshesInfosBuffer = std::make_unique<Buffer>(
             device,
-            sizeof(uint64_t) * pPrimMeshesAdresses.size(),
+            sizeof(uint64_t) * pPrimMeshesAdresses.size(), // TODO seperate size and count
             1,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -71,9 +75,13 @@ namespace mari {
         );
         pPrimMeshesInfosBuffer->stageToBuffer((void*) pPrimMeshesAdresses.data());
 
+        std::vector<uint64_t> pVolumes{};
+
         // Add dummy aabb to create an "empty" buffer
         if (aabbBDAs.size() == 0) {
             aabbBDAs.push_back(0);
+            volumes.push_back({});
+            pVolumes.push_back(0);
         }
 
         aabbBDAsBuffer = std::make_unique<Buffer>(
@@ -85,6 +93,37 @@ namespace mari {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
         aabbBDAsBuffer->stageToBuffer((void*) aabbBDAs.data());
+
+        volumesBuffer = std::make_unique<Buffer>(
+            device,
+            sizeof(VolumeData) * volumes.size(),
+            1,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+        volumesBuffer->stageToBuffer((void*) volumes.data());
+
+        uint64_t address = volumesBuffer->deviceAddress();
+        for (auto const &[id, node] : scene.nodes) {
+            if (node->volume) {
+                int count = 1; // node->volume.count
+                for (int i = 0; i < count; i++) {
+                    pVolumes.push_back(address);
+                }
+                address += sizeof(VolumeData);
+            }
+        }
+
+        pVolumesBuffer = std::make_unique<Buffer>(
+            device,
+            sizeof(uint64_t) * volumes.size(),
+            1,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+        pVolumesBuffer->stageToBuffer((void*) pVolumes.data());
 
         buildTLAS();
         buildAreaLights(scene);
@@ -180,6 +219,7 @@ namespace mari {
             pBuildRangeInfos.push_back(&buildRangeInfos.back());
 
             aabbBDAs.push_back(node->volume->getAabbPositionsDeviceAddress());
+            volumes.push_back(node->volume->data);
         }
         
         blas->build(geometries.data(), static_cast<uint32_t>(geometries.size()), primitiveCounts.data(), pBuildRangeInfos.data());

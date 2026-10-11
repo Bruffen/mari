@@ -10,6 +10,15 @@
 
 namespace mari {
 
+    struct VolumeData {
+        uint64_t densityBufferBDA;
+        uint64_t temperatureBufferBDA;
+        Medium medium;
+        float temperatureMultiplier  = 1.0f;
+        float emissivenessMultiplier = 1.0f;
+        float jitteringAmount        = 0.01f;
+    };
+
     class Volume {
         public:
             Volume(Device &device, std::string filepath);
@@ -22,10 +31,7 @@ namespace mari {
 
             void setTransform(const Transform &transform);
 
-            Medium medium;
-            float temperatureMultiplier     = 1.0f;
-            float emissivenessMultiplier    = 1.0f;
-            float jitteringAmount           = 0.01f;
+            VolumeData data{};
             VkAabbPositionsKHR aabb{};
         private:
             openvdb::GridBase::Ptr  density;

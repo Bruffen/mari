@@ -37,6 +37,7 @@ namespace mari {
         VkBool32 russianRoulette;
         VkBool32 nextEventEstimation;
         int samplesPerPixel;
+        int volumeInstanceOffset;
     };
 
     struct InfiniteLightUbo {
@@ -58,15 +59,6 @@ namespace mari {
         uint64_t cdfBufferAddress;
         float    integral;
         int      size;
-    };
-
-    struct VolumeUbo {
-        uint64_t densityBufferBDA;
-        uint64_t temperatureBufferBDA;
-        Medium medium;
-        float temperatureMultiplier;
-        float emissivenessMultiplier;
-        float jitteringAmount;
     };
 
     struct FrameInfo {

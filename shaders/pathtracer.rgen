@@ -3,7 +3,6 @@
 
 #include "common/raygencommon.glsl"
 
-layout(location = 0) rayPayloadEXT Payload prd;
 layout(location = 1) rayPayloadEXT ShadowPayload shadow_prd;
 
 void main() {

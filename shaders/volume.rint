@@ -6,12 +6,28 @@
 #extension GL_EXT_scalar_block_layout                       : require
 #extension GL_EXT_nonuniform_qualifier                      : require
 
+layout(binding = 3, set = 0, scalar) uniform Properties {
+    mat4  view_inverse;
+    mat4  proj_inverse;
+    int   frame_count;
+    int   max_depth;
+    float exposure;
+    int   tonemapper;
+    int   medium_integrator;
+    int   transmittance_algo;
+    bool  frame_accumulation;
+    bool  russian_roulette;
+    bool  next_event_estimation;
+    int   samples_per_pixel;
+    int   volume_instance_offset; // TODO uniform for this value only
+} properties;
+
 struct AABB {
     vec3 min;
     vec3 max;
 };
 
-layout(binding = 8, set = 0) buffer AABB_bdas { uint64_t addresses[]; } aabb_bdas;
+layout(binding = 7, set = 0) buffer AABB_bdas { uint64_t addresses[]; } aabb_bdas;
 layout(buffer_reference, scalar) readonly buffer AABBs { AABB a[]; };
 
 hitAttributeEXT vec2 attribs;
@@ -61,7 +77,7 @@ void main() {
 
     float t = -1.0;
 
-    uint64_t aabb_bda = aabb_bdas.addresses[gl_GeometryIndexEXT];
+    uint64_t aabb_bda = aabb_bdas.addresses[gl_InstanceID - properties.volume_instance_offset];
     AABB aabb = AABBs(aabb_bda).a[0];
 
     // Transform points from local to world positions
@@ -75,6 +91,6 @@ void main() {
     uint face;
     if (intersect_aabb(aabb, gl_WorldRayOriginEXT, gl_WorldRayDirectionEXT, t, face)) {
         attribs.y = float(face);
-        reportIntersectionEXT(t, 0);
+        reportIntersectionEXT(t, 1);
     }
 }

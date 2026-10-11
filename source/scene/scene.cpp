@@ -154,9 +154,7 @@ namespace mari {
     }
 
     // Calculate matrices whether they're static nodes or not
-    void Scene::start() {
-        volumeObjects.emplace_back(volumeObject);
-        
+    void Scene::start() {        
         for (auto& g : topNodes) {
             g->start(transform.mat4());
         }
