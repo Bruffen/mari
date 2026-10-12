@@ -67,10 +67,11 @@ PhaseFunctionSample pf_rayleigh_sample(vec3 wo, vec2 random) {
 }
 
 float pf_rayleigh_scattering_coefficient(float wavelength) {
+    wavelength *= 0.001;
     float ior = 1.000293;
     float sigma_s = 8.0 * pow(M_PI, 3) * pow(pow(ior, 2) - 1.0, 2);
     sigma_s /= 3.0 * 1.2250 * pow(wavelength, 4);
-    return sigma_s;
+    return sigma_s / 0.0014; // Normalize function so its maxium value becomes 1.0
 }
 
 /****************************************************************

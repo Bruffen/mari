@@ -348,7 +348,7 @@ namespace mari {
                 shadersMiss.push_back("../../shaders/spv/pathtracer.rmiss.spv");
                 break;
             case Integrator::PATH_TRACING_VOLUMETRIC_AHIT:
-                shadersRayGeneration.push_back("../../shaders/spv/pathtracer_volumetric.rgen.spv");
+                shadersRayGeneration.push_back("../../shaders/spv/pathtracer_volumetric_ahit.rgen.spv");
 
                 shadersClosestHit.push_back("../../shaders/spv/pathtracer.rchit.spv");
                 shadersAnyHit.push_back("../../shaders/spv/pathtracer.rahit.spv");

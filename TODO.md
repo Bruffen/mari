@@ -14,7 +14,7 @@
 - [x] Set opaque meshes
 - [x] Update acceleration structure on transform changes
 - [x] Rebuild acceleration structure on material changes
-- [ ] Update/rebuild light importance sampling on envmap or emissive changes
+- [x] Update/rebuild light importance sampling on envmap or emissive changes
 - [x] Move all logic to ray generation shaders
 
 ## Path Tracing
@@ -37,11 +37,15 @@
 - [x] NanoVDB
 - [x] Mesh bounded volumes
 - [x] Importance sampling
-- [ ] Transmittance estimators:
+- [ ] Free-flight estimators:
   - [ ] Ray marching
+  - [x] Delta tracking
+  - [x] Decomposition tracking
+- [ ] Transmittance estimators:
+  - [x] Ray marching
   - [ ] Unbiased Ray marching
   - [x] Delta tracking
-  - [ ] Ratio tracking
+  - [x] Ratio tracking
 - [ ] Phase functions:
     - [x] Isotropic
     - [ ] Rayleigh 

@@ -32,6 +32,13 @@ void medium_push(Medium medium) {
     if (current_medium >= MAX_MEDIA - 1) return;
 
     current_medium++;
+
+#ifdef SPECTRAL
+    if (medium.phase_function.type == PhaseFunctionType_Rayleigh) {
+        medium.scattering = pf_rayleigh_scattering_coefficient(wavelengths.x) * medium.scattering;
+    }
+#endif
+
     media[current_medium] = medium;
 }
 
@@ -129,6 +136,12 @@ MediumSample sample_medium(vec3 position, vec3 wo, Medium medium, inout uint see
     medium_sample.sigma_s  = min(medium.scattering * density, medium.scattering);
     medium_sample.albedo   = medium.albedo;
     medium_sample.emission = blackbody(temperature) * intensity;
+
+#ifdef SPECTRAL
+    // Convert rbg2spec coefficients to spectral quantities of the wavelength triplet
+    medium_sample.albedo   = rgb2spec_eval(wavelengths, medium_sample.albedo);
+    medium_sample.emission = rgb2spec_eval(wavelengths, medium_sample.emission);
+#endif
 
     return medium_sample;
 }

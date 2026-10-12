@@ -10,6 +10,10 @@
 #include "common/spectral.glsl"
 #include "common/material.glsl"
 
+#ifdef VOLUMETRIC
+#include "common/volume_nanovdb.glsl"
+#endif
+
 struct PrimMeshInfo {
     uint64_t vertices_bda;
     uint64_t indices_bda;
@@ -41,6 +45,8 @@ struct Hit {
     uint64_t material_bda;
     MaterialConstants material;
     uint  hit_kind;
+    bool  is_backface;
+    bool  is_emissive;
 };
 
 #define HitKind_Triangle 0
@@ -81,6 +87,13 @@ vec3 offset_position(vec3 position, vec3 normal)
     );
 }
 
+void flip_orientation(inout Hit hit) {
+    hit.normal_g  = -hit.normal_g;
+    hit.normal_s  = -hit.normal_s;
+    hit.tangent   = -hit.tangent;
+    hit.bitangent = -hit.bitangent;
+}
+
 MaterialData get_material(uint64_t bda) {
     return Materials(bda).m[0];
 }
@@ -114,14 +127,16 @@ MaterialConstants process_material(MaterialData data, vec4 color, vec2 uv) {
     return mc;
 }
 
-Hit process_hit(Payload payload) {
+Hit process_hit(Payload payload, vec3 origin, vec3 direction) {
     Hit hit;
     hit.t = payload.t;
     hit.hit_kind = payload.hit_kind;
 
+#ifdef VOLUMETRIC
     /* Procedural hit group for NanoVDB */
     if (hit.hit_kind == HitKind_AABB) {
         hit.material_type = MaterialType_Boundary;
+        hit.position = origin + direction * hit.t;
 
         int face = int(payload.barycentrics.z);
         switch (face) {
@@ -134,9 +149,13 @@ Hit process_hit(Payload payload) {
         }
         hit.normal_s = hit.normal_g;
 
+        initialize_volume_nano();
+        hit.material.medium = volume_nano.volume.medium;
+        hit.is_backface = dot(direction, hit.normal_g) > 0.0;
+
         return hit;
     }
-
+#endif
     /* Triangle hit group */
     // Get necessary buffers to get triangle information 
     uint64_t mesh_bda  = pPrimMeshInfos.addresses[payload.instance_index];
@@ -179,6 +198,8 @@ Hit process_hit(Payload payload) {
     hit.material = process_material(material_data, hit_color, hit_uv);
     hit.material_type = get_material_type(hit.material);
     hit.material_bda = prim_mesh.material_bda;
+    hit.is_backface = dot(direction, hit.normal_g) > 0.0;
+    hit.is_emissive = hit.material.emission.a > 0.0;
 
     // Apply normal mapping
     if (material_data.indices.normal > -1) {
@@ -196,14 +217,16 @@ Hit process_hit(Payload payload) {
         hit.bitangent = cross(hit.normal_s, hit.tangent);
     }
 
-    return hit;
-}
+    // Render backfaces
+    if (hit.is_backface && hit.material_type != MaterialType_Dielectric && hit.material_type != MaterialType_Boundary) {
+        flip_orientation(hit);
+    }
 
-void flip_orientation(inout Hit hit) {
-    hit.normal_g  = -hit.normal_g;
-    hit.normal_s  = -hit.normal_s;
-    hit.tangent   = -hit.tangent;
-    hit.bitangent = -hit.bitangent;
+    if (hit.is_emissive && !hit.material.double_sided_emission) {
+        hit.is_emissive = !hit.is_backface;
+    }
+
+    return hit;
 }
 
 #endif // _HIT_COMMON_GLSL_

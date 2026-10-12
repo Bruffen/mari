@@ -46,7 +46,7 @@ void main() {
                 break;
             }
 
-            Hit hit = process_hit(prd);
+            Hit hit = process_hit(prd, origin, direction);
             material = hit.material; // TODO remove global material
             const float distance = length(hit.position - origin);
             const bool is_backface = dot(direction, hit.normal_g) > 0.0;
@@ -169,25 +169,5 @@ void main() {
         result += radiance;
     }
 
-    result /= properties.samples_per_pixel;
-
-    if (isnan(result.r) || isnan(result.g) || isnan(result.b)) result = ERROR_COLOR;
-    if (isinf(result.r) || isinf(result.g) || isinf(result.b)) result = ERROR_COLOR;
-
-    if (properties.frame_accumulation) {
-        // Load existing accumulated color
-        vec4 previous_color = vec4(0.0);
-        if (properties.frame_count > 0) {
-            previous_color = imageLoad(image, ivec2(gl_LaunchIDEXT.xy));
-        }
-
-        // Calculate new average color
-        float avg = 1.0 / (properties.frame_count + 1.0);
-        result = (result + previous_color.rgb * properties.frame_count) * avg;
-        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(result, 1.0));
-    }
-
-    // Apply tone mapping
-    vec3 tonemapped_color = apply_tonemapping(properties.tonemapper, result, properties.exposure);
-    imageStore(present_image, ivec2(gl_LaunchIDEXT.xy), vec4(tonemapped_color, 1.0));
+    accumulate_result(result);
 }
